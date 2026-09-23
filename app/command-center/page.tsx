@@ -1,2 +1,58 @@
-import { Activity,ArrowUpRight,ClipboardCheck,Plus,ShieldAlert } from "lucide-react"; import Link from "next/link"; import { GlassPanel,MetricCard,PageHeader,StatusBadge } from "@/components/ui/Primitives";
-export default function CommandCenter(){return <div><PageHeader eyebrow="COMMAND CENTER" title="Operational overview" description="A focused view of clients, engagements, evidence, reports and actions across the PieroloOS workspace." action={<Link href="/clients/new" className="inline-flex items-center gap-2 rounded-xl bg-[#d9ae4a] px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-[#f0d28a]"><Plus size={17}/> New intake</Link>}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Active clients" value="0" detail="No records yet"/><MetricCard label="Engagements" value="0" detail="Awaiting first engagement"/><MetricCard label="Reports" value="0" detail="Generated reports"/><MetricCard label="Compliance" value="—" detail="No obligations tracked"/></div><div className="mt-4 grid gap-4 xl:grid-cols-[1.4fr_.9fr]"><GlassPanel><div className="flex items-center justify-between"><div><h2 className="font-semibold">Operational workflow</h2><p className="mt-1 text-xs text-slate-500">The initial service loop.</p></div><StatusBadge tone="info">Foundation</StatusBadge></div><div className="mt-6 space-y-3">{[["Client Intake","Capture structured facts and constraints."],["Business Profile","Convert intake into reusable business data."],["Jurisdiction Lens","Compare options with evidence and confidence."],["Formation Roadmap","Translate objectives into ordered steps."],["Compliance","Track obligations and completion."],["Report Generator","Produce reviewable client-facing outputs."]].map(([a,b],i)=><div key={a} className="flex gap-4 rounded-xl border border-white/8 bg-white/[.02] p-4"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[#d9ae4a]/20 text-xs gold-text">0{i+1}</div><div><div className="text-sm font-medium">{a}</div><div className="mt-1 text-xs text-slate-500">{b}</div></div><ArrowUpRight size={15} className="ml-auto text-slate-600"/></div>)}</div></GlassPanel><div className="space-y-4"><GlassPanel><div className="flex items-center gap-3"><ShieldAlert size={18} className="text-amber-300"/><div><h2 className="font-semibold">Outstanding actions</h2><p className="text-xs text-slate-500">Nothing requires attention.</p></div></div></GlassPanel><GlassPanel><div className="flex items-center gap-3"><Activity size={18} className="text-cyan-300"/><div><h2 className="font-semibold">Recent activity</h2><p className="text-xs text-slate-500">Activity timeline will populate as work begins.</p></div></div></GlassPanel><GlassPanel><div className="flex items-center gap-3"><ClipboardCheck size={18} className="text-violet-300"/><div><h2 className="font-semibold">System readiness</h2><p className="text-xs text-slate-500">Shell and core navigation initialized.</p></div></div></GlassPanel></div></div></div>}
+import Link from "next/link";
+import { ArrowUpRight, Database, FileCheck2, ShieldCheck, Workflow } from "lucide-react";
+import { GlassPanel, MetricCard, PageHeader, SectionHeader, StatusBadge } from "@/components/ui/primitives";
+import { productModules } from "@/lib/navigation";
+
+export default function CommandCenterPage() {
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="EXECUTIVE OPERATING VIEW"
+        title="Command Center"
+        description="A single operational surface for clients, engagements, evidence, workflows, and professional-service delivery."
+        actions={<Link href="/clients/new" className="button button-primary">New client</Link>}
+      />
+
+      <div className="metric-grid">
+        <MetricCard label="Active clients" value="0" detail="Awaiting first operational record" tone="gold" />
+        <MetricCard label="Engagements" value="0" detail="No active engagements yet" tone="violet" />
+        <MetricCard label="Reports" value="0" detail="Report engine initialized" tone="cyan" />
+        <MetricCard label="Compliance" value="Ready" detail="Control layer initialized" tone="gold" />
+      </div>
+
+      <div className="dashboard-grid">
+        <GlassPanel>
+          <SectionHeader title="Operational loop" description="The initial PieroloOS workflow is now represented as connected modules." />
+          <div className="workflow-list">
+            {productModules.map((module, index) => (
+              <Link href={module.href} className="workflow-row" key={module.key}>
+                <div className="workflow-index">{String(index + 1).padStart(2, "0")}</div>
+                <div className="workflow-copy">
+                  <strong>{module.label}</strong>
+                  <span>{module.status === "operational" ? "Operational foundation" : "Domain foundation ready"}</span>
+                </div>
+                <ArrowUpRight size={17} />
+              </Link>
+            ))}
+          </div>
+        </GlassPanel>
+
+        <div className="stack">
+          <GlassPanel>
+            <SectionHeader title="System state" />
+            <div className="state-list">
+              <div><span><Database size={16} /> Data architecture</span><StatusBadge tone="success">Ready</StatusBadge></div>
+              <div><span><ShieldCheck size={16} /> Authority model</span><StatusBadge tone="success">Defined</StatusBadge></div>
+              <div><span><FileCheck2 size={16} /> Evidence layer</span><StatusBadge tone="success">Defined</StatusBadge></div>
+              <div><span><Workflow size={16} /> Workflow engine</span><StatusBadge tone="info">Foundation</StatusBadge></div>
+            </div>
+          </GlassPanel>
+          <GlassPanel>
+            <SectionHeader title="Recent activity" />
+            <div className="empty-inline">No activity has been recorded yet. New client and engagement actions will appear here.</div>
+          </GlassPanel>
+        </div>
+      </div>
+    </div>
+  );
+}
