@@ -1,18 +1,15 @@
-import { createClient, getClientById, listClients } from '@/lib/db/client-repository';
-import { clientIntakeSchema } from '@/lib/validation/client';
+import { clientRepository } from "../db/client-repository";
+import { clientIntakeSchema } from "../validation/client";
 
-export async function createClientFromIntake(input: unknown) {
-  const data = clientIntakeSchema.parse(input);
-
-  return createClient({
-    organizationId: data.organizationId,
-    workspaceId: data.workspaceId,
-    name: data.name,
-    email: data.email,
-    country: data.country,
-    proposedBusiness: data.proposedBusiness,
-    intakeData: data.intakeData,
-  });
-}
-
-export { getClientById, listClients };
+export const clientService = {
+  async create(input: unknown) {
+    const data = clientIntakeSchema.parse(input);
+    return clientRepository.create({ organizationId: data.organizationId, workspaceId: data.workspaceId, name: data.founderName, email: data.email, country: data.country, proposedBusiness: data.proposedBusiness, intakeData: data });
+  },
+  get(id: string) {
+    return clientRepository.findById(id);
+  },
+  list(workspaceId: string) {
+    return clientRepository.listByWorkspace(workspaceId);
+  },
+};
