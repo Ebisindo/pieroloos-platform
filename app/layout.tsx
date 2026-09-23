@@ -1,3 +1,25 @@
-import "./globals.css"; import type { ReactNode } from "react"; import { AppShell } from "@/components/shell/AppShell";
-export const metadata={title:"PIEROLOOS — Corporate Intelligence & Formation Platform",description:"Professional operating environment for structured corporate service workflows."};
-export default function RootLayout({children}:{children:ReactNode}){return <html lang="en"><body><div className="cosmic-field" aria-hidden="true"/><AppShell>{children}</AppShell></body></html>}
+import type { Metadata } from "next";
+import "./globals.css";
+import { AppShell } from "@/components/shell/AppShell";
+import { BootLayer } from "@/components/shell/BootLayer";
+
+export const metadata: Metadata = {
+  title: {
+    default: "PieroloOS",
+    template: "%s | PieroloOS",
+  },
+  description:
+    "Corporate Intelligence & Formation Platform for structured business formation, compliance, research, and professional-service workflows.",
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en">
+      <body>
+        <BootLayer>
+          <AppShell>{children}</AppShell>
+        </BootLayer>
+      </body>
+    </html>
+  );
+}
