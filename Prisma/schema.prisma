@@ -1,1 +1,15 @@
-
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+generator client { provider = "prisma-client-js" }
+enum EvidenceClass { E0 E1 E2 E3 E4 }
+enum EngagementStatus { DRAFT ACTIVE ON_HOLD COMPLETED ARCHIVED }
+enum ComplianceStatus { NOT_STARTED IN_PROGRESS COMPLETE BLOCKED }
+model Organization { id String @id @default(cuid()) name String workspaces Workspace[] users User[] clients Client[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model User { id String @id @default(cuid()) organizationId String organization Organization @relation(fields:[organizationId], references:[id]) name String email String @unique role String @default("member") createdAt DateTime @default(now()) }
+model Workspace { id String @id @default(cuid()) organizationId String organization Organization @relation(fields:[organizationId], references:[id]) name String clients Client[] engagements Engagement[] createdAt DateTime @default(now()) }
+model Client { id String @id @default(cuid()) organizationId String organization Organization @relation(fields:[organizationId], references:[id]) workspaceId String workspace Workspace @relation(fields:[workspaceId], references:[id]) name String email String? country String? proposedBusiness String? intakeData Json? businessProfile BusinessProfile? engagements Engagement[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model BusinessProfile { id String @id @default(cuid()) clientId String @unique client Client @relation(fields:[clientId], references:[id]) data Json createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model Engagement { id String @id @default(cuid()) workspaceId String workspace Workspace @relation(fields:[workspaceId], references:[id]) clientId String client Client @relation(fields:[clientId], references:[id]) service String status EngagementStatus @default(DRAFT) nextAction String? notes String? activities Activity[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model Activity { id String @id @default(cuid()) engagementId String engagement Engagement @relation(fields:[engagementId], references:[id]) type String summary String metadata Json? createdAt DateTime @default(now()) }
+model Source { id String @id @default(cuid()) title String url String? sourceType String publicationDate DateTime? retrievedAt DateTime? evidence Evidence[] }
+model Evidence { id String @id @default(cuid()) sourceId String? source Source? evidenceClass EvidenceClass confidence Int? reviewStatus String? notes String? subjectType String subjectId String createdAt DateTime @default(now()) }
+model ComplianceItem { id String @id @default(cuid()) engagementId String? category String title String status ComplianceStatus @default(NOT_STARTED) dueAt DateTime? jurisdiction String? evidenceId String? }
