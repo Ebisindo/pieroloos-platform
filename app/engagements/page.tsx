@@ -1,1 +1,13 @@
-import { GlassPanel,PageHeader } from "@/components/ui/Primitives"; export default function Page(){return <><PageHeader eyebrow="ENGAGEMENTS" title="Engagements" description="This module is scaffolded for the next vertical implementation slice."/><GlassPanel><div className="py-14 text-center text-sm text-slate-500">Foundation state — no records yet.</div></GlassPanel></>}
+import { PageHeader, EmptyState } from "@/components/ui/primitives";
+
+export default function Page() {
+  return (
+    <div className="page-stack">
+      <PageHeader eyebrow="SERVICE DELIVERY" title="Engagements" description="Manage professional-service engagements, next actions, activity, and completion state." />
+      <EmptyState
+        title="Engagements workspace is initialized"
+        description="The application shell and domain foundation are ready. The next implementation slice will connect this module to persistent application data."
+      />
+    </div>
+  );
+}
