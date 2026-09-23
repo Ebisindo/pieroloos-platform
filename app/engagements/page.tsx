@@ -1,1 +1,1 @@
-
+import { GlassPanel,PageHeader } from "@/components/ui/Primitives"; export default function Page(){return <><PageHeader eyebrow="ENGAGEMENTS" title="Engagements" description="This module is scaffolded for the next vertical implementation slice."/><GlassPanel><div className="py-14 text-center text-sm text-slate-500">Foundation state — no records yet.</div></GlassPanel></>}
