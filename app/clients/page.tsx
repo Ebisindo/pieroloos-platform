@@ -1,1 +1,13 @@
-import Link from "next/link"; import { PageHeader,GlassPanel } from "@/components/ui/Primitives"; export default function Clients(){return <><PageHeader eyebrow="CLIENTS" title="Client registry" description="Structured client records will become the system-of-record for engagements." action={<Link href="/clients/new" className="rounded-xl bg-[#d9ae4a] px-4 py-2.5 text-sm font-semibold text-slate-950">Create client</Link>}/><GlassPanel><div className="py-14 text-center"><div className="text-sm font-medium">No clients yet</div><p className="mx-auto mt-2 max-w-md text-xs leading-5 text-slate-500">Start with a structured intake. Later, the same record will feed the business profile, jurisdiction analysis and engagement workflow.</p></div></GlassPanel></>}
+import { PageHeader, EmptyState } from "@/components/ui/primitives";
+
+export default function Page() {
+  return (
+    <div className="page-stack">
+      <PageHeader eyebrow="CLIENT OPERATIONS" title="Clients" description="Structured client records and intake workflows." />
+      <EmptyState
+        title="Clients workspace is initialized"
+        description="The application shell and domain foundation are ready. The next implementation slice will connect this module to persistent application data."
+      />
+    </div>
+  );
+}
