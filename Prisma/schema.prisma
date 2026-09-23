@@ -1,15 +1,318 @@
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
-generator client { provider = "prisma-client-js" }
-enum EvidenceClass { E0 E1 E2 E3 E4 }
-enum EngagementStatus { DRAFT ACTIVE ON_HOLD COMPLETED ARCHIVED }
-enum ComplianceStatus { NOT_STARTED IN_PROGRESS COMPLETE BLOCKED }
-model Organization { id String @id @default(cuid()) name String workspaces Workspace[] users User[] clients Client[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model User { id String @id @default(cuid()) organizationId String organization Organization @relation(fields:[organizationId], references:[id]) name String email String @unique role String @default("member") createdAt DateTime @default(now()) }
-model Workspace { id String @id @default(cuid()) organizationId String organization Organization @relation(fields:[organizationId], references:[id]) name String clients Client[] engagements Engagement[] createdAt DateTime @default(now()) }
-model Client { id String @id @default(cuid()) organizationId String organization Organization @relation(fields:[organizationId], references:[id]) workspaceId String workspace Workspace @relation(fields:[workspaceId], references:[id]) name String email String? country String? proposedBusiness String? intakeData Json? businessProfile BusinessProfile? engagements Engagement[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model BusinessProfile { id String @id @default(cuid()) clientId String @unique client Client @relation(fields:[clientId], references:[id]) data Json createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model Engagement { id String @id @default(cuid()) workspaceId String workspace Workspace @relation(fields:[workspaceId], references:[id]) clientId String client Client @relation(fields:[clientId], references:[id]) service String status EngagementStatus @default(DRAFT) nextAction String? notes String? activities Activity[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model Activity { id String @id @default(cuid()) engagementId String engagement Engagement @relation(fields:[engagementId], references:[id]) type String summary String metadata Json? createdAt DateTime @default(now()) }
-model Source { id String @id @default(cuid()) title String url String? sourceType String publicationDate DateTime? retrievedAt DateTime? evidence Evidence[] }
-model Evidence { id String @id @default(cuid()) sourceId String? source Source? evidenceClass EvidenceClass confidence Int? reviewStatus String? notes String? subjectType String subjectId String createdAt DateTime @default(now()) }
-model ComplianceItem { id String @id @default(cuid()) engagementId String? category String title String status ComplianceStatus @default(NOT_STARTED) dueAt DateTime? jurisdiction String? evidenceId String? }
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum EvidenceClass {
+  E0
+  E1
+  E2
+  E3
+  E4
+}
+
+enum EngagementStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum ComplianceStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETE
+  BLOCKED
+}
+
+enum RoadmapStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETE
+  BLOCKED
+  SKIPPED
+}
+
+enum ReportStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  ARCHIVED
+}
+
+model Organization {
+  id           String       @id @default(cuid())
+  name         String
+  workspaces   Workspace[]
+  users        User[]
+  clients      Client[]
+  documents    Document[]
+  auditEvents  AuditEvent[]
+  jurisdictions Jurisdiction[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  email          String       @unique
+  role           String       @default("member")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  auditEvents    AuditEvent[]
+}
+
+model Workspace {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  clients        Client[]
+  engagements    Engagement[]
+  documents      Document[]
+  reports        Report[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([organizationId])
+}
+
+model Client {
+  id              String          @id @default(cuid())
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId     String
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  email           String?
+  country         String?
+  proposedBusiness String?
+  intakeData      Json?
+  businessProfile BusinessProfile?
+  engagements     Engagement[]
+  documents       Document[]
+  reports         Report[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([organizationId])
+  @@index([workspaceId])
+}
+
+model BusinessProfile {
+  id         String   @id @default(cuid())
+  clientId   String   @unique
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  data       Json
+  version    Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Engagement {
+  id           String             @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service      String
+  status       EngagementStatus   @default(DRAFT)
+  nextAction   String?
+  notes        String?
+  activities   Activity[]
+  roadmap      FormationRoadmap?
+  compliance   ComplianceItem[]
+  documents    Document[]
+  reports      Report[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([clientId])
+}
+
+model Activity {
+  id           String      @id @default(cuid())
+  engagementId String
+  engagement   Engagement  @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  type         String
+  summary      String
+  metadata     Json?
+  createdAt    DateTime    @default(now())
+
+  @@index([engagementId, createdAt])
+}
+
+model Source {
+  id              String      @id @default(cuid())
+  title           String
+  url             String?
+  sourceType      String
+  publicationDate DateTime?
+  retrievedAt     DateTime    @default(now())
+  evidence        Evidence[]
+  createdAt       DateTime    @default(now())
+}
+
+model Evidence {
+  id            String        @id @default(cuid())
+  sourceId      String?
+  source        Source?       @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  evidenceClass EvidenceClass
+  confidence    Int?
+  reviewStatus  String?
+  notes         String?
+  subjectType   String
+  subjectId     String
+  createdAt     DateTime      @default(now())
+
+  @@index([subjectType, subjectId])
+  @@index([sourceId])
+}
+
+model Jurisdiction {
+  id             String                  @id @default(cuid())
+  organizationId String?
+  organization   Organization?           @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  name           String
+  countryCode    String?
+  profile        Json?
+  reviewDate     DateTime?
+  criteria       JurisdictionCriterion[]
+  observations   JurisdictionObservation[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+}
+
+model JurisdictionCriterion {
+  id             String        @id @default(cuid())
+  jurisdictionId String
+  jurisdiction   Jurisdiction   @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
+  key            String
+  label          String
+  weight         Float          @default(1)
+  createdAt      DateTime       @default(now())
+
+  @@unique([jurisdictionId, key])
+}
+
+model JurisdictionObservation {
+  id             String       @id @default(cuid())
+  jurisdictionId String
+  jurisdiction   Jurisdiction @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
+  criterionKey   String
+  value          Float
+  evidenceIds    String[]
+  assumptions    String[]
+  reviewRequired Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([jurisdictionId, criterionKey])
+}
+
+model FormationRoadmap {
+  id           String         @id @default(cuid())
+  engagementId String         @unique
+  engagement   Engagement     @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  title        String
+  status       RoadmapStatus  @default(NOT_STARTED)
+  steps        FormationStep[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model FormationStep {
+  id          String         @id @default(cuid())
+  roadmapId   String
+  roadmap     FormationRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  stage       String
+  title       String
+  description String?
+  order       Int
+  required    Boolean        @default(true)
+  status      RoadmapStatus  @default(NOT_STARTED)
+  completedAt DateTime?
+
+  @@unique([roadmapId, order])
+}
+
+model ComplianceItem {
+  id           String           @id @default(cuid())
+  engagementId String?
+  engagement   Engagement?      @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  category     String
+  title        String
+  status       ComplianceStatus @default(NOT_STARTED)
+  dueAt        DateTime?
+  jurisdiction String?
+  evidenceId   String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([engagementId, status])
+  @@index([dueAt])
+}
+
+model Document {
+  id           String       @id @default(cuid())
+  organizationId String
+  workspaceId  String
+  clientId     String?
+  engagementId String?
+  name         String
+  documentType String
+  storageKey   String
+  mimeType     String?
+  sizeBytes    Int?
+  metadata     Json?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client       Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  engagement   Engagement?  @relation(fields: [engagementId], references: [id], onDelete: SetNull)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([organizationId, workspaceId])
+}
+
+model Report {
+  id           String        @id @default(cuid())
+  workspaceId  String
+  clientId     String?
+  engagementId String?
+  title        String
+  status       ReportStatus  @default(DRAFT)
+  content      Json
+  disclaimer   String
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client       Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  engagement   Engagement?   @relation(fields: [engagementId], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model AuditEvent {
+  id           String   @id @default(cuid())
+  organizationId String
+  userId       String?
+  action       String
+  entityType   String
+  entityId     String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+}
