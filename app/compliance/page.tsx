@@ -1,13 +1,21 @@
-import { PageHeader, EmptyState } from "@/components/ui/primitives";
+import { ComplianceControlCenter } from "@/components/compliance/ComplianceControlCenter";
+import type { ComplianceControlSnapshot } from "@/lib/domain/compliance-control";
 
-export default function Page() {
+export default function CompliancePage() {
+  const snapshot: ComplianceControlSnapshot = {
+    generatedAt: new Date(),
+    portfolioStatus: "HEALTHY",
+    progressPercent: 0,
+    totals: {
+      obligations: 0, compliant: 0, dueSoon: 0, overdue: 0,
+      blocked: 0, awaitingEvidence: 0, awaitingReview: 0,
+    },
+    alerts: [],
+  };
+
   return (
-    <div className="page-stack">
-      <PageHeader eyebrow="CONTROL" title="Compliance" description="Track obligations, completion state, jurisdiction context, and future deadlines." />
-      <EmptyState
-        title="Compliance workspace is initialized"
-        description="The application shell and domain foundation are ready. The next implementation slice will connect this module to persistent application data."
-      />
-    </div>
+    <main className="mx-auto max-w-7xl p-6">
+      <ComplianceControlCenter snapshot={snapshot} />
+    </main>
   );
 }
