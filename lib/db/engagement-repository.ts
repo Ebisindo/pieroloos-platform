@@ -1,16 +1,46 @@
-import { prisma } from "./prisma";
+import { prisma } from "@/lib/db/prisma";
 
 export const engagementRepository = {
-  findById(id: string) {
-    return prisma.engagement.findUnique({ where: { id }, include: { client: true, activities: { orderBy: { createdAt: "desc" } } } });
+  async findById(id: string) {
+    return prisma.engagement.findUnique({
+      where: { id },
+      include: {
+        client: { include: { businessProfile: true } },
+        activities: { orderBy: { createdAt: "desc" } },
+      },
+    });
   },
-  listByWorkspace(workspaceId: string) {
-    return prisma.engagement.findMany({ where: { workspaceId }, orderBy: { updatedAt: "desc" }, include: { client: true } });
+
+  async listByClient(clientId: string) {
+    return prisma.engagement.findMany({
+      where: { clientId },
+      orderBy: { updatedAt: "desc" },
+      include: { activities: { orderBy: { createdAt: "desc" }, take: 10 } },
+    });
   },
-  create(input: { workspaceId: string; clientId: string; service: string; nextAction?: string; notes?: string }) {
-    return prisma.engagement.create({ data: input });
+
+  async create(data: {
+    clientId: string; service: string; ownerId?: string;
+    nextAction?: string; notes?: string;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const engagement = await tx.engagement.create({
+        data: { ...data, status: "INTAKE" },
+      });
+      await tx.activity.create({
+        data: {
+          engagementId: engagement.id,
+          type: "CREATED",
+          title: "Engagement created",
+          description: `Engagement opened for ${data.service}.`,
+          actorId: data.ownerId,
+        },
+      });
+      return engagement;
+    });
   },
-  update(id: string, data: { service?: string; status?: "DRAFT" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED"; nextAction?: string; notes?: string }) {
+
+  async update(id: string, data: Record<string, unknown>) {
     return prisma.engagement.update({ where: { id }, data });
   },
 };
