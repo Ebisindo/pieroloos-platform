@@ -16,10 +16,22 @@ export async function POST(request: Request) {
 
     const client = await createClientFromIntake(parsed.data);
 
-    return NextResponse.json({ data: client }, { status: 201 });
-  } catch {
     return NextResponse.json(
-      { error: "Unable to create client from intake." },
+      {
+        data: {
+          ...client,
+          legalName: client.name,
+        },
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error
+          ? error.message
+          : "Unable to create client from intake.",
+      },
       { status: 500 },
     );
   }
