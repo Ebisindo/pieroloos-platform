@@ -1,0 +1,9 @@
+PieroloOS replacement package
+
+Repository: Ebisindo/pieroloos-platform
+Baseline CI run: #222
+Baseline commit: b3dc6eb106e051d03ac1b1339da63027d894c6bb
+
+This ZIP is a targeted replacement set for the current CI/typecheck failures.
+It is intentionally not presented as a full repository archive.
+See REPLACE-INSTRUCTIONS.md before copying files.

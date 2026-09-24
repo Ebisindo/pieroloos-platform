@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -16,7 +16,7 @@
     "db:migrate": "prisma migrate dev"
   },
   "dependencies": {
-    "@prisma/client": "latest",
+    "@prisma/client": "6.19.3",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
@@ -28,7 +28,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "prisma": "latest",
+    "prisma": "6.19.3",
     "tailwindcss": "latest",
     "typescript": "latest",
     "vitest": "latest",
