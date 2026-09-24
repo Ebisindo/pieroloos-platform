@@ -1,15 +1,21 @@
-import { clientRepository } from "../db/client-repository";
-import { clientIntakeSchema } from "../validation/client";
+import { clientRepository } from "@/lib/db/client-repository";
+import { clientIntakeSchema, type ClientIntakeInput } from "@/lib/validation/intake";
 
 export const clientService = {
   async create(input: unknown) {
     const data = clientIntakeSchema.parse(input);
-    return clientRepository.create({ organizationId: data.organizationId, workspaceId: data.workspaceId, name: data.founderName, email: data.email, country: data.country, proposedBusiness: data.proposedBusiness, intakeData: data });
+    return clientRepository.createFromIntake(data);
   },
+
   get(id: string) {
     return clientRepository.findById(id);
   },
+
   list(workspaceId: string) {
     return clientRepository.listByWorkspace(workspaceId);
   },
 };
+
+export async function createClient(input: ClientIntakeInput) {
+  return clientRepository.createFromIntake(clientIntakeSchema.parse(input));
+}
