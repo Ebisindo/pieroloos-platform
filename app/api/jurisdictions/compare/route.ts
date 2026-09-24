@@ -3,4 +3,37 @@ import { jurisdictionRepository } from "@/lib/db/jurisdiction-repository";
 import { comparisonRepository } from "@/lib/db/comparison-repository";
 import { compareJurisdictions } from "@/lib/services/jurisdiction-engine";
 import { comparisonRequestSchema } from "@/lib/validation/jurisdiction";
-export async function POST(req:Request){try{const p=comparisonRequestSchema.safeParse(await req.json());if(!p.success)return NextResponse.json({error:"Invalid comparison request",issues:p.error.flatten()},{status:422});const all=await jurisdictionRepository.list();const js=all.filter(x=>p.data.jurisdictionIds.includes(x.id)).map(x=>({id:x.id,code:x.code,name:x.name,region:x.region??undefined,profileSummary:x.profileSummary??undefined,factors:x.factors.map(f=>({criterionKey:f.criterionKey,value:f.normalizedScore,normalizedScore:f.normalizedScore,evidenceClass:f.evidenceClass as never,sourceIds:f.sourceIds,confidence:f.confidence,reviewRequired:f.reviewRequired,notes:f.notes??undefined}))}));const results=compareJurisdictions(p.data,js);const snapshot=await comparisonRepository.create({businessProfileId:p.data.businessProfileId,methodologyVersion:p.data.methodologyVersion,criteriaJson:p.data.criteria,jurisdictionIds:p.data.jurisdictionIds,resultsJson:results});return NextResponse.json({data:{snapshot,results}},{status:201});}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Comparison failed."},{status:400});}}
+
+export async function POST(req: Request) {
+  try {
+    const parsed = comparisonRequestSchema.safeParse(await req.json());
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid comparison request", issues: parsed.error.flatten() },
+        { status: 422 },
+      );
+    }
+
+    const jurisdictions = await jurisdictionRepository.list();
+    const results = compareJurisdictions(parsed.data, jurisdictions);
+
+    const snapshot = await comparisonRepository.create({
+      businessProfileId: parsed.data.businessProfileId,
+      methodologyVersion: parsed.data.methodologyVersion,
+      criteriaJson: parsed.data.criteria,
+      jurisdictionIds: parsed.data.jurisdictionIds,
+      resultsJson: results,
+    });
+
+    return NextResponse.json(
+      { data: { snapshot, results } },
+      { status: 201 },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Comparison failed." },
+      { status: 400 },
+    );
+  }
+}
