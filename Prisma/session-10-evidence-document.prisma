@@ -1,0 +1,87 @@
+// ADDITIVE SESSION 10 SCHEMA.
+// Merge into the established prisma/schema.prisma.
+// Preserve existing datasource, generator and relations.
+
+enum DocumentReviewStatus {
+  UNREVIEWED
+  IN_REVIEW
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+}
+
+enum DocumentType {
+  FORMATION
+  COMPLIANCE
+  IDENTITY
+  TAX
+  BANKING
+  CONTRACT
+  LICENSE
+  REPORT
+  SOURCE
+  OTHER
+}
+
+enum EvidenceClass {
+  E0
+  E1
+  E2
+  E3
+  E4
+}
+
+model Document {
+  id String @id @default(cuid())
+  organizationId String
+  clientId String?
+  engagementId String?
+  complianceObligationId String?
+
+  name String
+  description String?
+  documentType DocumentType
+  mimeType String
+  sizeBytes Int
+  storageKey String
+
+  source String?
+  sourceType String?
+  publicationDate DateTime?
+  retrievedAt DateTime?
+
+  evidenceClass EvidenceClass @default(E0)
+  confidence Float @default(0)
+  reviewStatus DocumentReviewStatus @default(UNREVIEWED)
+
+  version Int @default(1)
+  contentHash String
+  previousVersionId String?
+
+  uploadedByUserId String
+  reviewedByUserId String?
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, clientId])
+  @@index([organizationId, engagementId])
+  @@index([organizationId, complianceObligationId])
+  @@index([contentHash])
+  @@index([reviewStatus])
+}
+
+model DocumentAuditEvent {
+  id String @id @default(cuid())
+  organizationId String
+  documentId String
+  actorUserId String
+  action String
+  metadata Json?
+  occurredAt DateTime @default(now())
+
+  @@index([organizationId, documentId, occurredAt])
+  @@index([actorUserId, occurredAt])
+}
