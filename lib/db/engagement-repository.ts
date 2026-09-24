@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import type { Prisma } from "@prisma/client";
 
 export const engagementRepository = {
   async findById(id: string) {
@@ -20,27 +21,42 @@ export const engagementRepository = {
   },
 
   async create(data: {
-    clientId: string; service: string; ownerId?: string;
-    nextAction?: string; notes?: string;
+    clientId: string;
+    service: string;
+    ownerId?: string;
+    nextAction?: string;
+    notes?: string;
   }) {
     return prisma.$transaction(async (tx) => {
-      const engagement = await tx.engagement.create({
-        data: { ...data, status: "INTAKE" },
+      const client = await tx.client.findUniqueOrThrow({
+        where: { id: data.clientId },
+        select: { workspaceId: true },
       });
+
+      const engagement = await tx.engagement.create({
+        data: {
+          workspaceId: client.workspaceId,
+          clientId: data.clientId,
+          service: data.service,
+          status: "DRAFT",
+          nextAction: data.nextAction,
+          notes: data.notes,
+        },
+      });
+
       await tx.activity.create({
         data: {
           engagementId: engagement.id,
           type: "CREATED",
-          title: "Engagement created",
-          description: `Engagement opened for ${data.service}.`,
-          actorId: data.ownerId,
+          summary: `Engagement opened for ${data.service}.`,
         },
       });
+
       return engagement;
     });
   },
 
-  async update(id: string, data: Record<string, unknown>) {
+  async update(id: string, data: Prisma.EngagementUpdateInput) {
     return prisma.engagement.update({ where: { id }, data });
   },
 };
