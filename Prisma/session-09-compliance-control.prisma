@@ -1,0 +1,63 @@
+// ADDITIVE SESSION 09 SCHEMA.
+// Merge into the existing prisma/schema.prisma. Do not replace it.
+
+enum EscalationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum EscalationStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  CANCELLED
+}
+
+model ComplianceEscalation {
+  id String @id @default(cuid())
+  organizationId String
+  obligationId String
+  level Int
+  reason String
+  status EscalationStatus @default(OPEN)
+  actorUserId String?
+  acknowledgedAt DateTime?
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status])
+  @@index([obligationId, createdAt])
+}
+
+model ComplianceNotification {
+  id String @id @default(cuid())
+  organizationId String
+  obligationId String?
+  recipientUserId String?
+  channel EscalationChannel
+  subject String
+  body String
+  scheduledFor DateTime
+  sentAt DateTime?
+  failedAt DateTime?
+  failureReason String?
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, scheduledFor])
+  @@index([scheduledFor, sentAt])
+}
+
+model ComplianceEscalationPolicy {
+  id String @id @default(cuid())
+  organizationId String
+  name String
+  enabled Boolean @default(true)
+  overdueAfterDays Int @default(3)
+  maxLevel Int @default(3)
+  notifyChannels Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, enabled])
+}
