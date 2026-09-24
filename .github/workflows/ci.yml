@@ -7,6 +7,8 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/pieroloos_ci
 
     steps:
       - name: Checkout
@@ -16,9 +18,16 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Validate Prisma schema
+        run: npm run db:validate
 
       - name: Typecheck
         run: npm run typecheck
