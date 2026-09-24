@@ -1,5 +1,8 @@
 import { z } from "zod";
-
-export const jurisdictionCriterionSchema = z.object({ key: z.string().min(1), label: z.string().min(1), weight: z.number().min(0) });
-export const jurisdictionObservationSchema = z.object({ jurisdictionId: z.string().min(1), criterionKey: z.string().min(1), value: z.number(), evidenceIds: z.array(z.string()), assumptions: z.array(z.string()), reviewRequired: z.boolean() });
-export const jurisdictionComparisonSchema = z.object({ criteria: z.array(jurisdictionCriterionSchema), observations: z.array(jurisdictionObservationSchema) });
+export const evidenceClassSchema=z.enum(["E0","E1","E2","E3","E4"]);
+export const jurisdictionCreateSchema=z.object({code:z.string().trim().min(2).max(20),name:z.string().trim().min(2).max(160),region:z.string().trim().max(120).optional(),profileSummary:z.string().trim().max(5000).optional()});
+export const criterionSchema=z.object({key:z.string().trim().regex(/^[a-z0-9_]+$/),name:z.string().trim().min(2).max(120),description:z.string().trim().max(1000),weight:z.number().min(0).max(100)});
+export const factorSchema=z.object({jurisdictionId:z.string().min(1),criterionKey:z.string().min(1),normalizedScore:z.number().min(0).max(100).nullable().optional(),evidenceClass:evidenceClassSchema,sourceIds:z.array(z.string()).default([]),confidence:z.number().min(0).max(100),reviewRequired:z.boolean().default(true),notes:z.string().trim().max(3000).optional()});
+export const evidenceCreateSchema=z.object({jurisdictionId:z.string().min(1),title:z.string().trim().min(2).max(240),sourceType:z.string().trim().min(2).max(100),sourceUrl:z.string().url().optional(),publicationDate:z.string().optional(),retrievedAt:z.string().datetime(),evidenceClass:evidenceClassSchema,reviewStatus:z.enum(["UNREVIEWED","REVIEWED","EXPIRED"]).default("UNREVIEWED"),notes:z.string().trim().max(3000).optional()});
+export const comparisonRequestSchema=z.object({jurisdictionIds:z.array(z.string().min(1)).min(1).max(50),criteria:z.array(criterionSchema).min(1).max(50),methodologyVersion:z.string().min(1).max(50).default("1.0"),businessProfileId:z.string().optional()});
+export type ComparisonRequest=z.infer<typeof comparisonRequestSchema>;
