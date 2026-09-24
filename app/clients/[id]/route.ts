@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { clientRepository } from "@/lib/db/client-repository";
-import { businessProfileService } from "@/lib/services/business-profile-service";
 
 type Context = { params: Promise<{ id: string }> };
 
