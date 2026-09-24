@@ -1,0 +1,3 @@
+import type { Jurisdiction } from "@/lib/domain/jurisdiction";
+import { EvidenceBadge } from "./EvidenceBadge";
+export function JurisdictionCard({jurisdiction}:{jurisdiction:Jurisdiction}){const e=jurisdiction.factors[0];return <article className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300/70">{jurisdiction.code}</p><h2 className="mt-2 text-lg font-semibold text-white">{jurisdiction.name}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{jurisdiction.profileSummary||"No profile summary available."}</p></div>{e&&<EvidenceBadge evidenceClass={e.evidenceClass}/>}</div></article>;}
