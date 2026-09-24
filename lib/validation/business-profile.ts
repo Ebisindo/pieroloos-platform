@@ -1,15 +1,16 @@
 import { z } from "zod";
 
-export const businessProfileSchema = z.object({
-  clientId: z.string().min(1),
-  businessIdentity: z.string().trim().optional(),
-  businessModel: z.string().trim().optional(),
-  targetMarket: z.string().trim().optional(),
-  revenueModel: z.string().trim().optional(),
-  ownership: z.string().trim().optional(),
-  expansionObjectives: z.array(z.string().trim()).default([]),
-  fundingStage: z.string().trim().optional(),
-  risksAndConstraints: z.array(z.string().trim()).default([]),
-  strategicNotes: z.string().trim().optional(),
-  operationalContext: z.string().trim().optional(),
+export const businessProfileUpdateSchema = z.object({
+  businessName: z.string().trim().max(200).optional(),
+  businessModel: z.string().trim().max(5000).optional(),
+  targetMarket: z.string().trim().max(5000).optional(),
+  revenueModel: z.string().trim().max(5000).optional(),
+  ownership: z.string().trim().max(5000).optional(),
+  expansionObjectives: z.string().trim().max(5000).optional(),
+  fundingStage: z.string().trim().max(5000).optional(),
+  riskConstraints: z.string().trim().max(5000).optional(),
+  strategicNotes: z.string().trim().max(5000).optional(),
+  operationalContext: z.string().trim().max(5000).optional(),
 });
+
+export type BusinessProfileUpdateInput = z.infer<typeof businessProfileUpdateSchema>;
