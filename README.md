@@ -1,5 +1,10 @@
-# PieroloOS
+# PieroloOS package-lock correction
 
-Corporate Intelligence & Formation Platform for PieroloCorp International LLC.
+This package deliberately does NOT contain a fake package-lock.json.
 
-Deployment validation baseline.
+The repository currently has no lockfile, and the package manifest resolves
+multiple dependencies from `latest`. npm must perform the real dependency
+resolution to produce the integrity and transitive dependency metadata needed
+for `npm ci`.
+
+See `package-lock-generation-instructions.txt`.
