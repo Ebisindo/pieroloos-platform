@@ -1,0 +1,10 @@
+{
+  "session": "10",
+  "title": "Evidence & Document Intelligence / Persistent Compliance Evidence System",
+  "file_count": 18,
+  "merge_strategy": "additive",
+  "architecture": "Document -> Evidence Intelligence -> Compliance Control Center",
+  "integrity": "SHA-256",
+  "storage": "PostgreSQL metadata + S3-compatible object storage",
+  "production_note": "Authenticate, authorize, scan, verify checksum, persist, audit and serve documents through controlled adapters."
+}
