@@ -25,13 +25,13 @@
   },
   "devDependencies": {
     "@playwright/test": "latest",
+    "@tailwindcss/postcss": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "prisma": "6.19.3",
     "tailwindcss": "latest",
     "typescript": "latest",
-    "vitest": "latest",
-    "@tailwindcss/postcss": "latest"
+    "vitest": "latest"
   }
 }
