@@ -1,0 +1,53 @@
+// Merge into the existing schema; do not overwrite Session 05.
+model Jurisdiction {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  region String?
+  profileSummary String?
+  factors JurisdictionFactor[]
+  evidence JurisdictionEvidence[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model JurisdictionFactor {
+  id String @id @default(cuid())
+  jurisdictionId String
+  criterionKey String
+  normalizedScore Float?
+  evidenceClass String @default("E0")
+  sourceIds String[]
+  confidence Int @default(0)
+  reviewRequired Boolean @default(true)
+  notes String?
+  jurisdiction Jurisdiction @relation(fields:[jurisdictionId],references:[id],onDelete:Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([jurisdictionId,criterionKey])
+}
+model JurisdictionEvidence {
+  id String @id @default(cuid())
+  jurisdictionId String
+  title String
+  sourceType String
+  sourceUrl String?
+  publicationDate DateTime?
+  retrievedAt DateTime
+  evidenceClass String @default("E0")
+  reviewStatus String @default("UNREVIEWED")
+  notes String?
+  jurisdiction Jurisdiction @relation(fields:[jurisdictionId],references:[id],onDelete:Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([jurisdictionId,reviewStatus])
+}
+model JurisdictionComparison {
+  id String @id @default(cuid())
+  businessProfileId String?
+  methodologyVersion String
+  criteriaJson String
+  jurisdictionIdsJson String
+  resultsJson String
+  createdAt DateTime @default(now())
+  @@index([businessProfileId,createdAt])
+}
