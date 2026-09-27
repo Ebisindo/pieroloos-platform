@@ -1,0 +1,129 @@
+// Merge into the existing Session 06 Prisma schema.
+// Preserve existing Client, BusinessProfile and JurisdictionComparison models.
+
+model WorkingJurisdictionDecision {
+  id                            String   @id @default(cuid())
+  businessProfileId             String
+  comparisonSnapshotId          String
+  jurisdictionId                String
+  rationale                     String?
+  decidedByUserId               String
+  decidedAt                     DateTime @default(now())
+  professionalReviewRequired    Boolean  @default(true)
+  professionalReviewCompleted   Boolean  @default(false)
+
+  formationPlans FormationPlan[]
+
+  @@index([businessProfileId])
+  @@index([comparisonSnapshotId])
+  @@index([jurisdictionId])
+}
+
+model FormationPlan {
+  id                            String   @id @default(cuid())
+  clientId                      String
+  businessProfileId             String
+  comparisonSnapshotId          String
+  workingJurisdictionDecisionId String
+  jurisdictionId                String
+  jurisdictionName              String
+  methodologyVersion            String
+  status                        String   @default("DRAFT")
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  workingJurisdictionDecision WorkingJurisdictionDecision @relation(fields: [workingJurisdictionDecisionId], references: [id])
+  stages                       FormationStage[]
+
+  @@index([clientId])
+  @@index([businessProfileId])
+  @@index([jurisdictionId])
+}
+
+model FormationStage {
+  id              String   @id @default(cuid())
+  formationPlanId String
+  key             String
+  title           String
+  description     String
+  order           Int
+  status          String   @default("PENDING")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  formationPlan FormationPlan   @relation(fields: [formationPlanId], references: [id], onDelete: Cascade)
+  tasks         FormationTask[]
+
+  @@unique([formationPlanId, key])
+  @@index([formationPlanId, order])
+}
+
+model FormationTask {
+  id                         String   @id @default(cuid())
+  formationStageId           String
+  key                        String
+  title                      String
+  description                String
+  order                      Int
+  status                     String   @default("PENDING")
+  dependsOnTaskKeys          String[]
+  requiresProfessionalReview Boolean  @default(false)
+  blockingReason             String?
+  completionNote             String?
+  completedAt                DateTime?
+  createdAt                  DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  formationStage       FormationStage                 @relation(fields: [formationStageId], references: [id], onDelete: Cascade)
+  evidenceRequirements FormationEvidenceRequirement[]
+  reviews              FormationReview[]
+
+  @@unique([formationStageId, key])
+  @@index([formationStageId, order])
+}
+
+model FormationEvidenceRequirement {
+  id              String   @id @default(cuid())
+  formationTaskId String
+  key             String
+  label           String
+  required        Boolean  @default(true)
+  satisfied       Boolean  @default(false)
+  evidenceId      String?
+  satisfiedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  formationTask FormationTask @relation(fields: [formationTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([formationTaskId, key])
+}
+
+model FormationReview {
+  id              String   @id @default(cuid())
+  formationTaskId String
+  reviewerUserId  String
+  outcome         String
+  note            String?
+  reviewedAt      DateTime @default(now())
+
+  formationTask FormationTask @relation(fields: [formationTaskId], references: [id], onDelete: Cascade)
+
+  @@index([formationTaskId, reviewedAt])
+}
+
+model FormationActivity {
+  id              String   @id @default(cuid())
+  formationPlanId String
+  taskId          String?
+  actorUserId     String
+  eventType       String
+  fromStatus      String?
+  toStatus        String?
+  note            String?
+  metadataJson    String?
+  createdAt       DateTime @default(now())
+
+  @@index([formationPlanId, createdAt])
+  @@index([taskId, createdAt])
+}
