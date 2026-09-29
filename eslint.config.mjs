@@ -10,7 +10,7 @@ export default defineConfig([
       "coverage/**",
       "dist/**",
       "playwright-report/**",
-      "test-results/**",
-    ],
-  },
+      "test-results/**"
+    ]
+  }
 ]);
