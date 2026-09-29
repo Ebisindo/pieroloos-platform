@@ -1,51 +1,51 @@
-# PieroloOS Prisma Package
+# PieroloOS — Lint / Typecheck Fix
 
-This package establishes the Prisma configuration and PostgreSQL-ready schema foundation for `Ebisindo/pieroloos-platform`.
+This package corrects the npm script configuration that caused:
 
-## Files
+`Invalid project directory provided, no such directory: /workspace/pieroloos-platform/lint`
 
-- `prisma/schema.prisma` — domain schema
-- `prisma.config.ts` — Prisma CLI configuration
-- `prisma/seed.ts` — safe empty-by-default seed
-- `prisma/migrations/` — migration directory
-- `.env.example` — required database environment variable
+## Correct scripts
 
-## Install
+- `npm run lint` → `eslint .`
+- `npm run typecheck` → `tsc --noEmit`
 
-From the project root:
+## Installation
+
+From the repository root:
 
 ```bash
 npm install
 ```
 
-## Validate
+Then run:
 
 ```bash
-npx prisma validate
+npm run lint
 ```
-
-## Format
 
 ```bash
-npx prisma format
+npm run typecheck
 ```
-
-## Generate client
 
 ```bash
-npx prisma generate
+npm run build
 ```
-
-## Development migration
-
-After setting a real `DATABASE_URL`:
-
-```bash
-npx prisma migrate dev --name init
-```
-
-Do not commit real `.env` files or database credentials.
 
 ## Important
 
-The schema is a coherent product-platform baseline for the PieroloOS domain. Before applying migrations to an existing database, compare it with any existing Prisma models/migrations in the repository and reconcile rather than blindly overwriting them.
+Do not run:
+
+```bash
+npm run typecheck lint
+```
+
+because `lint` becomes an argument to TypeScript.
+
+The correct commands are separate:
+
+```bash
+npm run lint
+npm run typecheck
+```
+
+The package also includes `eslint` and `eslint-config-next`, which are required by the new lint script.

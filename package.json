@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
@@ -21,17 +21,28 @@
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "zod": "latest"
+    "zod": "latest",
+    "next-auth": "latest"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "latest",
     "@playwright/test": "latest",
     "@tailwindcss/postcss": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "eslint": "latest",
+    "eslint-config-next": "latest",
     "prisma": "6.19.3",
     "tailwindcss": "latest",
     "typescript": "latest",
     "vitest": "latest"
-  }
+  },
+  "description": "PieroloOS Corporate Intelligence & Formation Platform",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ebisindo/pieroloos-platform.git"
+  },
+  "license": "ISC",
+  "type": "commonjs"
 }
