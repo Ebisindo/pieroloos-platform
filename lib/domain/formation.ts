@@ -49,6 +49,7 @@ export type FormationStage = {
 
 export type FormationPlan = {
   id: string;
+  workspaceId?: string;
   clientId: string;
   businessProfileId: string;
   comparisonSnapshotId: string;

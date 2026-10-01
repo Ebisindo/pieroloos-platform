@@ -1,4 +1,7 @@
 export type WorkspacePermission =
+  | "workspace:read" | "workspace:manage" | "settings:manage"
+  | "jurisdictions:read" | "jurisdictions:write"
+  | "formation:read" | "formation:write"
   | "documents:read" | "documents:write" | "documents:review"
   | "compliance:read" | "compliance:write"
   | "reports:read" | "reports:write" | "audit:read";

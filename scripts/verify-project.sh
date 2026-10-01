@@ -10,9 +10,9 @@ test -f package.json || { echo "ERROR: package.json not found"; exit 1; }
 test -f tsconfig.json || { echo "ERROR: tsconfig.json not found"; exit 1; }
 
 echo "=== npm lint ==="
-npm --prefix "$ROOT" exec eslint "$ROOT"
+npm --prefix "$ROOT" run lint
 
 echo "=== npm typecheck ==="
-npm --prefix "$ROOT" exec tsc --noEmit --project "$ROOT/tsconfig.json"
+npm --prefix "$ROOT" run typecheck
 
 echo "=== done ==="

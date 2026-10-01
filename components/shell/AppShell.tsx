@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className={cx("sidebar", mobileOpen && "sidebar-open")}>
         <div className="brand-lockup">
           <Image
-            src="/brand/pierolocorp-logo.webp"
+            src="/brand/pierolocorp-logo.jpg"
             alt="PieroloCorp"
             width={44}
             height={44}

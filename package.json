@@ -6,8 +6,8 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "npm --prefix . exec eslint .",
-    "typecheck": "npm --prefix . exec tsc --noEmit --project ./tsconfig.json",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "db:generate": "prisma generate",
@@ -19,10 +19,10 @@
     "@prisma/client": "6.19.3",
     "lucide-react": "latest",
     "next": "latest",
+    "next-auth": "^4.24.15",
     "react": "latest",
     "react-dom": "latest",
-    "zod": "latest",
-    "next-auth": "latest"
+    "zod": "latest"
   },
   "devDependencies": {
     "@eslint/eslintrc": "latest",
@@ -44,5 +44,5 @@
     "url": "git+https://github.com/Ebisindo/pieroloos-platform.git"
   },
   "license": "ISC",
-  "type": "commonjs"
+  "type": "module"
 }

@@ -22,7 +22,8 @@ export const engagementTransitionSchema = z.object({
 });
 
 export const activityCreateSchema = z.object({
-  engagementId: z.string().min(1),
+  engagementId: z.string().min(1).optional(),
+  workspaceId: z.string().trim().min(1).optional(),
   type: z.enum(ACTIVITY_TYPES),
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(5000).optional(),

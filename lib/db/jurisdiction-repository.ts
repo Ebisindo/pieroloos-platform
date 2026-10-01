@@ -14,6 +14,7 @@ function mapJurisdiction(record: {
   id: string;
   name: string;
   countryCode: string | null;
+  code: string | null;
   profile: unknown;
   observations: Array<{
     criterionKey: string;
@@ -38,7 +39,7 @@ function mapJurisdiction(record: {
 
   return {
     id: record.id,
-    code: record.countryCode ?? record.id,
+    code: record.countryCode ?? record.code ?? record.id,
     name: record.name,
     region: profileValue(record.profile, "region"),
     profileSummary:
@@ -49,8 +50,9 @@ function mapJurisdiction(record: {
 }
 
 export const jurisdictionRepository = {
-  async list(): Promise<DomainJurisdiction[]> {
+  async list(workspaceId: string): Promise<DomainJurisdiction[]> {
     const records = await prisma.jurisdiction.findMany({
+      where: { workspaceId },
       include: { observations: true },
       orderBy: { name: "asc" },
     });
@@ -58,24 +60,31 @@ export const jurisdictionRepository = {
     return records.map(mapJurisdiction);
   },
 
-  async findById(id: string): Promise<DomainJurisdiction | null> {
+  async findById(id: string, workspaceId: string): Promise<DomainJurisdiction | null> {
     const record = await prisma.jurisdiction.findUnique({
       where: { id },
       include: { observations: true },
     });
 
-    return record ? mapJurisdiction(record) : null;
+    return record?.workspaceId === workspaceId ? mapJurisdiction(record) : null;
   },
 
   async create(data: {
+    organizationId: string;
+    workspaceId: string;
     code: string;
     name: string;
+    country: string;
     region?: string;
     profileSummary?: string;
   }) {
     const created = await prisma.jurisdiction.create({
       data: {
+        organizationId: data.organizationId,
+        workspaceId: data.workspaceId,
         name: data.name,
+        country: data.country,
+        code: data.code,
         countryCode: data.code,
         profile: {
           region: data.region,

@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const controlCenterQuerySchema = z.object({
-  organizationId: z.string().min(1),
   clientId: z.string().optional(),
   status: z.enum([
     "NOT_STARTED","IN_PROGRESS","AWAITING_EVIDENCE","IN_REVIEW",

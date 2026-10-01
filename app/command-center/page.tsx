@@ -8,7 +8,7 @@ export default function CommandCenterPage() {
     <div className="page-stack">
       <PageHeader
         eyebrow="EXECUTIVE OPERATING VIEW"
-        title="Command Center"
+        title="Business Formation"
         description="A single operational surface for clients, engagements, evidence, workflows, and professional-service delivery."
         actions={<Link href="/clients/new" className="button button-primary">New client</Link>}
       />

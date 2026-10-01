@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 export const workspaceNavigation = [
-  { href: "/command-center", label: "Command Center", icon: LayoutDashboard },
+  { href: "/command-center", label: "Business Formation", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: BriefcaseBusiness },
   { href: "/jurisdictions", label: "Jurisdiction Lens", icon: Scale },
   { href: "/formation", label: "Formation", icon: GitBranch },

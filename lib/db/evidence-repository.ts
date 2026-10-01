@@ -3,21 +3,34 @@ import type { EvidenceClass } from "@prisma/client";
 
 export const evidenceRepository = {
   create(input: {
-    subjectType: string;
-    subjectId: string;
+    title: string;
+    source?: string | null;
+    sourceType?: string | null;
+    jurisdictionId?: string | null;
+    complianceItemId?: string | null;
     evidenceClass: EvidenceClass;
-    confidence?: number;
-    sourceId?: string;
-    reviewStatus?: string;
-    notes?: string;
+    confidence?: number | null;
+    reviewStatus?: string | null;
+    notes?: string | null;
   }) {
-    return prisma.evidence.create({ data: input });
+    return prisma.evidence.create({
+      data: {
+        title: input.title,
+        source: input.source,
+        sourceType: input.sourceType,
+        jurisdictionId: input.jurisdictionId,
+        complianceItemId: input.complianceItemId,
+        evidenceClass: input.evidenceClass,
+        confidence: input.confidence,
+        reviewStatus: input.reviewStatus,
+        notes: input.notes,
+      },
+    });
   },
 
   listForSubject(subjectType: string, subjectId: string) {
     return prisma.evidence.findMany({
-      where: { subjectType, subjectId },
-      include: { source: true },
+      where: { jurisdictionId: subjectType === "jurisdiction" ? subjectId : null, complianceItemId: subjectType === "compliance-item" ? subjectId : null },
       orderBy: { createdAt: "desc" },
     });
   },
@@ -29,8 +42,15 @@ export const evidenceRepository = {
     publicationDate?: Date;
     retrievedAt?: Date;
   }) {
-    return prisma.source.create({
-      data: { ...input, retrievedAt: input.retrievedAt ?? new Date() },
+    return prisma.evidence.create({
+      data: {
+        title: input.title,
+        source: input.url,
+        sourceType: input.sourceType,
+        publicationDate: input.publicationDate,
+        retrievedAt: input.retrievedAt ?? new Date(),
+        evidenceClass: "E0_UNKNOWN",
+      },
     });
   },
 };

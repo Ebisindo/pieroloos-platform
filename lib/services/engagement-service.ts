@@ -19,6 +19,7 @@ export const engagementService = {
     const updated = await engagementRepository.update(id, payload);
     await activityRepository.create({
       engagementId: id,
+      workspaceId: current.workspaceId,
       type: "UPDATED",
       title: "Engagement updated",
       description: "Operational engagement details were updated.",
@@ -39,6 +40,7 @@ export const engagementService = {
     const updated = await engagementRepository.update(id, { status: payload.toStatus });
     await activityRepository.create({
       engagementId: id,
+      workspaceId: current.workspaceId,
       type: "STATUS_CHANGED",
       title: `Status changed to ${payload.toStatus}`,
       description: payload.note,

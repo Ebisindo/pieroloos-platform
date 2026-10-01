@@ -47,7 +47,9 @@ export const engagementRepository = {
       await tx.activity.create({
         data: {
           engagementId: engagement.id,
+          workspaceId: client.workspaceId,
           type: "CREATED",
+          title: `Engagement opened for ${data.service}`,
           summary: `Engagement opened for ${data.service}.`,
         },
       });

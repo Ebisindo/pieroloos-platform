@@ -42,7 +42,7 @@ export function classifyUrgency(
   dueAt: Date | null | undefined,
   now = new Date(),
 ): ComplianceUrgency {
-  if (status === "BLOCKED" || status === "OVERDUE") return "CRITICAL";
+  if (status === "BLOCKED" || status === "OVERDUE" || status === "IN_REVIEW") return "CRITICAL";
   const days = daysUntil(dueAt, now);
   if (days == null) return "NONE";
   if (days <= 3) return "HIGH";
@@ -63,7 +63,7 @@ export function buildComplianceControlSnapshot(
     const days = daysUntil(o.dueAt, now);
     const terminal = ["COMPLIANT", "WAIVED", "NOT_APPLICABLE"].includes(o.status);
     const overdue = days !== null && days < 0 && !terminal;
-    const status = overdue ? "OVERDUE" as const : o.status;
+    const status: ComplianceStatus = overdue ? "OVERDUE" : o.status;
     return {
       id: `alert:${o.id}`,
       obligationId: o.id,

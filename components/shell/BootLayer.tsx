@@ -28,7 +28,7 @@ export function BootLayer({ children }: { children: React.ReactNode }) {
         <div className="boot-orbit boot-orbit-two" />
         <div className="boot-core">
           <Image
-            src="/brand/pierolocorp-logo.webp"
+            src="/brand/pierolocorp-logo.jpg"
             alt=""
             width={180}
             height={180}

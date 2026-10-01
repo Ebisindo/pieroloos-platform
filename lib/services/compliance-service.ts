@@ -11,11 +11,14 @@ export const complianceService = {
   },
 
   create(input: {
+    workspaceId: string;
     engagementId?: string;
+    clientId?: string;
     category: string;
     title: string;
     jurisdiction?: string;
     dueAt?: Date;
+    status?: ComplianceStatus;
   }) {
     return complianceRepository.create(input);
   },

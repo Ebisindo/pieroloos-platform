@@ -9,10 +9,10 @@ describe("engagement workflow", () => {
 
   it("rejects skipped stages", () => {
     expect(canTransition("INTAKE", "EXECUTION")).toBe(false);
-    expect(() => assertTransition("INTAKE", "CLOSED")).toThrow();
+    expect(() => assertTransition("INTAKE", "COMPLETED")).toThrow();
   });
 
-  it("protects closed engagements", () => {
-    expect(canTransition("CLOSED", "INTAKE")).toBe(false);
+  it("protects completed engagements", () => {
+    expect(canTransition("COMPLETED", "INTAKE")).toBe(false);
   });
 });

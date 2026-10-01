@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 
 export const formationRepository = {
   async createWorkingJurisdictionDecision(data: {
+    workspaceId: string;
     businessProfileId: string;
     comparisonSnapshotId: string;
     jurisdictionId: string;
@@ -10,10 +11,22 @@ export const formationRepository = {
     professionalReviewRequired: boolean;
     professionalReviewCompleted: boolean;
   }) {
-    return prisma.workingJurisdictionDecision.create({ data });
+    return prisma.workingJurisdictionDecision.create({
+      data: {
+        workspaceId: data.workspaceId,
+        businessProfileId: data.businessProfileId,
+        comparisonSnapshotId: data.comparisonSnapshotId,
+        jurisdictionId: data.jurisdictionId,
+        rationale: data.rationale,
+        decidedByUserId: data.decidedByUserId,
+        professionalReviewRequired: data.professionalReviewRequired,
+        professionalReviewCompleted: data.professionalReviewCompleted,
+      },
+    });
   },
 
   async createPlan(data: {
+    workspaceId: string;
     clientId: string;
     businessProfileId: string;
     comparisonSnapshotId: string;
@@ -23,7 +36,19 @@ export const formationRepository = {
     methodologyVersion: string;
     status: string;
   }) {
-    return prisma.formationPlan.create({ data });
+    return prisma.formationPlan.create({
+      data: {
+        workspaceId: data.workspaceId,
+        clientId: data.clientId,
+        businessProfileId: data.businessProfileId,
+        comparisonSnapshotId: data.comparisonSnapshotId,
+        workingJurisdictionDecisionId: data.workingJurisdictionDecisionId,
+        jurisdictionId: data.jurisdictionId,
+        jurisdictionName: data.jurisdictionName,
+        methodologyVersion: data.methodologyVersion,
+        status: data.status,
+      },
+    });
   },
 
   async createStage(data: {

@@ -1,8 +1,15 @@
 export const COMPLIANCE_STATUSES = [
   "NOT_STARTED",
   "IN_PROGRESS",
+  "AWAITING_EVIDENCE",
+  "IN_REVIEW",
   "COMPLETE",
+  "COMPLETED",
+  "COMPLIANT",
+  "OVERDUE",
   "BLOCKED",
+  "WAIVED",
+  "NOT_APPLICABLE",
 ] as const;
 
 export type ComplianceStatus = typeof COMPLIANCE_STATUSES[number];
@@ -47,7 +54,7 @@ export type ComplianceObligation = {
 };
 
 export function isTerminalComplianceStatus(status: ComplianceStatus) {
-  return status === "COMPLETE";
+  return ["COMPLETE", "COMPLETED", "COMPLIANT", "WAIVED", "NOT_APPLICABLE"].includes(status);
 }
 
 export function isOverdue(dueAt: Date | null | undefined, now = new Date()) {
@@ -59,6 +66,8 @@ export function calculateComplianceProgress(
 ) {
   if (!items.length) return 0;
 
-  const complete = items.filter((item) => item.status === "COMPLETE").length;
+  const complete = items.filter((item) =>
+    ["COMPLETE", "COMPLETED", "COMPLIANT", "WAIVED", "NOT_APPLICABLE"].includes(item.status),
+  ).length;
   return Math.round((complete / items.length) * 100);
 }

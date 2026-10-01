@@ -1,4 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import "tailwindcss";
 
 :root {
   --navy-950: #050816;
@@ -84,6 +85,9 @@ h1 { font-family:"Space Grotesk",sans-serif; font-size:clamp(27px,3vw,39px); lin
 .page-actions { display:flex; gap:8px; flex-shrink:0; }
 .button { min-height:38px; padding:0 15px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid var(--line); font-size:12px; font-weight:600; }
 .button-primary { background:linear-gradient(135deg, #d8b970, #b9984f); color:#10101a; border-color:rgba(255,255,255,.2); box-shadow:0 7px 25px rgba(214,182,106,.13); }
+.form-input { min-height:42px; width:100%; border:1px solid var(--line); border-radius:7px; padding:9px 11px; color:var(--text); background:rgba(5,8,22,.72); font-size:12px; }
+.form-input:focus { outline:2px solid rgba(103,217,232,.4); outline-offset:1px; }
+.form-input:disabled { opacity:.55; cursor:not-allowed; }
 
 .metric-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
 .glass-panel { border:1px solid var(--line); background:linear-gradient(145deg, rgba(17,24,52,.78), rgba(8,13,31,.7)); box-shadow:0 20px 60px rgba(0,0,0,.16); border-radius:14px; backdrop-filter:blur(16px); }

@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const createObligationSchema = z.object({
-  organizationId: z.string().min(1),
   clientId: z.string().min(1),
   businessProfileId: z.string().optional().nullable(),
   formationPlanId: z.string().optional().nullable(),
@@ -14,7 +13,7 @@ export const createObligationSchema = z.object({
     "RENEWAL","RECORDKEEPING","OTHER",
   ]),
   dueAt: z.coerce.date().optional().nullable(),
-  ownerUserId: z.string().optional().nullable(),
+  requiresEvidence: z.boolean().default(false),
   professionalReviewRequired: z.boolean().default(false),
 });
 
@@ -24,6 +23,10 @@ export const updateComplianceStatusSchema = z.object({
     "COMPLIANT","OVERDUE","BLOCKED","WAIVED","NOT_APPLICABLE",
   ]),
   note: z.string().max(4000).optional(),
+});
+
+export const approveComplianceReviewSchema = z.object({
+  note: z.string().trim().max(4000).optional(),
 });
 
 export const addComplianceEvidenceSchema = z.object({

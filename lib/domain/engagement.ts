@@ -1,6 +1,17 @@
 export const ENGAGEMENT_STATUSES = [
-  "INTAKE", "ASSESSMENT", "PLANNING", "APPROVAL",
-  "EXECUTION", "VERIFICATION", "RECORDING", "CLOSED",
+  "DRAFT",
+  "INTAKE",
+  "ASSESSMENT",
+  "PLANNING",
+  "EXECUTION",
+  "VERIFICATION",
+  "RECORDING",
+  "APPROVAL",
+  "ACTIVE",
+  "ON_HOLD",
+  "COMPLETED",
+  "CANCELLED",
+  "ARCHIVED",
 ] as const;
 
 export type EngagementStatus = typeof ENGAGEMENT_STATUSES[number];
@@ -13,14 +24,19 @@ export const ACTIVITY_TYPES = [
 export type ActivityType = typeof ACTIVITY_TYPES[number];
 
 const transitions: Record<EngagementStatus, EngagementStatus[]> = {
+  DRAFT: ["INTAKE"],
   INTAKE: ["ASSESSMENT"],
   ASSESSMENT: ["PLANNING"],
   PLANNING: ["APPROVAL"],
   APPROVAL: ["EXECUTION"],
   EXECUTION: ["VERIFICATION"],
   VERIFICATION: ["RECORDING"],
-  RECORDING: ["CLOSED"],
-  CLOSED: [],
+  RECORDING: ["ACTIVE", "COMPLETED"],
+  ACTIVE: ["ON_HOLD", "COMPLETED"],
+  ON_HOLD: ["ACTIVE", "COMPLETED"],
+  COMPLETED: [],
+  CANCELLED: [],
+  ARCHIVED: [],
 };
 
 export function canTransition(from: EngagementStatus, to: EngagementStatus) {
