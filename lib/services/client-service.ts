@@ -1,10 +1,11 @@
 import { clientRepository } from "@/lib/db/client-repository";
+import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 import { clientIntakeSchema, type ClientIntakeInput } from "@/lib/validation/intake";
 
 export const clientService = {
-  async create(input: unknown) {
+  async create(input: unknown, principal: WorkspacePrincipal) {
     const data = clientIntakeSchema.parse(input);
-    return clientRepository.createFromIntake(data);
+    return clientRepository.createFromIntake(data, principal);
   },
 
   get(id: string) {
@@ -16,6 +17,6 @@ export const clientService = {
   },
 };
 
-export async function createClient(input: ClientIntakeInput) {
-  return clientRepository.createFromIntake(clientIntakeSchema.parse(input));
+export async function createClient(input: ClientIntakeInput, principal: WorkspacePrincipal) {
+  return clientRepository.createFromIntake(clientIntakeSchema.parse(input), principal);
 }

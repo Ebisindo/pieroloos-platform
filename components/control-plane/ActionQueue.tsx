@@ -1,32 +1,48 @@
 import type { OperationalAction } from "@/lib/domain/action-control";
+import { StatusBadge } from "@/components/ui/primitives";
 
 const statusLabel: Record<OperationalAction["status"], string> = {
   OPEN: "Open", ASSIGNED: "Assigned", IN_PROGRESS: "In progress", BLOCKED: "Blocked",
   PENDING_REVIEW: "Pending review", RESOLVED: "Resolved", CANCELLED: "Cancelled",
 };
 
+const statusTone: Record<OperationalAction["status"], "neutral" | "success" | "warning" | "danger" | "info"> = {
+  OPEN: "warning",
+  ASSIGNED: "info",
+  IN_PROGRESS: "info",
+  BLOCKED: "danger",
+  PENDING_REVIEW: "warning",
+  RESOLVED: "success",
+  CANCELLED: "neutral",
+};
+
 export function ActionQueue({ actions }: { actions: OperationalAction[] }) {
   if (!actions.length) {
-    return <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-sm text-white/55">
-      No operational actions require attention.
-    </div>;
+    return <div className="empty-inline">No active operational actions require attention.</div>;
   }
 
-  return <div className="space-y-2">
-    {actions.map(action => (
-      <article key={action.id} className="rounded-xl border border-white/10 bg-white/[0.025] p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-white">{action.title}</p>
-            <p className="mt-1 text-xs text-white/45">{statusLabel[action.status]} · {action.priority}</p>
+  return (
+    <ol className="action-list" aria-label="Active operational actions">
+      {actions.map((action) => (
+        <li className="action-row" key={action.id}>
+          <div className="action-copy">
+            <h3 className="action-title">{action.title}</h3>
+            {action.description ? <p className="action-description">{action.description}</p> : null}
           </div>
-          {action.dueAt && (
-            <time className="text-xs text-white/40" dateTime={action.dueAt.toISOString()}>
-              Due {action.dueAt.toLocaleString()}
-            </time>
-          )}
-        </div>
-      </article>
-    ))}
-  </div>;
+          <div className="action-details">
+            <StatusBadge tone={statusTone[action.status]}>{statusLabel[action.status]}</StatusBadge>
+            <StatusBadge tone={action.priority === "CRITICAL" ? "danger" : action.priority === "HIGH" ? "warning" : "neutral"}>
+              {action.priority}
+            </StatusBadge>
+            {action.escalationLevel > 0 ? <StatusBadge tone="danger">Escalation {action.escalationLevel}</StatusBadge> : null}
+            {action.dueAt ? (
+              <time className="action-due" dateTime={action.dueAt.toISOString()}>
+                Due {action.dueAt.toLocaleString()}
+              </time>
+            ) : null}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
 }

@@ -84,6 +84,34 @@ enum TaskStatus {
   CANCELLED
 }
 
+enum OperationalActionStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  BLOCKED
+  PENDING_REVIEW
+  RESOLVED
+  CANCELLED
+}
+
+enum OperationalActionPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum OperationalActionEventType {
+  CREATED_FROM_SIGNAL
+  ACTION_CREATED
+  ACTION_ASSIGNED
+  ACTION_STARTED
+  ACTION_BLOCKED
+  ACTION_RESOLVED
+  ACTION_ESCALATED
+  ACTION_CANCELLED
+}
+
 model Organization {
   id        String   @id @default(cuid())
   name      String
@@ -663,4 +691,66 @@ model ComplianceEvidence {
   obligation ComplianceObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
 
   @@index([obligationId])
+}
+
+model OperationalAction {
+  id                     String                        @id @default(cuid())
+  organizationId         String
+  workspaceId            String
+  title                  String
+  description            String?
+  sourceSignalId         String?
+  clientId               String?
+  engagementId           String?
+  documentId             String?
+  complianceObligationId String?
+  assigneeUserId         String?
+  createdByUserId        String
+  priority               OperationalActionPriority     @default(NORMAL)
+  status                 OperationalActionStatus       @default(OPEN)
+  dueAt                  DateTime?
+  escalationLevel        Int                           @default(0)
+  escalationAt           DateTime?
+  resolvedAt             DateTime?
+  resolutionNote         String?
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
+  auditEvents            OperationalActionAuditEvent[]
+
+  @@unique([organizationId, workspaceId, sourceSignalId])
+  @@index([organizationId, workspaceId, status])
+  @@index([organizationId, workspaceId, dueAt])
+  @@index([assigneeUserId, status, dueAt])
+  @@index([sourceSignalId])
+  @@index([complianceObligationId, status])
+}
+
+model OperationalActionAuditEvent {
+  id             String                     @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  actionId       String
+  actorUserId    String
+  eventType      OperationalActionEventType
+  details        Json?
+  occurredAt     DateTime                   @default(now())
+
+  action OperationalAction @relation(fields: [actionId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([actionId, occurredAt])
+}
+
+model OperationalEscalationEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  actionId       String
+  fromLevel      Int
+  toLevel        Int
+  reason         String
+  occurredAt     DateTime @default(now())
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([actionId, occurredAt])
 }

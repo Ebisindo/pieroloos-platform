@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@prisma/client";
+import { assertPermission, type WorkspacePrincipal } from "@/lib/auth/workspace-access";
 import type { ClientIntakeInput } from "@/lib/validation/intake";
 
 function profileData(input: ClientIntakeInput): Prisma.InputJsonObject {
@@ -22,15 +23,19 @@ function profileData(input: ClientIntakeInput): Prisma.InputJsonObject {
 }
 
 export const clientRepository = {
-  async createFromIntake(input: ClientIntakeInput) {
+  async createFromIntake(input: ClientIntakeInput, principal: WorkspacePrincipal) {
+    assertPermission(principal, "formation:write");
     return prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.findFirst({
-        orderBy: { createdAt: "asc" },
-        include: { organization: true },
+        where: {
+          id: principal.workspaceId,
+          organizationId: principal.organizationId,
+        },
+        select: { id: true, organizationId: true },
       });
 
       if (!workspace) {
-        throw new Error("No workspace is configured for client intake.");
+        throw new Error("Workspace is not available for client intake.");
       }
 
       const intakeData = JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue;

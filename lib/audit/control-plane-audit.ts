@@ -6,7 +6,7 @@ export async function auditControlAction(
     organizationId: string;
     workspaceId: string;
     actorUserId: string;
-    action: "ACTION_CREATED" | "ACTION_ASSIGNED" | "ACTION_STARTED" | "ACTION_BLOCKED" | "ACTION_RESOLVED" | "ACTION_ESCALATED";
+    action: "ACTION_CREATED" | "ACTION_ASSIGNED" | "ACTION_STARTED" | "ACTION_BLOCKED" | "ACTION_RESOLVED" | "ACTION_ESCALATED" | "ACTION_CANCELLED";
     actionId: string;
     metadata?: Record<string, unknown>;
   },

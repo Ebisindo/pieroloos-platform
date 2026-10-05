@@ -1,13 +1,100 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getWorkspaceContext } from "@/lib/auth/workspace-context";
+import { prisma } from "@/lib/db/prisma";
+import { mapOperationalAction } from "@/lib/db/operational-action-query";
+import { resolveAction } from "@/lib/domain/action-control";
+
+const resolveSchema = z.object({
+  resolutionNote: z.string().trim().min(1),
+  expectedUpdatedAt: z.string().datetime(),
+});
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
 
-  return NextResponse.json({
-    error: "Resolution endpoint requires authenticated ControlPlaneService integration.",
-    actionId: id,
-  }, { status: 501 });
+  const context = await getWorkspaceContext();
+  if (!context.userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const principal = context.principal;
+  if (!principal) return NextResponse.json({ error: "Select an active workspace." }, { status: 409 });
+  if (!principal.permissions.includes("compliance:write")) {
+    return NextResponse.json({ error: "Compliance write permission required." }, { status: 403 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const parsed = resolveSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "A resolution note and current updated-at value are required." }, { status: 422 });
+  }
+
+  const expectedUpdatedAt = new Date(parsed.data.expectedUpdatedAt);
+  if (Number.isNaN(expectedUpdatedAt.getTime())) {
+    return NextResponse.json({ error: "A resolution note and current updated-at value are required." }, { status: 422 });
+  }
+
+  try {
+    const action = await prisma.operationalAction.findUnique({ where: { id } });
+    if (!action) return NextResponse.json({ error: "Operational action not found." }, { status: 404 });
+    if (action.organizationId !== principal.organizationId || action.workspaceId !== principal.workspaceId) {
+      return NextResponse.json({ error: "Forbidden: workspace boundary violation" }, { status: 403 });
+    }
+
+    const current = mapOperationalAction(action);
+    const next = resolveAction(current, parsed.data.resolutionNote, new Date());
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const latest = await tx.operationalAction.findUnique({ where: { id } });
+      if (!latest) throw new Error("ACTION_NOT_FOUND");
+      if (latest.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+        throw new Error("STALE_ACTION");
+      }
+
+      const updatedAction = await tx.operationalAction.update({
+        where: { id, updatedAt: expectedUpdatedAt },
+        data: {
+          status: next.status,
+          updatedAt: next.updatedAt,
+          resolvedAt: next.resolvedAt,
+          resolutionNote: next.resolutionNote ?? null,
+        },
+      });
+
+      await tx.operationalActionAuditEvent.create({
+        data: {
+          organizationId: latest.organizationId,
+          workspaceId: latest.workspaceId,
+          actionId: latest.id,
+          actorUserId: principal.userId,
+          eventType: "ACTION_RESOLVED",
+          details: {
+            fromStatus: current.status,
+            toStatus: next.status,
+            resolutionNote: next.resolutionNote,
+            expectedUpdatedAt: expectedUpdatedAt.toISOString(),
+          },
+        },
+      });
+
+      return updatedAction;
+    });
+
+    return NextResponse.json({ data: mapOperationalAction(updated) });
+  } catch (error) {
+    if (error instanceof Error && error.message === "ACTION_NOT_FOUND") {
+      return NextResponse.json({ error: "Operational action not found." }, { status: 404 });
+    }
+    if (error instanceof Error && error.message === "STALE_ACTION") {
+      return NextResponse.json({ error: "Action changed since it was loaded. Refresh before retrying." }, { status: 409 });
+    }
+    return NextResponse.json({ error: "Unable to resolve operational action." }, { status: 500 });
+  }
 }

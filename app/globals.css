@@ -113,6 +113,13 @@ h1 { font-family:"Space Grotesk",sans-serif; font-size:clamp(27px,3vw,39px); lin
 .workflow-copy strong { font-size:12px; font-weight:600; color:#dfe3ed; }
 .workflow-copy span { color:#737d97; font-size:10px; }
 .workflow-row svg { color:#66708b; }
+.action-list { margin:0; padding:0 20px 14px; list-style:none; }
+.action-row { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:13px 0; border-top:1px solid rgba(171,184,220,.07); }
+.action-copy { min-width:0; }
+.action-title { color:#dfe3ed; font-size:12px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; }
+.action-description { margin-top:4px; color:#737d97; font-size:10px; line-height:1.5; }
+.action-details { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:6px; }
+.action-due { flex-basis:100%; color:#929bb5; font-size:10px; text-align:right; }
 .state-list { padding:2px 20px 18px; }
 .state-list > div { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-top:1px solid rgba(171,184,220,.07); gap:12px; }
 .state-list span { display:flex; align-items:center; gap:8px; color:#9ca6bd; font-size:11px; }
@@ -160,6 +167,9 @@ h1 { font-family:"Space Grotesk",sans-serif; font-size:clamp(27px,3vw,39px); lin
   .topbar { padding:0 16px; }
   .security-state,.search-button span,.search-button kbd { display:none; }
   .dashboard-grid { grid-template-columns:1fr; }
+  .action-row { flex-direction:column; gap:9px; }
+  .action-details { justify-content:flex-start; }
+  .action-due { text-align:left; }
   .page-header { align-items:flex-start; flex-direction:column; }
   .page-actions { width:100%; }
   .page-actions .button { flex:1; }
