@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import type { FormationTask as DomainFormationTask } from "@/lib/domain/formation";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import { evidenceSatisfied, taskCanComplete, taskDependenciesSatisfied } from "@/lib/domain/formation";
@@ -8,8 +10,7 @@ import { formationTaskActionSchema } from "@/lib/validation/formation";
 type RouteContext = { params: Promise<{ id: string; taskId: string }> };
 
 export async function PATCH(request: Request, routeContext: RouteContext) {
-  const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(request.url).origin) {
+  if (hasInvalidRequestOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
@@ -110,7 +111,12 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
     if (!document) return NextResponse.json({ error: "Document not found for this client and workspace." }, { status: 404 });
   }
 
-  const updatedTask = await prisma.$transaction(async (transaction) => {
+  const permission = parsed.data.action === "REVIEW_APPROVE"
+    ? "documents:review"
+    : parsed.data.action === "SATISFY_EVIDENCE"
+      ? "documents:write"
+      : "formation:write";
+  const updatedTask = await withAuthorizedWorkspaceTransaction(principal, permission, async (transaction) => {
     if (parsed.data.action === "REVIEW_APPROVE") {
       await transaction.formationReview.create({
         data: {

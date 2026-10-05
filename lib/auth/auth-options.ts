@@ -18,6 +18,11 @@ const platformSuperadminEmails = new Set(
 export const oidcConfigured = Boolean(issuer && clientId && clientSecret);
 export const githubConfigured = Boolean(githubId && githubSecret);
 export const authConfigured = oidcConfigured || githubConfigured;
+export const AUTH_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
+
+if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_SECRET) {
+  throw new Error("NEXTAUTH_SECRET must be configured in production.");
+}
 
 export function isPlatformSuperadmin(email: string | null | undefined): boolean {
   return Boolean(email && platformSuperadminEmails.has(email.trim().toLowerCase()));
@@ -25,7 +30,7 @@ export function isPlatformSuperadmin(email: string | null | undefined): boolean 
 
 export const authOptions: AuthOptions = {
   secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-me",
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: AUTH_SESSION_MAX_AGE_SECONDS },
   providers: [
     ...(githubConfigured
       ? [GitHubProvider({ clientId: githubId!, clientSecret: githubSecret! })]

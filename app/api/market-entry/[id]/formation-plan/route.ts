@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { z } from "zod";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
@@ -70,7 +71,7 @@ export async function POST(
   }
 
   const updatedAt = new Date();
-  const result = await prisma.$transaction(async (transaction) => {
+  const result = await withAuthorizedWorkspaceTransaction(principal, "formation:write", async (transaction) => {
     const updated = await transaction.marketEntryPlan.updateMany({
       where: {
         id,

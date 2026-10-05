@@ -20,4 +20,6 @@ Source references and dates are user-entered tracking data. Verification is an i
 
 ## Deployment
 
+Use the explicit validation, migration, and drift-check procedure in [Session 19 — Production Data Integrity & Migration Control](./SESSION-19-PRODUCTION-DATA-INTEGRITY.md). A migration's presence in Git does not prove that a database has been migrated or verified.
+
 Apply `prisma/migrations/20261005224000_evidence_governance` using the normal database migration process after verifying the intended PostgreSQL target.

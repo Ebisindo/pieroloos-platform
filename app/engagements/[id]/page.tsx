@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { engagementRepository } from "@/lib/db/engagement-repository";
 import { StatusBadge } from "@/components/engagement/StatusBadge";
 import { ActivityTimeline } from "@/components/engagement/ActivityTimeline";
@@ -10,8 +11,11 @@ type BusinessProfileData = {
 };
 
 export default async function EngagementPage({ params }: Props) {
+  const workspaceContext = await getWorkspaceContext();
+  if (!workspaceContext.userId) redirect("/signin");
+  if (!workspaceContext.principal?.permissions.includes("engagement:read")) notFound();
   const { id } = await params;
-  const engagement = await engagementRepository.findById(id);
+  const engagement = await engagementRepository.findById(id, workspaceContext.principal);
 
   if (!engagement) notFound();
 

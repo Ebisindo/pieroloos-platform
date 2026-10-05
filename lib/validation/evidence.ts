@@ -10,9 +10,13 @@ export const evidenceInputSchema = z.object({
   confidence: z.number().int().min(0).max(100).optional().nullable(),
   reviewStatus: z.string().trim().max(80).optional().nullable(),
   notes: z.string().trim().max(4000).optional().nullable(),
-});
+}).refine(
+  (input) => Boolean(input.jurisdictionId) !== Boolean(input.complianceItemId),
+  "Evidence must belong to exactly one workspace jurisdiction or compliance item.",
+);
 
 export const sourceInputSchema = z.object({
+  jurisdictionId: z.string().trim().min(1),
   title: z.string().trim().min(1),
   url: z.string().url().optional().or(z.literal("")),
   sourceType: z.string().trim().min(1),

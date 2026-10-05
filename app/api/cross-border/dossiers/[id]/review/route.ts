@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { isCrossBorderDossierReadyForReview } from "@/lib/domain/cross-border";
@@ -59,7 +60,7 @@ export async function POST(
   }
 
   const reviewedAt = new Date();
-  const result = await prisma.$transaction(async (transaction) => {
+  const result = await withAuthorizedWorkspaceTransaction(principal, "documents:review", async (transaction) => {
     const updated = await transaction.crossBorderDossier.updateMany({
       where: {
         id,

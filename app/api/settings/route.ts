@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -31,8 +33,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(request.url).origin) {
+  if (hasInvalidRequestOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
@@ -42,6 +43,7 @@ export async function PATCH(request: Request) {
   if (!context.principal.permissions.includes("settings:manage")) {
     return NextResponse.json({ error: "Settings management permission required." }, { status: 403 });
   }
+  const principal = context.principal;
 
   let body: unknown;
   try {
@@ -54,10 +56,22 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid settings.", issues: parsed.error.flatten() }, { status: 422 });
   }
 
-  const settings = await prisma.workspaceSettings.upsert({
-    where: { workspaceId: context.principal.workspaceId },
-    update: parsed.data,
-    create: { workspaceId: context.principal.workspaceId, ...parsed.data },
+  const settings = await withAuthorizedWorkspaceTransaction(principal, "settings:manage", async (transaction) => {
+    const updatedSettings = await transaction.workspaceSettings.upsert({
+      where: { workspaceId: principal.workspaceId },
+      update: parsed.data,
+      create: { workspaceId: principal.workspaceId, ...parsed.data },
+    });
+    await transaction.activity.create({
+      data: {
+        workspaceId: principal.workspaceId,
+        actorId: principal.userId,
+        type: "UPDATED",
+        title: "Workspace settings updated",
+        summary: "Workspace settings were updated by an authorized administrator.",
+      },
+    });
+    return updatedSettings;
   });
 
   return NextResponse.json({ data: settings });

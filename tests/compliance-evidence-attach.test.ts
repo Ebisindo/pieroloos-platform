@@ -31,6 +31,7 @@ const principal: WorkspacePrincipal = {
   userId: "user-1",
   organizationId: "org-1",
   workspaceId: "workspace-1",
+  role: "owner",
   permissions: ["documents:write"],
 };
 
@@ -50,6 +51,8 @@ describe("compliance evidence attachment", () => {
     evidenceCreateMock.mockReset().mockImplementation(async ({ data }) => ({ id: "evidence-1", ...data }));
     activityCreateMock.mockReset().mockResolvedValue({ id: "activity-1" });
     transactionMock.mockReset().mockImplementation((callback) => callback({
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: "OWNER" }) },
+      workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
       complianceEvidence: { create: evidenceCreateMock },
       complianceActivity: { create: activityCreateMock },
     }));

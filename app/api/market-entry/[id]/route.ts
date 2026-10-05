@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { canTransitionMarketEntry, type MarketEntryStatus } from "@/lib/domain/market-entry";
@@ -60,7 +61,7 @@ export async function PATCH(
   }
 
   const updatedAt = new Date();
-  const result = await prisma.$transaction(async (transaction) => {
+  const result = await withAuthorizedWorkspaceTransaction(context.principal, "jurisdictions:write", async (transaction) => {
     const updated = await transaction.marketEntryPlan.updateMany({
       where: {
         id,

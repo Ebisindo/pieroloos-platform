@@ -53,6 +53,7 @@ const principal: WorkspacePrincipal = {
   userId: "user-1",
   organizationId: "org-1",
   workspaceId: "workspace-1",
+  role: "owner",
   permissions: ["jurisdictions:read", "jurisdictions:write", "documents:review"],
 };
 
@@ -110,6 +111,8 @@ describe("market-entry routes", () => {
     transactionPlanFindFirstMock.mockReset().mockResolvedValue({ ...marketPlan, version: 3 });
     auditCreateMock.mockReset().mockResolvedValue({ id: "audit-1" });
     transactionMock.mockReset().mockImplementation((callback) => callback({
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: "OWNER" }) },
+      workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
       workingJurisdictionDecision: {
         findFirst: decisionFindFirstMock,
         create: decisionCreateMock,

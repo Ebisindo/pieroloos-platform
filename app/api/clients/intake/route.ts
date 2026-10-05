@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { createClientFromIntake } from "@/lib/services/client-intake-service";
 import { clientIntakeSchema } from "@/lib/validation/intake";
 
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(request.url).origin) {
+  if (hasInvalidRequestOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 

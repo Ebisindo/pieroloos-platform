@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { prisma } from "@/lib/db/prisma";
@@ -66,7 +67,7 @@ export async function POST(
   });
   if (!document) return NextResponse.json({ error: "Evidence document was not found for this client and workspace." }, { status: 404 });
 
-  const result = await prisma.$transaction(async (transaction) => {
+  const result = await withAuthorizedWorkspaceTransaction(principal, "documents:write", async (transaction) => {
     const updated = await transaction.crossBorderDossier.updateMany({
       where: { id, workspaceId: principal.workspaceId, version: parsed.data.expectedVersion },
       data: {

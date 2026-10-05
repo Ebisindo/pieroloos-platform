@@ -32,4 +32,4 @@ Each assessment stores its source pathway version so subsequent pathway changes 
 
 ## Validation
 
-Session 15 is covered by the same Prisma validation, TypeScript, full Vitest, ESLint, and production-build commands as Session 14. The migration must be applied and verified against the intended PostgreSQL environment before deployment.
+Session 15 is covered by the Session 19 PostgreSQL migration, drift, integrity, TypeScript, Vitest, ESLint, and production-build checks. Apply migrations only through the explicit target procedure documented in [Session 19 — Production Data Integrity & Migration Control](./SESSION-19-PRODUCTION-DATA-INTEGRITY.md); the target environment must pass verification before deployment.

@@ -3,15 +3,15 @@ import {
   calculateComplianceProgress,
   type ComplianceStatus,
 } from "../domain/compliance";
+import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 
 export const complianceService = {
-  async getSummary(engagementId: string) {
-    const items = await complianceRepository.listByEngagement(engagementId);
+  async getSummary(engagementId: string, principal: WorkspacePrincipal) {
+    const items = await complianceRepository.listByEngagement(engagementId, principal);
     return { items, progress: calculateComplianceProgress(items) };
   },
 
   create(input: {
-    workspaceId: string;
     engagementId?: string;
     clientId?: string;
     category: string;
@@ -19,11 +19,11 @@ export const complianceService = {
     jurisdiction?: string;
     dueAt?: Date;
     status?: ComplianceStatus;
-  }) {
-    return complianceRepository.create(input);
+  }, principal: WorkspacePrincipal) {
+    return complianceRepository.create(input, principal);
   },
 
-  updateStatus(id: string, status: ComplianceStatus) {
-    return complianceRepository.updateStatus(id, status);
+  updateStatus(id: string, status: ComplianceStatus, principal: WorkspacePrincipal) {
+    return complianceRepository.updateStatus(id, status, principal);
   },
 };

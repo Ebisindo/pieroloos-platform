@@ -1,12 +1,9 @@
-# Session 08 Prisma Merge Instructions
+# Prisma Schema and Migration Instructions
 
-Do not replace `prisma/schema.prisma`.
+`prisma/schema.prisma` is the active data model. `prisma/migrations/` is the authoritative, ordered PostgreSQL migration history; the target database's `_prisma_migrations` table records which entries have been applied.
 
-1. Open the existing schema.
-2. Keep the existing generator and datasource.
-3. Merge the Session 08 enums/models.
-4. Resolve relations against existing Client, BusinessProfile, FormationPlan, Document and User models.
-5. Run `npx prisma format`.
-6. Run `npx prisma validate`.
-7. Run `npx prisma generate`.
-8. Create the migration only after validation succeeds.
+The `prisma/session-*.prisma` files are historical reference fragments, not active schema inputs and not migrations. Do not merge or apply them during deployment.
+
+For a production-safe deployment, use the Session 19 procedure in [docs/SESSION-19-PRODUCTION-DATA-INTEGRITY.md](../docs/SESSION-19-PRODUCTION-DATA-INTEGRITY.md). It validates and generates the client, deploys committed migrations, checks applied migration status, compares migration history to the Prisma schema, and compares the target database to the schema.
+
+Use `npm run db:migrate:dev -- --name <description>` only for local development when creating a migration. Review and commit the generated SQL migration before deployment. Never use `migrate dev` against staging or production.

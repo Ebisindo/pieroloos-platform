@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
+import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 import type { Jurisdiction as DomainJurisdiction, JurisdictionFactor } from "@/lib/domain/jurisdiction";
 
 function profileValue(profile: unknown, key: string): string | undefined {
@@ -70,28 +72,39 @@ export const jurisdictionRepository = {
   },
 
   async create(data: {
-    organizationId: string;
-    workspaceId: string;
     code: string;
     name: string;
     country: string;
     region?: string;
     profileSummary?: string;
-  }) {
-    const created = await prisma.jurisdiction.create({
-      data: {
-        organizationId: data.organizationId,
-        workspaceId: data.workspaceId,
-        name: data.name,
-        country: data.country,
-        code: data.code,
-        countryCode: data.code,
-        profile: {
-          region: data.region,
-          profileSummary: data.profileSummary,
+  }, principal: WorkspacePrincipal) {
+    const created = await withAuthorizedWorkspaceTransaction(principal, "jurisdictions:write", async (transaction) => {
+      const jurisdiction = await transaction.jurisdiction.create({
+        data: {
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+          name: data.name,
+          country: data.country,
+          code: data.code,
+          countryCode: data.code,
+          profile: {
+            region: data.region,
+            profileSummary: data.profileSummary,
+          },
         },
-      },
-      include: { observations: true },
+        include: { observations: true },
+      });
+      await transaction.activity.create({
+        data: {
+          workspaceId: principal.workspaceId,
+          actorId: principal.userId,
+          type: "CREATED",
+          title: "Workspace jurisdiction created",
+          summary: "A jurisdiction profile was created for this workspace.",
+          metadata: { jurisdictionId: jurisdiction.id },
+        },
+      });
+      return jurisdiction;
     });
 
     return mapJurisdiction(created);

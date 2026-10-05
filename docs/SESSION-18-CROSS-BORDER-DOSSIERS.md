@@ -24,4 +24,6 @@ A dossier organizes preparation only. The platform does not execute payments, as
 
 ## Deployment
 
+Use the explicit validation, migration, and drift-check procedure in [Session 19 — Production Data Integrity & Migration Control](./SESSION-19-PRODUCTION-DATA-INTEGRITY.md). A migration's presence in Git does not prove that a database has been migrated or verified.
+
 Apply `prisma/migrations/20261005224500_cross_border_dossiers` using the normal database migration process after verifying the intended PostgreSQL target.

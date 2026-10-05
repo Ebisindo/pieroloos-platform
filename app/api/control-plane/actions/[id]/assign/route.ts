@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { z } from "zod";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
@@ -65,7 +66,13 @@ export async function POST(
 
   const updatedAt = new Date();
   try {
-    const result = await prisma.$transaction(async (transaction) => {
+    const result = await withAuthorizedWorkspaceTransaction(principal, "compliance:write", async (transaction) => {
+      const currentMembership = await transaction.membership.findFirst({
+        where: { userId: parsed.data.assigneeUserId, organizationId: principal.organizationId },
+        select: { id: true },
+      });
+      if (!currentMembership) throw new Error("ASSIGNEE_NOT_MEMBER");
+
       const updated = await transaction.operationalAction.updateMany({
         where: {
           id,
@@ -108,6 +115,9 @@ export async function POST(
 
     return NextResponse.json({ data: mapOperationalAction(result) });
   } catch (error) {
+    if (error instanceof Error && error.message === "ASSIGNEE_NOT_MEMBER") {
+      return NextResponse.json({ error: "Assignee must be a member of the active organization." }, { status: 422 });
+    }
     if (error instanceof Error && error.message === "ACTION_NOT_FOUND") {
       return NextResponse.json({ error: "Operational action not found." }, { status: 404 });
     }

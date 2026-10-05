@@ -7,7 +7,25 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pieroloos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pieroloos_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
+      DATABASE_ENV: ci
+      NEXTAUTH_SECRET: ci-only-not-a-deployment-secret
+      DATABASE_URL_CI: postgresql://postgres:postgres@localhost:5432/pieroloos_ci?schema=public
+      SHADOW_DATABASE_URL_CI: postgresql://postgres:postgres@localhost:5432/pieroloos_shadow?schema=public
       DATABASE_URL: postgresql://ci:ci@localhost:5432/pieroloos_ci
 
     steps:
@@ -23,11 +41,14 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Generate Prisma client
-        run: npm run db:generate
+      - name: Create disposable shadow database
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE pieroloos_shadow;'
 
-      - name: Validate Prisma schema
-        run: npm run db:validate
+      - name: Validate, migrate, and verify PostgreSQL
+        run: npm run db:deploy -- ci
+
+      - name: Test PostgreSQL data integrity
+        run: npm run test:db
 
       - name: Typecheck
         run: npm run typecheck

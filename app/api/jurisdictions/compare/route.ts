@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { jurisdictionRepository } from "@/lib/db/jurisdiction-repository";
 import { comparisonRepository } from "@/lib/db/comparison-repository";
 import { compareJurisdictions } from "@/lib/services/jurisdiction-engine";
@@ -7,8 +8,7 @@ import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(req.url).origin) {
+  if (hasInvalidRequestOrigin(req)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
@@ -46,13 +46,12 @@ export async function POST(req: Request) {
     const results = compareJurisdictions(parsed.data, jurisdictions);
 
     const snapshot = await comparisonRepository.create({
-      workspaceId: context.principal.workspaceId,
       businessProfileId: parsed.data.businessProfileId,
       methodologyVersion: parsed.data.methodologyVersion,
       criteriaJson: parsed.data.criteria,
       jurisdictionIds: parsed.data.jurisdictionIds,
       resultsJson: results,
-    });
+    }, context.principal);
 
     return NextResponse.json(
       { data: { snapshot, results } },

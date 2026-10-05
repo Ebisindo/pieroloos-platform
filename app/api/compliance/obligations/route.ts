@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import { createObligationSchema } from "@/lib/validation/compliance";
@@ -20,8 +22,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(request.url).origin) {
+  if (hasInvalidRequestOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     if (!jurisdiction) return NextResponse.json({ error: "Jurisdiction is not available in this workspace." }, { status: 422 });
   }
 
-  const obligation = await prisma.$transaction(async (transaction) => {
+  const obligation = await withAuthorizedWorkspaceTransaction(context.principal, "compliance:write", async (transaction) => {
     const created = await transaction.complianceObligation.create({
       data: {
         organizationId: principal.organizationId,

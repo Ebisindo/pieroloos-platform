@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth-options";
-import { hasPermission, type Permission, type Role } from "@/lib/auth/roles";
-import type { WorkspacePermission, WorkspacePrincipal } from "@/lib/auth/workspace-access";
+import { isRole, permissionsForRole, type WorkspacePrincipal } from "@/lib/auth/workspace-access";
+import type { Role } from "@/lib/auth/roles";
 import { prisma } from "@/lib/db/prisma";
 
 export type AccessibleWorkspace = {
@@ -11,24 +11,6 @@ export type AccessibleWorkspace = {
   organizationId: string;
   role: Role;
 };
-
-const permissionMap: Array<[WorkspacePermission, Permission]> = [
-  ["workspace:read", "workspace:read"],
-  ["workspace:manage", "workspace:manage"],
-  ["settings:manage", "settings:manage"],
-  ["jurisdictions:read", "workspace:read"],
-  ["jurisdictions:write", "workspace:manage"],
-  ["formation:read", "workspace:read"],
-  ["formation:write", "engagement:write"],
-  ["documents:read", "evidence:read"],
-  ["documents:write", "evidence:write"],
-  ["documents:review", "evidence:review"],
-  ["compliance:read", "compliance:read"],
-  ["compliance:write", "compliance:write"],
-  ["reports:read", "report:read"],
-  ["reports:write", "report:write"],
-  ["audit:read", "audit:read"],
-];
 
 export async function getWorkspaceContext() {
   const session = await getServerSession(authOptions);
@@ -48,13 +30,17 @@ export async function getWorkspaceContext() {
     },
   });
 
-  const workspaces: AccessibleWorkspace[] = memberships.flatMap((membership) =>
-    membership.organization.workspaces.map((workspace) => ({
+  const workspaces: AccessibleWorkspace[] = memberships.flatMap((membership) => {
+    const role = membership.role.toLowerCase();
+    if (!isRole(role)) {
+      throw new Error(`Unsupported membership role "${membership.role}" for user "${userId}".`);
+    }
+    return membership.organization.workspaces.map((workspace) => ({
       ...workspace,
       organizationId: membership.organizationId,
-      role: membership.role.toLowerCase() as Role,
-    })),
-  );
+      role,
+    }));
+  });
 
   const cookieJar = await cookies();
   const requestedWorkspaceId = cookieJar.get("active-workspace")?.value;
@@ -66,9 +52,8 @@ export async function getWorkspaceContext() {
         userId,
         organizationId: activeWorkspace.organizationId,
         workspaceId: activeWorkspace.id,
-        permissions: permissionMap
-          .filter(([, rolePermission]) => hasPermission(activeWorkspace.role, rolePermission))
-          .map(([permission]) => permission),
+        role: activeWorkspace.role,
+        permissions: permissionsForRole(activeWorkspace.role),
       }
     : null;
 

@@ -24,8 +24,11 @@ vi.mock("@/lib/auth/workspace-context", () => ({ getWorkspaceContext: getWorkspa
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     $transaction: vi.fn(async (callback) => callback({
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: "OWNER" }) },
+      workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
       operationalAction: {
         findUnique: operationalActionFindUniqueMock,
+        findFirst: operationalActionFindUniqueMock,
         update: operationalActionUpdateMock,
       },
       operationalActionAuditEvent: {
@@ -34,6 +37,7 @@ vi.mock("@/lib/db/prisma", () => ({
     })),
     operationalAction: {
       findUnique: operationalActionFindUniqueMock,
+      findFirst: operationalActionFindUniqueMock,
       update: operationalActionUpdateMock,
     },
     operationalActionAuditEvent: {
@@ -75,6 +79,7 @@ const principal: WorkspacePrincipal = {
   userId: "user-1",
   organizationId: "org-1",
   workspaceId: "workspace-1",
+  role: "owner",
   permissions: ["compliance:read"],
 };
 
@@ -123,7 +128,7 @@ describe("control-plane actions GET", () => {
     const response = await transitionPost(
       new Request("http://localhost/api/control-plane/actions/action-1/transition", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", origin: "http://localhost" },
         body: JSON.stringify({ status: "IN_PROGRESS", expectedUpdatedAt: "2024-01-01T00:00:00.000Z" }),
       }),
       { params: Promise.resolve({ id: "action-1" }) },
@@ -143,7 +148,7 @@ describe("control-plane actions GET", () => {
     const response = await transitionPost(
       new Request("http://localhost/api/control-plane/actions/action-1/transition", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", origin: "http://localhost" },
         body: JSON.stringify({ status: "ASSIGNED", expectedUpdatedAt: "2024-01-01T00:00:00.000Z" }),
       }),
       { params: Promise.resolve({ id: "action-1" }) },
@@ -163,7 +168,7 @@ describe("control-plane actions GET", () => {
     const response = await transitionPost(
       new Request("http://localhost/api/control-plane/actions/action-1/transition", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", origin: "http://localhost" },
         body: JSON.stringify({ status: "RESOLVED", expectedUpdatedAt: "2024-01-01T00:00:00.000Z" }),
       }),
       { params: Promise.resolve({ id: "action-1" }) },
@@ -207,7 +212,7 @@ describe("control-plane actions GET", () => {
     const response = await transitionPost(
       new Request("http://localhost/api/control-plane/actions/action-1/transition", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", origin: "http://localhost" },
         body: JSON.stringify({ status: "IN_PROGRESS", expectedUpdatedAt: "2024-01-01T00:00:00.000Z" }),
       }),
       { params: Promise.resolve({ id: "action-1" }) },
@@ -252,7 +257,7 @@ describe("control-plane actions GET", () => {
     const response = await resolvePost(
       new Request("http://localhost/api/control-plane/actions/action-1/resolve", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", origin: "http://localhost" },
         body: JSON.stringify({ resolutionNote: "Evidence replaced.", expectedUpdatedAt: "2024-01-01T00:00:00.000Z" }),
       }),
       { params: Promise.resolve({ id: "action-1" }) },
@@ -312,7 +317,7 @@ describe("control-plane actions GET", () => {
     });
     const request = new Request("http://localhost/api/control-plane/actions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", origin: "http://localhost" },
       body: JSON.stringify({ signalId: "evidence-gap:obligation-1" }),
     });
 
@@ -329,7 +334,7 @@ describe("control-plane actions GET", () => {
     } });
     const request = new Request("http://localhost/api/control-plane/actions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", origin: "http://localhost" },
       body: JSON.stringify({ signalId: "client-invented-signal" }),
     });
 
@@ -369,7 +374,7 @@ describe("control-plane actions GET", () => {
     createActionFromTrustedSignalMock.mockResolvedValue({ action: { id: "action-1" }, created: false });
     const request = new Request("http://localhost/api/control-plane/actions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", origin: "http://localhost" },
       body: JSON.stringify({ signalId: "evidence-gap:obligation-1" }),
     });
 

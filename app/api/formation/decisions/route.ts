@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { formationRepository } from "@/lib/db/formation-repository";
 import { prisma } from "@/lib/db/prisma";
 import { workingJurisdictionDecisionSchema } from "@/lib/validation/formation";
 
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(request.url).origin) {
+  if (hasInvalidRequestOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
@@ -56,7 +56,6 @@ export async function POST(request: Request) {
   if (!jurisdiction) return NextResponse.json({ error: "Selected jurisdiction is not available." }, { status: 404 });
 
   const decision = await formationRepository.createWorkingJurisdictionDecision({
-    workspaceId: principal.workspaceId,
     businessProfileId: profile.id,
     comparisonSnapshotId: comparison.id,
     jurisdictionId: jurisdiction.id,
@@ -64,7 +63,7 @@ export async function POST(request: Request) {
     decidedByUserId: principal.userId,
     professionalReviewRequired: true,
     professionalReviewCompleted: false,
-  });
+  }, principal);
 
   return NextResponse.json({ data: decision }, { status: 201 });
 }

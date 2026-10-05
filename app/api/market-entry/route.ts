@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { prisma } from "@/lib/db/prisma";
@@ -115,7 +116,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const plan = await prisma.$transaction(async (transaction) => {
+  const plan = await withAuthorizedWorkspaceTransaction(principal, "jurisdictions:write", async (transaction) => {
     const existingDecision = await transaction.workingJurisdictionDecision.findFirst({
       where: {
         workspaceId: principal.workspaceId,

@@ -3,8 +3,9 @@ import { clientRepository } from "@/lib/db/client-repository";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 import { clientIntakeSchema } from "@/lib/validation/intake";
 
-const { transactionMock, workspaceFindFirstMock, clientCreateMock } = vi.hoisted(() => ({
+const { transactionMock, membershipFindUniqueMock, workspaceFindFirstMock, clientCreateMock } = vi.hoisted(() => ({
   transactionMock: vi.fn(),
+  membershipFindUniqueMock: vi.fn(),
   workspaceFindFirstMock: vi.fn(),
   clientCreateMock: vi.fn(),
 }));
@@ -16,6 +17,7 @@ vi.mock("@/lib/db/prisma", () => ({
 describe("client repository authorization", () => {
   beforeEach(() => {
     transactionMock.mockReset();
+    membershipFindUniqueMock.mockReset();
     workspaceFindFirstMock.mockReset();
     clientCreateMock.mockReset();
   });
@@ -29,6 +31,7 @@ describe("client repository authorization", () => {
       userId: "user-1",
       organizationId: "org-1",
       workspaceId: "workspace-1",
+      role: "owner",
       permissions: ["workspace:read"],
     };
 
@@ -39,10 +42,15 @@ describe("client repository authorization", () => {
   });
 
   it("creates the client in the principal's organization and workspace", async () => {
-    transactionMock.mockImplementation((callback) => callback({
-      workspace: { findFirst: workspaceFindFirstMock },
-      client: { create: clientCreateMock },
-    }));
+    transactionMock.mockImplementation((callback) => {
+      membershipFindUniqueMock.mockResolvedValue({ role: "OWNER" });
+      workspaceFindFirstMock.mockResolvedValue({ id: "workspace-2", organizationId: "org-2" });
+      return callback({
+        membership: { findUnique: membershipFindUniqueMock },
+        workspace: { findFirst: workspaceFindFirstMock },
+        client: { create: clientCreateMock },
+      });
+    });
     workspaceFindFirstMock.mockResolvedValue({ id: "workspace-2", organizationId: "org-2" });
     clientCreateMock.mockResolvedValue({ id: "client-1" });
 
@@ -54,6 +62,7 @@ describe("client repository authorization", () => {
       userId: "user-1",
       organizationId: "org-2",
       workspaceId: "workspace-2",
+      role: "owner",
       permissions: ["formation:write"],
     };
 

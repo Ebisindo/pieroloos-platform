@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@prisma/client";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { assertPermission, type WorkspacePrincipal } from "@/lib/auth/workspace-access";
 import type { ClientIntakeInput } from "@/lib/validation/intake";
 
@@ -25,7 +26,7 @@ function profileData(input: ClientIntakeInput): Prisma.InputJsonObject {
 export const clientRepository = {
   async createFromIntake(input: ClientIntakeInput, principal: WorkspacePrincipal) {
     assertPermission(principal, "formation:write");
-    return prisma.$transaction(async (tx) => {
+    return withAuthorizedWorkspaceTransaction(principal, "formation:write", async (tx) => {
       const workspace = await tx.workspace.findFirst({
         where: {
           id: principal.workspaceId,
@@ -72,9 +73,10 @@ export const clientRepository = {
     });
   },
 
-  async findById(id: string) {
-    return prisma.client.findUnique({
-      where: { id },
+  async findById(id: string, principal: WorkspacePrincipal) {
+    assertPermission(principal, "client:read");
+    return prisma.client.findFirst({
+      where: { id, workspaceId: principal.workspaceId },
       include: {
         businessProfile: true,
         engagements: {
@@ -90,9 +92,10 @@ export const clientRepository = {
     });
   },
 
-  async listByWorkspace(workspaceId: string) {
+  async listByWorkspace(principal: WorkspacePrincipal) {
+    assertPermission(principal, "client:read");
     return prisma.client.findMany({
-      where: { workspaceId },
+      where: { workspaceId: principal.workspaceId },
       orderBy: { updatedAt: "desc" },
       include: { businessProfile: true, engagements: true },
     });
@@ -101,14 +104,38 @@ export const clientRepository = {
   async update(
     id: string,
     data: Partial<Pick<ClientIntakeInput["client"], "legalName" | "email" | "phone" | "residenceCountry">>,
+    principal: WorkspacePrincipal,
   ) {
-    return prisma.client.update({
-      where: { id },
-      data: {
-        ...(data.legalName !== undefined ? { name: data.legalName } : {}),
-        ...(data.email !== undefined ? { email: data.email } : {}),
-        ...(data.residenceCountry !== undefined ? { country: data.residenceCountry } : {}),
-      },
+    assertPermission(principal, "client:write");
+    return withAuthorizedWorkspaceTransaction(principal, "client:write", async (tx) => {
+      const updated = await tx.client.updateMany({
+        where: { id, workspaceId: principal.workspaceId },
+        data: {
+          ...(data.legalName !== undefined ? { name: data.legalName } : {}),
+          ...(data.email !== undefined ? { email: data.email } : {}),
+          ...(data.phone !== undefined ? { phone: data.phone } : {}),
+          ...(data.residenceCountry !== undefined ? { country: data.residenceCountry } : {}),
+        },
+      });
+      if (updated.count !== 1) throw new Error("CLIENT_NOT_FOUND");
+
+      const client = await tx.client.findFirst({
+        where: { id, workspaceId: principal.workspaceId },
+      });
+      if (!client) throw new Error("CLIENT_NOT_FOUND");
+
+      await tx.activity.create({
+        data: {
+          workspaceId: principal.workspaceId,
+          actorId: principal.userId,
+          type: "UPDATED",
+          title: "Client profile updated",
+          summary: "Client profile details were updated.",
+          metadata: { clientId: id },
+        },
+      });
+
+      return client;
     });
   },
 };

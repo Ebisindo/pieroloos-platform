@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { prisma } from "@/lib/db/prisma";
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const dossier = await prisma.$transaction(async (transaction) => {
+  const dossier = await withAuthorizedWorkspaceTransaction(principal, "compliance:write", async (transaction) => {
     const created = await transaction.crossBorderDossier.create({
       data: {
         workspaceId: principal.workspaceId,

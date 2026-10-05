@@ -9,11 +9,14 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "test:db": "node scripts/run-db-tests.mjs",
     "test:e2e": "playwright test",
+    "db:inventory": "node scripts/check-migration-inventory.mjs",
+    "db:deploy": "node scripts/db-deploy.mjs",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:format": "prisma format",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate:dev": "prisma migrate dev"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

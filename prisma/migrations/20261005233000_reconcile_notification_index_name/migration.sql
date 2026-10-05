@@ -1,0 +1,2 @@
+ALTER INDEX "ComplianceNotification_organizationId_workspaceId_scheduledFor_"
+RENAME TO "ComplianceNotification_organizationId_workspaceId_scheduled_idx";

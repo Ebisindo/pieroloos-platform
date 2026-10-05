@@ -42,6 +42,7 @@ const principal: WorkspacePrincipal = {
   userId: "user-1",
   organizationId: "org-1",
   workspaceId: "workspace-1",
+  role: "owner",
   permissions: ["compliance:write", "compliance:read", "documents:review"],
 };
 
@@ -70,6 +71,8 @@ describe("cross-border dossier routes", () => {
     transactionDossierFindFirstMock.mockReset().mockResolvedValue({ id: "dossier-1", version: 4, status: "REVIEWED" });
     auditCreateMock.mockReset().mockResolvedValue({ id: "audit-1" });
     transactionMock.mockReset().mockImplementation((callback) => callback({
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: "OWNER" }) },
+      workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
       crossBorderDossier: {
         create: dossierCreateMock,
         updateMany: dossierUpdateManyMock,

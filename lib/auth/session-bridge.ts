@@ -1,20 +1,24 @@
 import { auth } from "@/lib/auth/auth";
+import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import type { AuthContext } from "./session";
-import type { Role } from "./roles";
 
 export async function getPieroloSession(): Promise<AuthContext | null> {
   const session = await auth();
-  if (!session?.user) return null;
+  if (!session?.user?.id || !session.user.email) return null;
+  const workspaceContext = await getWorkspaceContext();
+  if (!workspaceContext.principal) return null;
 
   return {
-    sessionId: session.user.id ?? session.user.email ?? "unknown",
+    sessionId: session.user.id,
     user: {
-      id: session.user.id ?? session.user.email ?? "unknown",
-      organizationId: "",
-      workspaceIds: [],
-      email: session.user.email ?? "",
+      id: session.user.id,
+      organizationId: workspaceContext.principal.organizationId,
+      workspaceIds: workspaceContext.workspaces
+        .filter((workspace) => workspace.organizationId === workspaceContext.principal?.organizationId)
+        .map((workspace) => workspace.id),
+      email: session.user.email,
       name: session.user.name ?? undefined,
-      role: "viewer" as Role,
+      role: workspaceContext.principal.role,
     },
   };
 }

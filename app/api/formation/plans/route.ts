@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import { formationPlanCreateSchema } from "@/lib/validation/formation";
@@ -6,8 +8,7 @@ import { createFormationPlan } from "@/lib/services/formation-engine";
 import { persistFormationPlan } from "@/lib/services/formation-persistence";
 
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(request.url).origin) {
+  if (hasInvalidRequestOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
   });
   if (!jurisdiction) return NextResponse.json({ error: "Selected jurisdiction is not available." }, { status: 404 });
 
-  const savedPlan = await prisma.$transaction(async (transaction) => {
+  const savedPlan = await withAuthorizedWorkspaceTransaction(principal, "formation:write", async (transaction) => {
     const decisionId = `decision-${crypto.randomUUID()}`;
     const decidedAt = new Date();
     await transaction.workingJurisdictionDecision.create({

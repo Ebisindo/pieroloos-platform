@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { prisma } from "@/lib/db/prisma";
@@ -43,7 +44,7 @@ export async function POST(
     return NextResponse.json({ error: "Dossier changed. Refresh before retrying." }, { status: 409 });
   }
 
-  const result = await prisma.$transaction(async (transaction) => {
+  const result = await withAuthorizedWorkspaceTransaction(principal, "compliance:write", async (transaction) => {
     const updatedDossier = await transaction.crossBorderDossier.updateMany({
       where: { id, workspaceId: principal.workspaceId, version: parsed.data.expectedVersion },
       data: {

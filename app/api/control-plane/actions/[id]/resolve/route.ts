@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { z } from "zod";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -50,11 +51,10 @@ export async function POST(
   }
 
   try {
-    const action = await prisma.operationalAction.findUnique({ where: { id } });
+    const action = await prisma.operationalAction.findFirst({
+      where: { id, organizationId: principal.organizationId, workspaceId: principal.workspaceId },
+    });
     if (!action) return NextResponse.json({ error: "Operational action not found." }, { status: 404 });
-    if (action.organizationId !== principal.organizationId || action.workspaceId !== principal.workspaceId) {
-      return NextResponse.json({ error: "Forbidden: workspace boundary violation" }, { status: 403 });
-    }
 
     const current = mapOperationalAction(action);
     let next;
@@ -67,15 +67,22 @@ export async function POST(
       throw error;
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const latest = await tx.operationalAction.findUnique({ where: { id } });
+    const updated = await withAuthorizedWorkspaceTransaction(principal, "compliance:write", async (tx) => {
+      const latest = await tx.operationalAction.findFirst({
+        where: { id, organizationId: principal.organizationId, workspaceId: principal.workspaceId },
+      });
       if (!latest) throw new Error("ACTION_NOT_FOUND");
       if (latest.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
         throw new Error("STALE_ACTION");
       }
 
       const updatedAction = await tx.operationalAction.update({
-        where: { id, updatedAt: expectedUpdatedAt },
+        where: {
+          id,
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+          updatedAt: expectedUpdatedAt,
+        },
         data: {
           status: next.status,
           updatedAt: next.updatedAt,

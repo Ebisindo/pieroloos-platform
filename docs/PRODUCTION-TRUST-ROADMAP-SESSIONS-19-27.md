@@ -34,11 +34,15 @@ Sessions are intentionally ordered: each session establishes capabilities and co
 
 Establish confidence that production data can be deployed, evolved, backed up, restored, and reconciled safely.
 
+Implementation phases and current verification status are tracked in [Session 19 — Production Data Integrity & Migration Control](./SESSION-19-PRODUCTION-DATA-INTEGRITY.md).
+
 **Exit gate:** A repeatable production migration and recovery process is documented and verified; migrations are reviewed for data safety and consistency; backup and restore have been exercised against a representative environment; schema and migration state are reconciled.
 
 ### 20 — Identity, Tenant Isolation & Authorization Hardening
 
 Prove that identity, workspace membership, tenant boundaries, and role-based permissions are enforced consistently across UI, APIs, background work, and data access.
+
+Implementation status, controls, and outstanding verification are tracked in [Session 20 — Identity, Tenant Isolation & Authorization Hardening](./SESSION-20-IDENTITY-TENANT-AUTHORIZATION.md).
 
 **Exit gate:** Cross-tenant access and unauthorized operations are covered by negative tests; every sensitive operation has an explicit authorization policy; identity/session and privileged-access behavior is documented and verified.
 

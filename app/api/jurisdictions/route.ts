@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { jurisdictionRepository } from "@/lib/db/jurisdiction-repository";
 import { jurisdictionCreateSchema } from "@/lib/validation/jurisdiction";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -14,8 +15,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-	const origin = request.headers.get("origin");
-	if (origin && new URL(origin).origin !== new URL(request.url).origin) {
+	if (hasInvalidRequestOrigin(request)) {
 		return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
 	}
 
@@ -33,8 +33,6 @@ export async function POST(request: Request) {
 
 	const data = await jurisdictionRepository.create({
 		...parsed.data,
-		organizationId: context.principal.organizationId,
-		workspaceId: context.principal.workspaceId,
-	});
+	}, context.principal);
 	return NextResponse.json({ data }, { status: 201 });
 }

@@ -8,12 +8,12 @@ export const clientService = {
     return clientRepository.createFromIntake(data, principal);
   },
 
-  get(id: string) {
-    return clientRepository.findById(id);
+  get(id: string, principal: WorkspacePrincipal) {
+    return clientRepository.findById(id, principal);
   },
 
-  list(workspaceId: string) {
-    return clientRepository.listByWorkspace(workspaceId);
+  list(principal: WorkspacePrincipal) {
+    return clientRepository.listByWorkspace(principal);
   },
 };
 

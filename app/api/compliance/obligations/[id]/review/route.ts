@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import { approveComplianceReviewSchema } from "@/lib/validation/compliance";
@@ -6,8 +8,7 @@ import { approveComplianceReviewSchema } from "@/lib/validation/compliance";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, routeContext: RouteContext) {
-  const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(request.url).origin) {
+  if (hasInvalidRequestOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
@@ -45,7 +46,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
     return NextResponse.json({ error: "Attach required evidence before approving review." }, { status: 409 });
   }
 
-  const updated = await prisma.$transaction(async (transaction) => {
+  const updated = await withAuthorizedWorkspaceTransaction(principal, "documents:review", async (transaction) => {
     const result = await transaction.complianceObligation.update({
       where: { id: obligation.id },
       data: { professionalReviewCompleted: true, status: "COMPLIANT", completedAt: new Date() },

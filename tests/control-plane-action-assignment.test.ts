@@ -33,6 +33,7 @@ const principal: WorkspacePrincipal = {
   userId: "user-1",
   organizationId: "org-1",
   workspaceId: "workspace-1",
+  role: "owner",
   permissions: ["compliance:write"],
 };
 
@@ -78,6 +79,11 @@ describe("operational action assignment", () => {
     actionFindFirstMock.mockReset().mockResolvedValue(actionRecord);
     membershipFindFirstMock.mockReset().mockResolvedValue({ id: "membership-2" });
     transactionMock.mockReset().mockImplementation((callback) => callback({
+      membership: {
+        findUnique: vi.fn().mockResolvedValue({ role: "OWNER" }),
+        findFirst: membershipFindFirstMock,
+      },
+      workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
       operationalAction: {
         updateMany: updateManyMock,
         findFirst: transactionActionFindFirstMock,

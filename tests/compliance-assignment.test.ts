@@ -6,14 +6,14 @@ const {
   getWorkspaceContextMock,
   obligationFindFirstMock,
   membershipFindFirstMock,
-  obligationUpdateMock,
+  obligationUpdateManyMock,
   activityCreateMock,
   transactionMock,
 } = vi.hoisted(() => ({
   getWorkspaceContextMock: vi.fn(),
   obligationFindFirstMock: vi.fn(),
   membershipFindFirstMock: vi.fn(),
-  obligationUpdateMock: vi.fn(),
+  obligationUpdateManyMock: vi.fn(),
   activityCreateMock: vi.fn(),
   transactionMock: vi.fn(),
 }));
@@ -31,6 +31,7 @@ const principal: WorkspacePrincipal = {
   userId: "manager-1",
   organizationId: "org-1",
   workspaceId: "workspace-1",
+  role: "owner",
   permissions: ["compliance:write"],
 };
 
@@ -47,10 +48,18 @@ describe("compliance obligation assignment", () => {
     getWorkspaceContextMock.mockReset().mockResolvedValue({ userId: principal.userId, principal });
     obligationFindFirstMock.mockReset().mockResolvedValue({ id: "obligation-1", ownerUserId: "user-old" });
     membershipFindFirstMock.mockReset().mockResolvedValue({ userId: "user-new" });
-    obligationUpdateMock.mockReset().mockResolvedValue({ id: "obligation-1", ownerUserId: "user-new" });
+    obligationUpdateManyMock.mockReset().mockResolvedValue({ count: 1 });
     activityCreateMock.mockReset().mockResolvedValue({ id: "activity-1" });
     transactionMock.mockReset().mockImplementation((callback) => callback({
-      complianceObligation: { update: obligationUpdateMock },
+      membership: {
+        findUnique: vi.fn().mockResolvedValue({ role: "OWNER" }),
+        findFirst: membershipFindFirstMock,
+      },
+      workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
+      complianceObligation: {
+        updateMany: obligationUpdateManyMock,
+        findFirst: obligationFindFirstMock,
+      },
       complianceActivity: { create: activityCreateMock },
     }));
   });
@@ -64,8 +73,8 @@ describe("compliance obligation assignment", () => {
     expect(membershipFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { userId: "user-new", organizationId: "org-1" },
     }));
-    expect(obligationUpdateMock).toHaveBeenCalledWith({
-      where: { id: "obligation-1" },
+    expect(obligationUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "obligation-1", workspaceId: "workspace-1" },
       data: { ownerUserId: "user-new" },
     });
     expect(activityCreateMock).toHaveBeenCalledWith(expect.objectContaining({

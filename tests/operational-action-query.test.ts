@@ -40,6 +40,7 @@ describe("operational action query", () => {
       userId: "user-1",
       organizationId: "org-1",
       workspaceId: "workspace-1",
+      role: "owner",
       permissions: ["compliance:read"],
     };
 
@@ -62,6 +63,7 @@ describe("operational action query", () => {
       userId: "user-1",
       organizationId: "org-1",
       workspaceId: "workspace-1",
+      role: "owner",
       permissions: ["workspace:read"],
     };
 

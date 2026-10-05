@@ -28,6 +28,8 @@ A pathway is an internal planning record. It does not determine whether a market
 
 ## Validation
 
+For any target, use the explicit validation, migration, and drift-check procedure in [Session 19 — Production Data Integrity & Migration Control](./SESSION-19-PRODUCTION-DATA-INTEGRITY.md). A migration's presence in Git does not prove that a database has been migrated or verified.
+
 Run:
 
 ```bash

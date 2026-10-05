@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { prisma } from "@/lib/db/prisma";
@@ -43,7 +44,7 @@ export async function PATCH(
   if (!existing) return NextResponse.json({ error: "Evidence record not found." }, { status: 404 });
 
   const reviewedAt = new Date();
-  const result = await prisma.$transaction(async (transaction) => {
+  const result = await withAuthorizedWorkspaceTransaction(context.principal, "documents:review", async (transaction) => {
     const updated = await transaction.complianceEvidence.updateMany({
       where: { id: existing.id, obligationId: obligation.id },
       data: {
