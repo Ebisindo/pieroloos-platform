@@ -57,6 +57,9 @@ export function transitionAction(
   to: ControlActionStatus,
   now = new Date(),
 ): OperationalAction {
+  if (to === "RESOLVED") {
+    throw new Error("Actions must be resolved with a resolution note.");
+  }
   if (!canTransitionAction(action.status, to)) {
     throw new Error(`Invalid action transition: ${action.status} -> ${to}`);
   }
@@ -65,7 +68,7 @@ export function transitionAction(
     ...action,
     status: to,
     updatedAt: now,
-    resolvedAt: to === "RESOLVED" ? now : action.resolvedAt,
+    resolvedAt: action.resolvedAt,
   };
 }
 
@@ -73,15 +76,18 @@ export function resolveAction(
   action: OperationalAction,
   resolutionNote: string,
   now = new Date(),
-) {
+): OperationalAction {
   if (!resolutionNote.trim()) {
     throw new Error("A resolution note is required.");
   }
-
-  const next = transitionAction(action, "RESOLVED", now);
+  if (!canTransitionAction(action.status, "RESOLVED")) {
+    throw new Error(`Invalid action transition: ${action.status} -> RESOLVED`);
+  }
 
   return {
-    ...next,
+    ...action,
+    status: "RESOLVED",
+    updatedAt: now,
     resolutionNote: resolutionNote.trim(),
     resolvedAt: now,
   };

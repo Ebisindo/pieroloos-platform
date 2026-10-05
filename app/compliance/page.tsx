@@ -41,11 +41,21 @@ export default async function CompliancePage() {
     where: { workspaceId: context.principal.workspaceId },
     include: {
       client: { select: { id: true, name: true, organizationName: true, firstName: true, lastName: true } },
-      evidence: { select: { id: true, documentId: true, evidenceClass: true } },
+      evidence: {
+        select: {
+          id: true,
+          documentId: true,
+          evidenceClass: true,
+          sourceReference: true,
+          validThrough: true,
+          reviewStatus: true,
+          reviewNote: true,
+        },
+      },
     },
     orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
   });
-  const [clients, documents] = await Promise.all([prisma.client.findMany({
+  const [clients, documents, memberships] = await Promise.all([prisma.client.findMany({
     where: { workspaceId: context.principal.workspaceId },
     select: { id: true, name: true, organizationName: true, firstName: true, lastName: true },
     orderBy: { createdAt: "desc" },
@@ -53,6 +63,10 @@ export default async function CompliancePage() {
     where: { workspaceId: context.principal.workspaceId, clientId: { not: null } },
     select: { id: true, name: true, clientId: true },
     orderBy: { createdAt: "desc" },
+  }), prisma.membership.findMany({
+    where: { organizationId: context.principal.organizationId },
+    select: { userId: true, user: { select: { name: true, email: true } } },
+    orderBy: { user: { email: "asc" } },
   })]);
   const snapshot = buildComplianceControlSnapshot(obligations);
 
@@ -81,12 +95,17 @@ export default async function CompliancePage() {
           title: obligation.title,
           type: obligation.type,
           status: obligation.status,
+          ownerUserId: obligation.ownerUserId,
           dueAt: obligation.dueAt?.toISOString() ?? null,
           requiresEvidence: obligation.requiresEvidence,
           evidence: obligation.evidence.map((item) => ({
             id: item.id,
             documentId: item.documentId,
             evidenceClass: item.evidenceClass,
+            sourceReference: item.sourceReference,
+            validThrough: item.validThrough?.toISOString() ?? null,
+            reviewStatus: item.reviewStatus,
+            reviewNote: item.reviewNote,
           })),
         }))}
         clients={clients.map((client) => ({
@@ -99,6 +118,10 @@ export default async function CompliancePage() {
           id: document.id,
           name: document.name,
           clientId: document.clientId!,
+        }))}
+        teamMembers={memberships.map((membership) => ({
+          userId: membership.userId,
+          name: membership.user.name || membership.user.email,
         }))}
         canManage={context.principal.permissions.includes("compliance:write")}
         canReview={context.principal.permissions.includes("documents:review")}

@@ -34,6 +34,17 @@ export async function POST(request: Request, routeContext: RouteContext) {
   });
   if (!document) return NextResponse.json({ error: "Document not found for this client and workspace." }, { status: 404 });
 
+  const validThrough = parsed.data.validThrough
+    ? new Date(Date.UTC(
+        parsed.data.validThrough.getUTCFullYear(),
+        parsed.data.validThrough.getUTCMonth(),
+        parsed.data.validThrough.getUTCDate(),
+        23,
+        59,
+        59,
+        999,
+      ))
+    : null;
   const evidence = await prisma.$transaction(async (transaction) => {
     const created = await transaction.complianceEvidence.create({
       data: {
@@ -41,6 +52,8 @@ export async function POST(request: Request, routeContext: RouteContext) {
         documentId: document.id,
         evidenceClass: parsed.data.evidenceClass,
         note: parsed.data.note,
+        sourceReference: parsed.data.sourceReference || null,
+        validThrough,
       },
     });
     await transaction.complianceActivity.create({
@@ -49,7 +62,12 @@ export async function POST(request: Request, routeContext: RouteContext) {
         action: "EVIDENCE_ATTACHED",
         actorUserId: principal.userId,
         note: parsed.data.note,
-        metadata: { evidenceId: created.id, documentId: document.id },
+        metadata: {
+          evidenceId: created.id,
+          documentId: document.id,
+          sourceReference: created.sourceReference,
+          validThrough: created.validThrough?.toISOString() ?? null,
+        },
       },
     });
     return created;

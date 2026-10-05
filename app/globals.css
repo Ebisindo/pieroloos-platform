@@ -118,6 +118,19 @@ h1 { font-family:"Space Grotesk",sans-serif; font-size:clamp(27px,3vw,39px); lin
 .action-copy { min-width:0; }
 .action-title { color:#dfe3ed; font-size:12px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; }
 .action-description { margin-top:4px; color:#737d97; font-size:10px; line-height:1.5; }
+.action-assignee { margin-top:7px; color:#929bb5; font-size:10px; }
+.action-management { display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px; flex-basis:100%; padding-top:10px; border-top:1px solid rgba(171,184,220,.07); }
+.action-control { display:flex; flex-wrap:wrap; align-items:center; gap:7px; max-width:100%; }
+.action-control label,.action-transition-control > span { color:#929bb5; font-size:10px; }
+.action-control .form-input { width:auto; min-width:180px; min-height:34px; padding:6px 9px; }
+.action-control textarea.form-input { width:min(340px,70vw); }
+.action-control .button { min-height:34px; padding:0 10px; font-size:10px; }
+.action-error { padding:0 20px 12px; color:var(--danger); font-size:11px; }
+.notification-list { margin:0; padding:0 20px 16px; list-style:none; }
+.notification-row { display:flex; justify-content:space-between; gap:12px; padding:11px 0; border-top:1px solid rgba(171,184,220,.07); }
+.notification-row h3 { color:#dfe3ed; font-size:11px; font-weight:600; }
+.notification-row p { margin-top:4px; color:#929bb5; font-size:10px; line-height:1.5; }
+.notification-row time { flex-shrink:0; color:#737d97; font-size:9px; }
 .action-details { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:6px; }
 .action-due { flex-basis:100%; color:#929bb5; font-size:10px; text-align:right; }
 .state-list { padding:2px 20px 18px; }
@@ -170,6 +183,7 @@ h1 { font-family:"Space Grotesk",sans-serif; font-size:clamp(27px,3vw,39px); lin
   .action-row { flex-direction:column; gap:9px; }
   .action-details { justify-content:flex-start; }
   .action-due { text-align:left; }
+  .notification-row { flex-direction:column; gap:5px; }
   .page-header { align-items:flex-start; flex-direction:column; }
   .page-actions { width:100%; }
   .page-actions .button { flex:1; }

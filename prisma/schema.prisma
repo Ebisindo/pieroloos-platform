@@ -15,6 +15,51 @@ enum UserRole {
   VIEWER
 }
 
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum MarketEntryStatus {
+  ASSESSING
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+}
+
+enum MarketEntryReviewStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum EvidenceReviewStatus {
+  PENDING
+  VERIFIED
+  CHANGES_REQUESTED
+}
+
+enum CrossBorderDossierStatus {
+  PREPARING
+  REVIEWED
+  CHANGES_REQUESTED
+  ARCHIVED
+}
+
+enum CrossBorderControlStatus {
+  NOT_ASSESSED
+  IN_PROGRESS
+  COMPLETE
+  NOT_APPLICABLE
+}
+
 enum EngagementStatus {
   DRAFT
   INTAKE
@@ -106,6 +151,7 @@ enum OperationalActionEventType {
   ACTION_CREATED
   ACTION_ASSIGNED
   ACTION_STARTED
+  ACTION_SUBMITTED_FOR_REVIEW
   ACTION_BLOCKED
   ACTION_RESOLVED
   ACTION_ESCALATED
@@ -124,6 +170,7 @@ model Organization {
   clients               Client[]
   jurisdictions         Jurisdiction[]
   complianceObligations ComplianceObligation[]
+  marketEntryPlans      MarketEntryPlan[]
 }
 
 model User {
@@ -160,20 +207,23 @@ model Workspace {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization            Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  clients                 Client[]
-  engagements             Engagement[]
-  jurisdictions           Jurisdiction[]
-  complianceItems         ComplianceItem[]
-  settings                WorkspaceSettings?
-  jurisdictionComparisons JurisdictionComparison[]
-  formationPlans          FormationPlan[]
-  workingDecisions        WorkingJurisdictionDecision[]
-  complianceObligations   ComplianceObligation[]
-  documents               Document[]
-  reports                 Report[]
-  activities              Activity[]
-  tasks                   Task[]
+  organization               Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clients                    Client[]
+  engagements                Engagement[]
+  jurisdictions              Jurisdiction[]
+  complianceItems            ComplianceItem[]
+  settings                   WorkspaceSettings?
+  jurisdictionComparisons    JurisdictionComparison[]
+  formationPlans             FormationPlan[]
+  workingDecisions           WorkingJurisdictionDecision[]
+  complianceObligations      ComplianceObligation[]
+  marketEntryPlans           MarketEntryPlan[]
+  marketReadinessAssessments MarketReadinessAssessment[]
+  documents                  Document[]
+  reports                    Report[]
+  activities                 Activity[]
+  tasks                      Task[]
+  crossBorderDossiers        CrossBorderDossier[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -204,6 +254,7 @@ model Client {
   engagements           Engagement[]
   documents             Document[]
   reports               Report[]
+  crossBorderDossiers   CrossBorderDossier[]
 
   @@index([workspaceId])
 }
@@ -228,8 +279,9 @@ model BusinessProfile {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  formationPlans FormationPlan[]
+  client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  formationPlans   FormationPlan[]
+  marketEntryPlans MarketEntryPlan[]
 }
 
 model Engagement {
@@ -274,14 +326,17 @@ model Jurisdiction {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  organization          Organization?                 @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  workspace             Workspace?                    @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  evidence              Evidence[]
-  roadmap               FormationRoadmap[]
-  observations          JurisdictionObservation[]
-  workingDecisions      WorkingJurisdictionDecision[]
-  formationPlans        FormationPlan[]
-  complianceObligations ComplianceObligation[]
+  organization                   Organization?                 @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  workspace                      Workspace?                    @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  evidence                       Evidence[]
+  roadmap                        FormationRoadmap[]
+  observations                   JurisdictionObservation[]
+  workingDecisions               WorkingJurisdictionDecision[]
+  formationPlans                 FormationPlan[]
+  complianceObligations          ComplianceObligation[]
+  marketEntryPlans               MarketEntryPlan[]
+  crossBorderDossiersOrigin      CrossBorderDossier[]          @relation("CrossBorderOrigin")
+  crossBorderDossiersDestination CrossBorderDossier[]          @relation("CrossBorderDestination")
 
   @@index([workspaceId])
   @@index([country])
@@ -377,9 +432,10 @@ model Document {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  evidence  Evidence? @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  workspace                  Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client                     Client?                      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  evidence                   Evidence?                    @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  crossBorderControlEvidence CrossBorderControlEvidence[]
 
   @@index([workspaceId])
   @@index([clientId])
@@ -489,6 +545,7 @@ model JurisdictionComparison {
 
   workspace        Workspace                     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   workingDecisions WorkingJurisdictionDecision[]
+  marketEntryPlans MarketEntryPlan[]
 
   @@index([workspaceId, createdAt])
   @@index([businessProfileId, createdAt])
@@ -510,6 +567,7 @@ model WorkingJurisdictionDecision {
   comparisonSnapshot JurisdictionComparison @relation(fields: [comparisonSnapshotId], references: [id], onDelete: Cascade)
   jurisdiction       Jurisdiction           @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
   formationPlans     FormationPlan[]
+  marketEntryPlans   MarketEntryPlan[]
 
   @@index([workspaceId, businessProfileId])
   @@index([jurisdictionId])
@@ -536,6 +594,7 @@ model FormationPlan {
   jurisdiction                Jurisdiction                @relation(fields: [jurisdictionId], references: [id])
   stages                      FormationStage[]
   complianceObligations       ComplianceObligation[]
+  marketEntryPlans            MarketEntryPlan[]
 
   @@index([workspaceId, createdAt])
   @@index([clientId])
@@ -652,6 +711,75 @@ model ComplianceObligation {
   @@index([clientId])
 }
 
+model MarketEntryPlan {
+  id                        String                  @id @default(cuid())
+  workspaceId               String
+  businessProfileId         String
+  comparisonSnapshotId      String
+  targetJurisdictionId      String
+  formationPlanId           String?
+  rationale                 String
+  status                    MarketEntryStatus       @default(ASSESSING)
+  reviewStatus              MarketEntryReviewStatus @default(PENDING)
+  reviewNote                String?
+  reviewedByUserId          String?
+  reviewedAt                DateTime?
+  reviewedAssessmentVersion Int?
+  createdByUserId           String
+  version                   Int                     @default(1)
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  workspace                     Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  businessProfile               BusinessProfile              @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
+  comparisonSnapshot            JurisdictionComparison       @relation(fields: [comparisonSnapshotId], references: [id], onDelete: Restrict)
+  targetJurisdiction            Jurisdiction                 @relation(fields: [targetJurisdictionId], references: [id], onDelete: Restrict)
+  formationPlan                 FormationPlan?               @relation(fields: [formationPlanId], references: [id], onDelete: SetNull)
+  auditEvents                   MarketEntryAuditEvent[]
+  readinessAssessments          MarketReadinessAssessment[]
+  crossBorderDossiers           CrossBorderDossier[]
+  organization                  Organization?                @relation(fields: [organizationId], references: [id])
+  organizationId                String?
+  workingJurisdictionDecision   WorkingJurisdictionDecision? @relation(fields: [workingJurisdictionDecisionId], references: [id])
+  workingJurisdictionDecisionId String?
+
+  @@index([workspaceId, status, updatedAt])
+  @@index([businessProfileId, updatedAt])
+  @@index([targetJurisdictionId, status])
+}
+
+model MarketEntryAuditEvent {
+  id                String   @id @default(cuid())
+  marketEntryPlanId String
+  workspaceId       String
+  actorUserId       String
+  eventType         String
+  details           Json?
+  occurredAt        DateTime @default(now())
+
+  marketEntryPlan MarketEntryPlan @relation(fields: [marketEntryPlanId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, occurredAt])
+  @@index([marketEntryPlanId, occurredAt])
+}
+
+model MarketReadinessAssessment {
+  id                String   @id @default(cuid())
+  marketEntryPlanId String
+  workspaceId       String
+  assessedByUserId  String
+  planVersion       Int
+  status            String
+  resultJson        Json
+  assessedAt        DateTime @default(now())
+
+  marketEntryPlan MarketEntryPlan @relation(fields: [marketEntryPlanId], references: [id], onDelete: Restrict)
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, assessedAt])
+  @@index([marketEntryPlanId, assessedAt])
+}
+
 model ComplianceActivity {
   id           String   @id @default(cuid())
   obligationId String
@@ -681,16 +809,103 @@ model ComplianceReminder {
 }
 
 model ComplianceEvidence {
-  id            String   @id @default(cuid())
-  obligationId  String
-  documentId    String
-  evidenceClass String
-  note          String?
-  createdAt     DateTime @default(now())
+  id               String               @id @default(cuid())
+  obligationId     String
+  documentId       String
+  evidenceClass    String
+  note             String?
+  sourceReference  String?
+  validThrough     DateTime?
+  reviewStatus     EvidenceReviewStatus @default(PENDING)
+  reviewNote       String?
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime             @default(now())
 
   obligation ComplianceObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
 
-  @@index([obligationId])
+  @@index([obligationId, reviewStatus, validThrough])
+}
+
+model CrossBorderDossier {
+  id                        String                   @id @default(cuid())
+  workspaceId               String
+  clientId                  String
+  marketEntryPlanId         String?
+  originJurisdictionId      String
+  destinationJurisdictionId String
+  counterpartyName          String
+  counterpartyCountry       String?
+  activityDescription       String
+  currencyCode              String?
+  estimatedValue            Decimal?                 @db.Decimal(18, 2)
+  status                    CrossBorderDossierStatus @default(PREPARING)
+  version                   Int                      @default(1)
+  createdByUserId           String
+  reviewedByUserId          String?
+  reviewNote                String?
+  reviewedAt                DateTime?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  workspace               Workspace                      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client                  Client                         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  marketEntryPlan         MarketEntryPlan?               @relation(fields: [marketEntryPlanId], references: [id], onDelete: SetNull)
+  originJurisdiction      Jurisdiction                   @relation("CrossBorderOrigin", fields: [originJurisdictionId], references: [id], onDelete: Restrict)
+  destinationJurisdiction Jurisdiction                   @relation("CrossBorderDestination", fields: [destinationJurisdictionId], references: [id], onDelete: Restrict)
+  controls                CrossBorderDossierControl[]
+  auditEvents             CrossBorderDossierAuditEvent[]
+
+  @@index([workspaceId, status, updatedAt])
+  @@index([clientId, createdAt])
+  @@index([originJurisdictionId, destinationJurisdictionId])
+}
+
+model CrossBorderDossierControl {
+  id               String                   @id @default(cuid())
+  dossierId        String
+  category         String
+  title            String
+  description      String?
+  status           CrossBorderControlStatus @default(NOT_ASSESSED)
+  requiresEvidence Boolean                  @default(false)
+  createdByUserId  String
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  dossier  CrossBorderDossier           @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  evidence CrossBorderControlEvidence[]
+
+  @@index([dossierId, status])
+}
+
+model CrossBorderControlEvidence {
+  id             String   @id @default(cuid())
+  controlId      String
+  documentId     String
+  linkedByUserId String
+  linkedAt       DateTime @default(now())
+
+  control  CrossBorderDossierControl @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  document Document                  @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@unique([controlId, documentId])
+  @@index([documentId])
+}
+
+model CrossBorderDossierAuditEvent {
+  id          String   @id @default(cuid())
+  dossierId   String
+  workspaceId String
+  actorUserId String
+  eventType   String
+  details     Json?
+  occurredAt  DateTime @default(now())
+
+  dossier CrossBorderDossier @relation(fields: [dossierId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, occurredAt])
+  @@index([dossierId, occurredAt])
 }
 
 model OperationalAction {
@@ -741,6 +956,30 @@ model OperationalActionAuditEvent {
   @@index([actionId, occurredAt])
 }
 
+model ComplianceNotification {
+  id              String              @id @default(cuid())
+  organizationId  String
+  workspaceId     String
+  obligationId    String?
+  actionId        String?
+  recipientUserId String?
+  channel         NotificationChannel
+  subject         String
+  body            String
+  scheduledFor    DateTime
+  status          NotificationStatus  @default(QUEUED)
+  sentAt          DateTime?
+  failedAt        DateTime?
+  failureReason   String?
+  dedupeKey       String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([organizationId, workspaceId, dedupeKey])
+  @@index([organizationId, workspaceId, scheduledFor])
+  @@index([organizationId, workspaceId, status])
+}
+
 model OperationalEscalationEvent {
   id             String   @id @default(cuid())
   organizationId String
@@ -751,6 +990,7 @@ model OperationalEscalationEvent {
   reason         String
   occurredAt     DateTime @default(now())
 
+  @@unique([actionId, toLevel])
   @@index([organizationId, workspaceId, occurredAt])
   @@index([actionId, occurredAt])
 }

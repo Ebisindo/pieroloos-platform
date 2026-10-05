@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import { mapOperationalAction } from "@/lib/db/operational-action-query";
 import { transitionAction, type ControlActionStatus } from "@/lib/domain/action-control";
 
 const transitionSchema = z.object({
-  status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "BLOCKED", "PENDING_REVIEW", "RESOLVED", "CANCELLED"]),
+  status: z.enum(["IN_PROGRESS", "BLOCKED", "PENDING_REVIEW", "CANCELLED"]),
   expectedUpdatedAt: z.string().datetime(),
 });
 
@@ -15,17 +16,23 @@ function mapAuditEventType(status: ControlActionStatus) {
     case "ASSIGNED": return "ACTION_ASSIGNED";
     case "IN_PROGRESS": return "ACTION_STARTED";
     case "BLOCKED": return "ACTION_BLOCKED";
-    case "PENDING_REVIEW": return "ACTION_STARTED";
-    case "RESOLVED": return "ACTION_RESOLVED";
+    case "PENDING_REVIEW": return "ACTION_SUBMITTED_FOR_REVIEW";
     case "CANCELLED": return "ACTION_CANCELLED";
     default: return "ACTION_CREATED";
   }
+}
+
+function isRecordNotFoundError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
 }
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (hasInvalidRequestOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
   const { id } = await params;
 
   const context = await getWorkspaceContext();
@@ -61,7 +68,15 @@ export async function POST(
     }
 
     const current = mapOperationalAction(action);
-    const next = transitionAction(current, parsed.data.status, new Date());
+    let next;
+    try {
+      next = transitionAction(current, parsed.data.status, new Date());
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Invalid action transition:")) {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+      throw error;
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       const latest = await tx.operationalAction.findUnique({ where: { id } });
@@ -106,6 +121,9 @@ export async function POST(
     if (error instanceof Error && error.message === "STALE_ACTION") {
       return NextResponse.json({ error: "Action changed since it was loaded. Refresh before retrying." }, { status: 409 });
     }
-    return NextResponse.json({ error: "Unable to update operational action." }, { status: 500 });
+    if (isRecordNotFoundError(error)) {
+      return NextResponse.json({ error: "Action changed since it was loaded. Refresh before retrying." }, { status: 409 });
+    }
+    throw error;
   }
 }

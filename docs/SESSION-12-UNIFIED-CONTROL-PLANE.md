@@ -145,3 +145,5 @@ The next architectural transition should connect the control plane to:
 - background workers
 - durable notification delivery
 - richer Command Center action management
+
+Session 13 has since added audited, optimistic-lock action assignment and lifecycle routes, plus an authenticated escalation worker that writes escalation events and a durable notification outbox atomically. Recipient-scoped in-app notices are displayed in the Command Center. External delivery, scheduler configuration, and additional server-derived signal sources remain follow-up work.

@@ -33,6 +33,17 @@ export const addComplianceEvidenceSchema = z.object({
   documentId: z.string().min(1),
   evidenceClass: z.enum(["E0","E1","E2","E3","E4"]),
   note: z.string().max(4000).optional(),
+  sourceReference: z.string().trim().max(2000).optional(),
+  validThrough: z.coerce.date().optional().nullable(),
+});
+
+export const reviewComplianceEvidenceSchema = z.object({
+  reviewStatus: z.enum(["VERIFIED", "CHANGES_REQUESTED"]),
+  note: z.string().trim().min(4).max(4000),
+});
+
+export const assignComplianceObligationSchema = z.object({
+  ownerUserId: z.string().min(1).nullable(),
 });
 
 export const reminderSchema = z.object({

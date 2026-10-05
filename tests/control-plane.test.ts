@@ -28,6 +28,7 @@ describe("Session 12 control plane", () => {
   it("requires a resolution note", () => {
     const started = transitionAction(base, "ASSIGNED");
     const inProgress = transitionAction(started, "IN_PROGRESS");
+    expect(() => transitionAction(inProgress, "RESOLVED")).toThrow("resolution note");
     expect(() => resolveAction(inProgress, " ")).toThrow();
     expect(resolveAction(inProgress, "Replacement evidence uploaded").status).toBe("RESOLVED");
   });

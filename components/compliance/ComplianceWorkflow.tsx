@@ -14,25 +14,37 @@ type Obligation = {
   title: string;
   type: string;
   status: string;
+  ownerUserId: string | null;
   dueAt: string | null;
   requiresEvidence: boolean;
-  evidence: Array<{ id: string; documentId: string; evidenceClass: string }>;
+  evidence: Array<{
+    id: string;
+    documentId: string;
+    evidenceClass: string;
+    sourceReference: string | null;
+    validThrough: string | null;
+    reviewStatus: string;
+    reviewNote: string | null;
+  }>;
 };
 
 type ClientOption = { id: string; name: string };
 type DocumentOption = { id: string; name: string; clientId: string };
+type TeamMemberOption = { userId: string; name: string };
 const terminalStatuses = new Set(["COMPLETE", "COMPLETED", "COMPLIANT", "WAIVED", "NOT_APPLICABLE"]);
 
 export function ComplianceWorkflow({
   obligations,
   clients,
   documents,
+  teamMembers,
   canManage,
   canReview,
 }: {
   obligations: Obligation[];
   clients: ClientOption[];
   documents: DocumentOption[];
+  teamMembers: TeamMemberOption[];
   canManage: boolean;
   canReview: boolean;
 }) {
@@ -41,6 +53,9 @@ export function ComplianceWorkflow({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [selectedEvidence, setSelectedEvidence] = useState<Record<string, string>>({});
+  const [evidenceSource, setEvidenceSource] = useState<Record<string, string>>({});
+  const [evidenceValidThrough, setEvidenceValidThrough] = useState<Record<string, string>>({});
+  const [evidenceReviewNotes, setEvidenceReviewNotes] = useState<Record<string, string>>({});
   const [currentTime, setCurrentTime] = useState<number | null>(null);
 
   useEffect(() => {
@@ -109,6 +124,25 @@ export function ComplianceWorkflow({
     }
   }
 
+  async function assignOwner(id: string, ownerUserId: string | null) {
+    setBusyId(id);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/compliance/obligations/${id}/assignment`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ownerUserId }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to assign obligation owner.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to assign obligation owner.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
   async function approveReview(id: string) {
     setBusyId(id);
     setMessage("");
@@ -137,7 +171,12 @@ export function ComplianceWorkflow({
       const response = await fetch(`/api/compliance/obligations/${obligation.id}/evidence`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId, evidenceClass: "E1" }),
+        body: JSON.stringify({
+          documentId,
+          evidenceClass: "E1",
+          sourceReference: evidenceSource[obligation.id] || undefined,
+          validThrough: evidenceValidThrough[obligation.id] || null,
+        }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Unable to attach evidence.");
@@ -145,6 +184,30 @@ export function ComplianceWorkflow({
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to attach evidence.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function reviewEvidence(obligation: Obligation, evidenceId: string, reviewStatus: "VERIFIED" | "CHANGES_REQUESTED") {
+    const note = evidenceReviewNotes[evidenceId]?.trim();
+    if (!note) {
+      setMessage("Add a review note before recording an evidence decision.");
+      return;
+    }
+    setBusyId(obligation.id);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/compliance/obligations/${obligation.id}/evidence/${evidenceId}/review`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewStatus, note }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to record evidence review.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to record evidence review.");
     } finally {
       setBusyId("");
     }
@@ -245,13 +308,43 @@ export function ComplianceWorkflow({
                   <ShieldCheck size={14} /> Approve review
                 </button>
               ) : null}
-              {canManage && obligation.requiresEvidence ? (
+              {(canManage || canReview) && obligation.requiresEvidence ? (
                 <details className="text-xs text-slate-400 sm:col-span-3">
                   <summary className="cursor-pointer">Evidence ({obligation.evidence.length})</summary>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-2 space-y-3">
                     {obligation.evidence.map((item) => (
-                      <span key={item.id} className="status-badge status-success">{item.evidenceClass}</span>
+                      <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 p-3">
+                        <span className={`status-badge ${item.validThrough && currentTime !== null && new Date(item.validThrough).getTime() < currentTime ? "status-danger" : item.reviewStatus === "VERIFIED" ? "status-success" : item.reviewStatus === "CHANGES_REQUESTED" ? "status-danger" : "status-info"}`}>
+                          {item.evidenceClass} · {item.validThrough && currentTime !== null && new Date(item.validThrough).getTime() < currentTime ? "EXPIRED" : item.reviewStatus.replaceAll("_", " ")}
+                        </span>
+                        {item.sourceReference ? <span>Source: {item.sourceReference}</span> : <span>Source not recorded</span>}
+                        {item.validThrough
+                          ? <span>Valid through {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(item.validThrough))}</span>
+                          : <span>No validity date recorded</span>}
+                        {item.reviewNote ? <span>Review note: {item.reviewNote}</span> : null}
+                        {canReview ? (
+                          <>
+                            <label className="sr-only" htmlFor={`evidence-review-${item.id}`}>Review note for evidence</label>
+                            <input
+                              id={`evidence-review-${item.id}`}
+                              className="form-input min-h-10 sm:w-64"
+                              value={evidenceReviewNotes[item.id] ?? ""}
+                              onChange={(event) => setEvidenceReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))}
+                              placeholder="Review note"
+                              maxLength={4000}
+                            />
+                            <button className="icon-button" type="button" disabled={busyId === obligation.id} onClick={() => reviewEvidence(obligation, item.id, "VERIFIED")}>
+                              Verify
+                            </button>
+                            <button className="icon-button" type="button" disabled={busyId === obligation.id} onClick={() => reviewEvidence(obligation, item.id, "CHANGES_REQUESTED")}>
+                              Request changes
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
                     ))}
+                    {canManage ? (
+                    <div className="flex flex-wrap items-center gap-2">
                     <label className="sr-only" htmlFor={`evidence-${obligation.id}`}>Document evidence for {obligation.title}</label>
                     <select
                       id={`evidence-${obligation.id}`}
@@ -264,6 +357,23 @@ export function ComplianceWorkflow({
                         <option key={document.id} value={document.id}>{document.name}</option>
                       ))}
                     </select>
+                    <label className="sr-only" htmlFor={`evidence-source-${obligation.id}`}>Evidence source reference</label>
+                    <input
+                      id={`evidence-source-${obligation.id}`}
+                      className="form-input min-h-10 sm:w-52"
+                      value={evidenceSource[obligation.id] ?? ""}
+                      onChange={(event) => setEvidenceSource((current) => ({ ...current, [obligation.id]: event.target.value }))}
+                      placeholder="Source reference (optional)"
+                      maxLength={2000}
+                    />
+                    <label className="sr-only" htmlFor={`evidence-valid-${obligation.id}`}>Evidence valid through</label>
+                    <input
+                      id={`evidence-valid-${obligation.id}`}
+                      className="form-input min-h-10 sm:w-44"
+                      type="date"
+                      value={evidenceValidThrough[obligation.id] ?? ""}
+                      onChange={(event) => setEvidenceValidThrough((current) => ({ ...current, [obligation.id]: event.target.value }))}
+                    />
                     <button
                       className="icon-button"
                       type="button"
@@ -274,8 +384,27 @@ export function ComplianceWorkflow({
                     >
                       <FileCheck2 size={15} />
                     </button>
+                    </div>
+                    ) : null}
                   </div>
                 </details>
+              ) : null}
+              {canManage ? (
+                <>
+                <label className="sr-only" htmlFor={`owner-${obligation.id}`}>Assign owner for {obligation.title}</label>
+                <select
+                  id={`owner-${obligation.id}`}
+                  className="form-input min-h-10 sm:w-48"
+                  value={obligation.ownerUserId ?? ""}
+                  disabled={busyId === obligation.id}
+                  onChange={(event) => assignOwner(obligation.id, event.target.value || null)}
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.map((member) => (
+                    <option key={member.userId} value={member.userId}>{member.name}</option>
+                  ))}
+                </select>
+                </>
               ) : null}
               {canManage ? (
                 <label className="sr-only" htmlFor={`status-${obligation.id}`}>Update status for {obligation.title}</label>

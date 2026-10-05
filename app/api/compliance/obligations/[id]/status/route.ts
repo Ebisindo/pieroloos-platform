@@ -34,12 +34,18 @@ export async function PATCH(request: Request, routeContext: { params: Promise<{ 
       requiresEvidence: true,
       professionalReviewRequired: true,
       professionalReviewCompleted: true,
-      _count: { select: { evidence: true } },
+      evidence: {
+        where: {
+          reviewStatus: "VERIFIED",
+          OR: [{ validThrough: null }, { validThrough: { gte: new Date() } }],
+        },
+        select: { id: true },
+      },
     },
   });
   if (!existing) return NextResponse.json({ error: "Compliance obligation not found." }, { status: 404 });
-  if (parsed.data.status === "COMPLIANT" && existing.requiresEvidence && existing._count.evidence === 0) {
-    return NextResponse.json({ error: "Attach required evidence before marking this obligation compliant." }, { status: 409 });
+  if (parsed.data.status === "COMPLIANT" && existing.requiresEvidence && existing.evidence.length === 0) {
+    return NextResponse.json({ error: "A current, professionally verified evidence record is required before marking this obligation compliant." }, { status: 409 });
   }
   if (parsed.data.status === "COMPLIANT" && existing.professionalReviewRequired && !existing.professionalReviewCompleted) {
     return NextResponse.json({ error: "Professional review must be approved before marking this obligation compliant." }, { status: 409 });

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { ArrowUpRight, Database, FileCheck2, ShieldCheck, Workflow } from "lucide-react";
 import { ActionQueue } from "@/components/control-plane/ActionQueue";
+import { NotificationInbox } from "@/components/control-plane/NotificationInbox";
 import { GlassPanel, MetricCard, PageHeader, SectionHeader, StatusBadge } from "@/components/ui/primitives";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { listActiveOperationalActions } from "@/lib/db/operational-action-query";
+import { notificationRepository } from "@/lib/db/notification-repository";
 import { prisma } from "@/lib/db/prisma";
 import { productModules } from "@/lib/navigation";
 
@@ -11,7 +13,8 @@ export default async function CommandCenterPage() {
   const context = await getWorkspaceContext();
   const canReadWorkspace = context.principal?.permissions.includes("workspace:read") ?? false;
   const canReadActions = context.principal?.permissions.includes("compliance:read") ?? false;
-  const [counts, activeActions] = await Promise.all([
+  const canManageActions = context.principal?.permissions.includes("compliance:write") ?? false;
+  const [counts, activeActions, assignees, notifications] = await Promise.all([
     context.principal && canReadWorkspace
       ? Promise.all([
         prisma.client.count({
@@ -22,6 +25,14 @@ export default async function CommandCenterPage() {
       ])
       : null,
     context.principal && canReadActions ? listActiveOperationalActions(context.principal) : null,
+    context.principal && canManageActions
+      ? prisma.membership.findMany({
+        where: { organizationId: context.principal.organizationId },
+        select: { userId: true, user: { select: { name: true, email: true } } },
+        orderBy: { user: { email: "asc" } },
+      }).then((members) => members.map(({ userId, user }) => ({ userId, ...user })))
+      : [],
+    context.principal && canReadActions ? notificationRepository.listForRecipient(context.principal) : [],
   ]);
 
   return (
@@ -45,7 +56,7 @@ export default async function CommandCenterPage() {
           <GlassPanel>
             <SectionHeader title="Operational actions" description="Open work prioritized by urgency, deadline, and escalation." />
             {activeActions ? (
-              <ActionQueue actions={activeActions} />
+              <ActionQueue actions={activeActions} canManage={canManageActions} assignees={assignees} />
             ) : (
               <div className="empty-inline">
                 {context.principal ? "Compliance access is required to view actions." : "Select an active workspace to view actions."}
@@ -80,8 +91,8 @@ export default async function CommandCenterPage() {
             </div>
           </GlassPanel>
           <GlassPanel>
-            <SectionHeader title="Recent activity" />
-            <div className="empty-inline">No activity has been recorded yet. New client and engagement actions will appear here.</div>
+            <SectionHeader title="Notifications" description="Operational updates addressed to you in this workspace." />
+            <NotificationInbox notifications={notifications} />
           </GlassPanel>
         </div>
       </div>

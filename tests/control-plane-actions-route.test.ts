@@ -113,8 +113,28 @@ describe("control-plane actions GET", () => {
     };
     const prismaMock: any = (await import("@/lib/db/prisma")).prisma;
     prismaMock.operationalAction.findUnique.mockResolvedValue(action);
-    prismaMock.operationalAction.update.mockResolvedValue({ ...action, status: "ASSIGNED", updatedAt: new Date("2024-01-01T00:05:00.000Z") });
+    prismaMock.operationalAction.update.mockResolvedValue({ ...action, status: "IN_PROGRESS", updatedAt: new Date("2024-01-01T00:05:00.000Z") });
     prismaMock.operationalActionAuditEvent.create.mockResolvedValue({ id: "audit-1" });
+    getWorkspaceContextMock.mockResolvedValue({
+      userId: principal.userId,
+      principal: { ...principal, permissions: [...principal.permissions, "compliance:write"] },
+    });
+
+    const response = await transitionPost(
+      new Request("http://localhost/api/control-plane/actions/action-1/transition", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "IN_PROGRESS", expectedUpdatedAt: "2024-01-01T00:00:00.000Z" }),
+      }),
+      { params: Promise.resolve({ id: "action-1" }) },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({ data: expect.objectContaining({ status: "IN_PROGRESS" }) }));
+    expect(prismaMock.operationalAction.update).toHaveBeenCalled();
+  });
+
+  it("requires the dedicated assignment command to assign an action", async () => {
     getWorkspaceContextMock.mockResolvedValue({
       userId: principal.userId,
       principal: { ...principal, permissions: [...principal.permissions, "compliance:write"] },
@@ -129,9 +149,29 @@ describe("control-plane actions GET", () => {
       { params: Promise.resolve({ id: "action-1" }) },
     );
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(expect.objectContaining({ data: expect.objectContaining({ status: "ASSIGNED" }) }));
-    expect(prismaMock.operationalAction.update).toHaveBeenCalled();
+    expect(response.status).toBe(422);
+    expect(operationalActionFindUniqueMock).not.toHaveBeenCalled();
+    expect(operationalActionUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("requires the resolution endpoint and note to resolve an action", async () => {
+    getWorkspaceContextMock.mockResolvedValue({
+      userId: principal.userId,
+      principal: { ...principal, permissions: [...principal.permissions, "compliance:write"] },
+    });
+
+    const response = await transitionPost(
+      new Request("http://localhost/api/control-plane/actions/action-1/transition", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "RESOLVED", expectedUpdatedAt: "2024-01-01T00:00:00.000Z" }),
+      }),
+      { params: Promise.resolve({ id: "action-1" }) },
+    );
+
+    expect(response.status).toBe(422);
+    expect(operationalActionFindUniqueMock).not.toHaveBeenCalled();
+    expect(operationalActionUpdateMock).not.toHaveBeenCalled();
   });
 
   it("rejects stale transitions with a concurrency conflict", async () => {
@@ -168,7 +208,7 @@ describe("control-plane actions GET", () => {
       new Request("http://localhost/api/control-plane/actions/action-1/transition", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: "ASSIGNED", expectedUpdatedAt: "2024-01-01T00:00:00.000Z" }),
+        body: JSON.stringify({ status: "IN_PROGRESS", expectedUpdatedAt: "2024-01-01T00:00:00.000Z" }),
       }),
       { params: Promise.resolve({ id: "action-1" }) },
     );
