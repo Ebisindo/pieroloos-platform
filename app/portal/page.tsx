@@ -2,8 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { ClientEvidenceUpload } from "@/components/portal/ClientEvidenceUpload";
+import { ClientPortalCollaboration } from "@/components/portal/ClientPortalCollaboration";
 import { getClientPortalContext } from "@/lib/auth/client-portal-context";
-import { getClientPortalOverview } from "@/lib/services/client-portal-service";
+import {
+  getClientPortalOverview,
+  listClientPortalInteractions,
+} from "@/lib/services/client-portal-service";
 
 function displayDate(value: Date | null) {
   return value ? new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(value) : "No date set";
@@ -32,6 +36,17 @@ export default async function ClientPortalPage() {
           clientPortalGrantId: grant.id,
         })
       : Promise.resolve(null),
+  ));
+  const interactionLists = await Promise.all(context.grants.map((grant) =>
+    grant.canViewStatus
+      ? listClientPortalInteractions({
+          userId: context.userId!,
+          organizationId: grant.organizationId,
+          workspaceId: grant.workspaceId,
+          clientId: grant.clientId,
+          clientPortalGrantId: grant.id,
+        })
+      : Promise.resolve([]),
   ));
 
   return (
@@ -160,6 +175,32 @@ export default async function ClientPortalPage() {
                       </ul>
                     </section>
                   ) : null}
+
+                  {grant.canViewStatus ? (
+                    <ClientPortalCollaboration
+                      clientId={grant.clientId}
+                      interactions={interactionLists[index]}
+                      resources={[
+                        ...overview.engagements.flatMap((engagement) => engagement.tasks.map((task) => ({
+                          id: task.id,
+                          type: "TASK" as const,
+                          title: task.title,
+                        }))),
+                        ...overview.formationPlans.flatMap((plan) => plan.stages.flatMap((stage) =>
+                          stage.tasks.map((task) => ({
+                            id: task.id,
+                            type: "FORMATION_TASK" as const,
+                            title: task.title,
+                          })),
+                        )),
+                        ...overview.obligations.map((obligation) => ({
+                          id: obligation.id,
+                          type: "OBLIGATION" as const,
+                          title: obligation.title,
+                        })),
+                      ]}
+                    />
+                  ) : null}
                 </>
               )}
             </section>
@@ -167,7 +208,7 @@ export default async function ClientPortalPage() {
         })}
       </div>
       <p className="text-xs leading-5 text-slate-500">
-        This portal shares workflow status and evidence only. It does not provide legal or regulatory determinations.
+        This portal supports status, evidence, client messages, completion submissions, and authenticated acknowledgments. It does not provide legal or regulatory determinations, and acknowledgment records are not legal electronic signatures.
       </p>
     </main>
   );

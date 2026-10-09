@@ -1,7 +1,10 @@
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { ClientPortalAccessManager } from "@/components/portal/ClientPortalAccessManager";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
-import { listWorkspacePortalClients } from "@/lib/services/client-portal-service";
+import {
+  listWorkspaceClientPortalInteractions,
+  listWorkspacePortalClients,
+} from "@/lib/services/client-portal-service";
 
 export default async function ClientsPage() {
   const context = await getWorkspaceContext();
@@ -16,6 +19,10 @@ export default async function ClientsPage() {
   }
 
   const clients = await listWorkspacePortalClients(context.principal);
+  const clientsWithInteractions = await Promise.all(clients.map(async (client) => ({
+    ...client,
+    interactions: await listWorkspaceClientPortalInteractions(client.id, context.principal!),
+  })));
   return (
     <main className="page-stack">
       <header>
@@ -26,9 +33,12 @@ export default async function ClientsPage() {
         </p>
       </header>
       <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4 text-sm leading-6 text-amber-100">
-        Client-visible requests are opt-in and hidden by default. Portal clients can view status and published work, and upload evidence; they cannot change task states, approve work, message professionals, or sign documents in this release.
+        Client-visible requests are opt-in and hidden by default. Clients can submit completion details, exchange visible messages, and acknowledge exact statements. Acknowledgments are not legal electronic signatures; workflow status remains under professional control.
       </div>
-      <ClientPortalAccessManager clients={clients} />
+      <ClientPortalAccessManager
+        clients={clientsWithInteractions}
+        canWrite={context.principal.permissions.includes("client:write")}
+      />
     </main>
   );
 }

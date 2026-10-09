@@ -36,6 +36,20 @@ enum NotificationAttemptStatus {
   PERMANENT_FAILURE
 }
 
+enum ClientPortalInteractionKind {
+  MESSAGE
+  COMPLETION_SUBMISSION
+  ACKNOWLEDGMENT_REQUEST
+  ACKNOWLEDGMENT
+}
+
+enum ClientPortalInteractionStatus {
+  PENDING
+  ACCEPTED
+  CHANGES_REQUESTED
+  ACKNOWLEDGED
+}
+
 enum BillingPlanTier {
   FREE
   FOUNDER
@@ -286,6 +300,7 @@ model Organization {
   billingWebhookEvents BillingWebhookEvent[]
   clientPortalGrants   ClientPortalGrant[]
   clientPortalEvents   ClientPortalAuditEvent[]
+  clientPortalInteractions ClientPortalInteraction[]
 }
 
 model User {
@@ -302,6 +317,8 @@ model User {
   clientPortalGrants     ClientPortalGrant[]      @relation("ClientPortalGrantUser")
   portalGrantsCreated    ClientPortalGrant[]      @relation("ClientPortalGrantCreatedBy")
   clientPortalEvents     ClientPortalAuditEvent[] @relation("PortalAuditActor")
+  portalInteractionsAuthored ClientPortalInteraction[] @relation("PortalInteractionActor")
+  portalInteractionsReviewed ClientPortalInteraction[] @relation("PortalInteractionReviewer")
 }
 
 model Membership {
@@ -349,6 +366,7 @@ model Workspace {
   crossBorderDossiers        CrossBorderDossier[]
   clientPortalGrants          ClientPortalGrant[]
   clientPortalEvents          ClientPortalAuditEvent[]
+  clientPortalInteractions    ClientPortalInteraction[]
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
 
@@ -385,6 +403,7 @@ model Client {
   crossBorderDossiers   CrossBorderDossier[]
   portalAccessGrants    ClientPortalGrant[]
   portalEvents          ClientPortalAuditEvent[]
+  portalInteractions    ClientPortalInteraction[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -1241,6 +1260,7 @@ model ClientPortalGrant {
   user         User         @relation("ClientPortalGrantUser", fields: [userId], references: [id], onDelete: Cascade)
   grantedBy    User         @relation("ClientPortalGrantCreatedBy", fields: [grantedByUserId], references: [id], onDelete: Restrict)
   events       ClientPortalAuditEvent[]
+  interactions ClientPortalInteraction[]
 
   @@unique([clientId, userId])
   @@index([userId, revokedAt, expiresAt])
@@ -1268,6 +1288,40 @@ model ClientPortalAuditEvent {
   @@index([organizationId, workspaceId, occurredAt])
   @@index([clientId, occurredAt])
   @@index([actorUserId, occurredAt])
+}
+
+model ClientPortalInteraction {
+  id                    String                         @id @default(cuid())
+  organizationId        String
+  workspaceId           String
+  clientId              String
+  grantId               String?
+  actorUserId           String
+  kind                  ClientPortalInteractionKind
+  status                ClientPortalInteractionStatus?
+  resourceType          String?
+  resourceId            String?
+  parentInteractionId   String?
+  body                  String
+  contentHash           String?
+  reviewedByUserId      String?
+  reviewedAt            DateTime?
+  reviewNote            String?
+  createdAt             DateTime                       @default(now())
+
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace         Workspace                @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  client            Client                   @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  grant             ClientPortalGrant?       @relation(fields: [grantId], references: [id], onDelete: SetNull)
+  actor             User                     @relation("PortalInteractionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  reviewer          User?                    @relation("PortalInteractionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+  parentInteraction ClientPortalInteraction? @relation("PortalInteractionThread", fields: [parentInteractionId], references: [id], onDelete: Restrict)
+  childInteractions ClientPortalInteraction[] @relation("PortalInteractionThread")
+
+  @@index([organizationId, workspaceId, clientId, createdAt])
+  @@index([clientId, resourceType, resourceId, createdAt])
+  @@index([parentInteractionId, createdAt])
+  @@index([kind, status, createdAt])
 }
 
 model OperationalEscalationEvent {

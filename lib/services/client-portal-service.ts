@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import {
   withClientPortalGrantTransaction,
@@ -5,6 +7,73 @@ import {
 } from "@/lib/auth/client-portal-access";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 import { getS3ObjectStorage } from "@/lib/storage/s3-object-storage";
+
+type PortalResourceType = "TASK" | "FORMATION_TASK" | "OBLIGATION";
+
+async function isPublishedPortalResource(
+  transaction: Prisma.TransactionClient,
+  scope: { organizationId: string; workspaceId: string; clientId: string },
+  resourceType: PortalResourceType,
+  resourceId: string,
+) {
+  if (resourceType === "TASK") {
+    return Boolean(await transaction.task.findFirst({
+      where: {
+        id: resourceId,
+        workspaceId: scope.workspaceId,
+        portalVisible: true,
+        engagement: { clientId: scope.clientId, workspaceId: scope.workspaceId },
+      },
+      select: { id: true },
+    }));
+  }
+  if (resourceType === "FORMATION_TASK") {
+    return Boolean(await transaction.formationTask.findFirst({
+      where: {
+        id: resourceId,
+        portalVisible: true,
+        formationStage: { formationPlan: { clientId: scope.clientId, workspaceId: scope.workspaceId } },
+      },
+      select: { id: true },
+    }));
+  }
+  if (resourceType !== "OBLIGATION") return false;
+  return Boolean(await transaction.complianceObligation.findFirst({
+    where: {
+      id: resourceId,
+      organizationId: scope.organizationId,
+      clientId: scope.clientId,
+      workspaceId: scope.workspaceId,
+      portalVisible: true,
+    },
+    select: { id: true },
+  }));
+}
+
+function hashAcknowledgmentContent(content: string) {
+  return createHash("sha256").update(content, "utf8").digest("hex");
+}
+
+async function recordPortalInteractionAudit(
+  transaction: Prisma.TransactionClient,
+  scope: { organizationId: string; workspaceId: string; clientId: string },
+  actorUserId: string,
+  action: string,
+  interactionId: string,
+  metadata?: Prisma.InputJsonValue,
+  grantId?: string,
+) {
+  await transaction.clientPortalAuditEvent.create({
+    data: {
+      ...scope,
+      grantId,
+      actorUserId,
+      action,
+      resourceId: interactionId,
+      metadata,
+    },
+  });
+}
 
 export async function listWorkspacePortalClients(principal: WorkspacePrincipal) {
   return withAuthorizedWorkspaceTransaction(principal, "client:read", async (transaction) => {
@@ -580,5 +649,317 @@ export async function createClientPortalDocumentDownloadUrl(
   return getS3ObjectStorage().createDownloadUrl(document.storageKey, {
     expiresInSeconds: 300,
     filename: document.name,
+  });
+}
+
+export async function listClientPortalInteractions(principal: ClientPortalPrincipal) {
+  return withClientPortalGrantTransaction(principal, "VIEW_STATUS", async (transaction) => {
+    const grant = await transaction.clientPortalGrant.findUniqueOrThrow({
+      where: { id: principal.clientPortalGrantId },
+      select: { canViewTasks: true },
+    });
+    const interactions = await transaction.clientPortalInteraction.findMany({
+      where: {
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId: principal.clientId,
+        ...(grant.canViewTasks ? {} : { kind: "MESSAGE", resourceId: null }),
+      },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        resourceType: true,
+        resourceId: true,
+        parentInteractionId: true,
+        body: true,
+        contentHash: true,
+        reviewNote: true,
+        reviewedAt: true,
+        createdAt: true,
+        actor: { select: { id: true, name: true, email: true } },
+        parentInteraction: { select: { body: true, kind: true } },
+      },
+      orderBy: { createdAt: "asc" },
+      take: 200,
+    });
+    await transaction.clientPortalAuditEvent.create({
+      data: {
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId: principal.clientId,
+        grantId: principal.clientPortalGrantId,
+        actorUserId: principal.userId,
+        action: "PORTAL_INTERACTIONS_VIEWED",
+      },
+    });
+    return interactions;
+  });
+}
+
+export async function createClientPortalInteraction(
+  principal: ClientPortalPrincipal,
+  input:
+    | { kind: "MESSAGE"; content: string; resourceType?: PortalResourceType; resourceId?: string }
+    | { kind: "COMPLETION_SUBMISSION"; content: string; resourceType: PortalResourceType; resourceId: string }
+    | { kind: "ACKNOWLEDGMENT"; requestId: string },
+) {
+  const capability = input.kind === "MESSAGE" && !input.resourceId ? "VIEW_STATUS" : "VIEW_TASKS";
+  return withClientPortalGrantTransaction(principal, capability, async (transaction) => {
+    if (input.kind === "ACKNOWLEDGMENT") {
+      const request = await transaction.clientPortalInteraction.findFirst({
+        where: {
+          id: input.requestId,
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+          clientId: principal.clientId,
+          kind: "ACKNOWLEDGMENT_REQUEST",
+          status: "PENDING",
+        },
+        select: { id: true, body: true, resourceType: true, resourceId: true },
+      });
+      if (!request) throw new Error("CLIENT_PORTAL_ACKNOWLEDGMENT_REQUEST_NOT_FOUND");
+      if (!request.resourceType || !request.resourceId ||
+        !await isPublishedPortalResource(
+          transaction,
+          principal,
+          request.resourceType as PortalResourceType,
+          request.resourceId,
+        )) {
+        throw new Error("CLIENT_PORTAL_RESOURCE_NOT_FOUND");
+      }
+
+      const occurredAt = new Date();
+      const contentHash = hashAcknowledgmentContent(request.body);
+      await transaction.clientPortalInteraction.update({
+        where: { id: request.id },
+        data: { status: "ACKNOWLEDGED" },
+      });
+      const acknowledgment = await transaction.clientPortalInteraction.create({
+        data: {
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+          clientId: principal.clientId,
+          grantId: principal.clientPortalGrantId,
+          actorUserId: principal.userId,
+          kind: "ACKNOWLEDGMENT",
+          status: "ACKNOWLEDGED",
+          resourceType: request.resourceType,
+          resourceId: request.resourceId,
+          parentInteractionId: request.id,
+          body: request.body,
+          contentHash,
+          createdAt: occurredAt,
+        },
+        select: { id: true, kind: true, status: true, body: true, contentHash: true, createdAt: true },
+      });
+      await recordPortalInteractionAudit(
+        transaction,
+        principal,
+        principal.userId,
+        "CLIENT_ACKNOWLEDGED",
+        acknowledgment.id,
+        { requestId: request.id, contentHash },
+        principal.clientPortalGrantId,
+      );
+      return acknowledgment;
+    }
+
+    if (input.kind === "COMPLETION_SUBMISSION" || input.resourceId) {
+      if (!input.resourceType || !input.resourceId ||
+        !await isPublishedPortalResource(transaction, principal, input.resourceType, input.resourceId)) {
+        throw new Error("CLIENT_PORTAL_RESOURCE_NOT_FOUND");
+      }
+    }
+
+    if (input.kind === "COMPLETION_SUBMISSION") {
+      const pending = await transaction.clientPortalInteraction.findFirst({
+        where: {
+          clientId: principal.clientId,
+          kind: "COMPLETION_SUBMISSION",
+          status: "PENDING",
+          resourceType: input.resourceType,
+          resourceId: input.resourceId,
+        },
+        select: { id: true },
+      });
+      if (pending) throw new Error("CLIENT_PORTAL_SUBMISSION_PENDING");
+    }
+
+    const interaction = await transaction.clientPortalInteraction.create({
+      data: {
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId: principal.clientId,
+        grantId: principal.clientPortalGrantId,
+        actorUserId: principal.userId,
+        kind: input.kind,
+        status: input.kind === "COMPLETION_SUBMISSION" ? "PENDING" : null,
+        resourceType: input.resourceType ?? null,
+        resourceId: input.resourceId ?? null,
+        body: input.content,
+      },
+      select: { id: true, kind: true, status: true, body: true, resourceType: true, resourceId: true, createdAt: true },
+    });
+    await recordPortalInteractionAudit(
+      transaction,
+      principal,
+      principal.userId,
+      input.kind === "MESSAGE" ? "CLIENT_MESSAGE_SENT" : "CLIENT_COMPLETION_SUBMITTED",
+      interaction.id,
+      undefined,
+      principal.clientPortalGrantId,
+    );
+    return interaction;
+  });
+}
+
+export async function listWorkspaceClientPortalInteractions(
+  clientId: string,
+  principal: WorkspacePrincipal,
+) {
+  return withAuthorizedWorkspaceTransaction(principal, "client:read", async (transaction) => {
+    const client = await transaction.client.findFirst({
+      where: {
+        id: clientId,
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+      },
+      select: { id: true },
+    });
+    if (!client) throw new Error("CLIENT_NOT_FOUND");
+    return transaction.clientPortalInteraction.findMany({
+      where: {
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId: client.id,
+      },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        resourceType: true,
+        resourceId: true,
+        parentInteractionId: true,
+        body: true,
+        contentHash: true,
+        reviewNote: true,
+        reviewedAt: true,
+        createdAt: true,
+        actor: { select: { id: true, name: true, email: true } },
+        parentInteraction: { select: { body: true, kind: true } },
+      },
+      orderBy: { createdAt: "asc" },
+      take: 200,
+    });
+  });
+}
+
+export async function createWorkspaceClientPortalInteraction(
+  clientId: string,
+  principal: WorkspacePrincipal,
+  input:
+    | { kind: "MESSAGE"; content: string; resourceType?: PortalResourceType; resourceId?: string }
+    | { kind: "ACKNOWLEDGMENT_REQUEST"; content: string; resourceType: PortalResourceType; resourceId: string },
+) {
+  return withAuthorizedWorkspaceTransaction(principal, "client:write", async (transaction) => {
+    const client = await transaction.client.findFirst({
+      where: {
+        id: clientId,
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+      },
+      select: { id: true },
+    });
+    if (!client) throw new Error("CLIENT_NOT_FOUND");
+    const clientScope = { organizationId: principal.organizationId, workspaceId: principal.workspaceId, clientId: client.id };
+    const activeGrant = await transaction.clientPortalGrant.findFirst({
+      where: {
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId: client.id,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { id: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!activeGrant) throw new Error("CLIENT_PORTAL_GRANT_NOT_ACTIVE");
+    if ((input.kind === "ACKNOWLEDGMENT_REQUEST" || input.resourceId) &&
+      (!input.resourceType || !input.resourceId ||
+        !await isPublishedPortalResource(
+          transaction,
+          clientScope,
+          input.resourceType,
+          input.resourceId,
+        ))) {
+      throw new Error("CLIENT_PORTAL_RESOURCE_NOT_FOUND");
+    }
+    const interaction = await transaction.clientPortalInteraction.create({
+      data: {
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId: client.id,
+        grantId: activeGrant.id,
+        actorUserId: principal.userId,
+        kind: input.kind,
+        status: input.kind === "ACKNOWLEDGMENT_REQUEST" ? "PENDING" : null,
+        resourceType: input.resourceType ?? null,
+        resourceId: input.resourceId ?? null,
+        body: input.content,
+      },
+      select: { id: true, kind: true, status: true, body: true, resourceType: true, resourceId: true, createdAt: true },
+    });
+    await recordPortalInteractionAudit(
+      transaction,
+      clientScope,
+      principal.userId,
+      input.kind === "MESSAGE" ? "STAFF_MESSAGE_SENT" : "ACKNOWLEDGMENT_REQUESTED",
+      interaction.id,
+    );
+    return interaction;
+  });
+}
+
+export async function reviewClientPortalCompletionSubmission(
+  clientId: string,
+  interactionId: string,
+  principal: WorkspacePrincipal,
+  decision: "ACCEPTED" | "CHANGES_REQUESTED",
+  note?: string,
+) {
+  return withAuthorizedWorkspaceTransaction(principal, "client:write", async (transaction) => {
+    const interaction = await transaction.clientPortalInteraction.findFirst({
+      where: {
+        id: interactionId,
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId,
+        kind: "COMPLETION_SUBMISSION",
+        status: "PENDING",
+      },
+      select: { id: true, clientId: true },
+    });
+    if (!interaction) throw new Error("CLIENT_PORTAL_SUBMISSION_NOT_FOUND");
+    const reviewedAt = new Date();
+    const updated = await transaction.clientPortalInteraction.update({
+      where: { id: interaction.id },
+      data: {
+        status: decision,
+        reviewedByUserId: principal.userId,
+        reviewedAt,
+        reviewNote: note || null,
+      },
+      select: { id: true, status: true, reviewedAt: true, reviewNote: true },
+    });
+    await recordPortalInteractionAudit(
+      transaction,
+      { organizationId: principal.organizationId, workspaceId: principal.workspaceId, clientId: interaction.clientId },
+      principal.userId,
+      `COMPLETION_${decision}`,
+      interaction.id,
+      { note: note ?? null },
+    );
+    return updated;
   });
 }

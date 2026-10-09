@@ -22,6 +22,10 @@ const {
   documentFindMany,
   documentFindFirst,
   documentAccessEventCreate,
+  interactionFindMany,
+  interactionFindFirst,
+  interactionCreate,
+  interactionUpdate,
   transaction,
 } = vi.hoisted(() => {
   const clientFindFirst = vi.fn();
@@ -43,6 +47,10 @@ const {
   const documentFindMany = vi.fn();
   const documentFindFirst = vi.fn();
   const documentAccessEventCreate = vi.fn();
+  const interactionFindMany = vi.fn();
+  const interactionFindFirst = vi.fn();
+  const interactionCreate = vi.fn();
+  const interactionUpdate = vi.fn();
   const transaction = {
     client: { findFirst: clientFindFirst, findMany: clientFindMany },
     user: { findFirst: userFindFirst, create: userCreate },
@@ -59,6 +67,12 @@ const {
     clientPortalAuditEvent: { create: auditCreate },
     document: { findMany: documentFindMany, findFirst: documentFindFirst },
     documentAccessEvent: { create: documentAccessEventCreate },
+    clientPortalInteraction: {
+      findMany: interactionFindMany,
+      findFirst: interactionFindFirst,
+      create: interactionCreate,
+      update: interactionUpdate,
+    },
   };
   return {
     clientFindFirst,
@@ -80,6 +94,10 @@ const {
     documentFindMany,
     documentFindFirst,
     documentAccessEventCreate,
+    interactionFindMany,
+    interactionFindFirst,
+    interactionCreate,
+    interactionUpdate,
     transaction,
   };
 });
@@ -102,7 +120,9 @@ vi.mock("@/lib/storage/s3-object-storage", () => ({
 
 import {
   createClientPortalGrant,
+  createClientPortalInteraction,
   getClientPortalOverview,
+  reviewClientPortalCompletionSubmission,
   setClientPortalTaskVisibility,
 } from "@/lib/services/client-portal-service";
 
@@ -140,6 +160,18 @@ describe("client portal service", () => {
     grantFindUniqueOrThrow.mockResolvedValue({ canViewTasks: true });
     documentFindMany.mockResolvedValue([]);
     documentFindFirst.mockResolvedValue(null);
+    interactionFindMany.mockResolvedValue([]);
+    interactionFindFirst.mockResolvedValue(null);
+    interactionCreate.mockResolvedValue({
+      id: "interaction-1",
+      kind: "COMPLETION_SUBMISSION",
+      status: "PENDING",
+      body: "Done",
+      resourceType: "TASK",
+      resourceId: "task-1",
+      createdAt: new Date("2026-10-09T00:00:00.000Z"),
+    });
+    interactionUpdate.mockResolvedValue({});
     auditCreate.mockResolvedValue({});
     documentAccessEventCreate.mockResolvedValue({});
   });
@@ -223,6 +255,116 @@ describe("client portal service", () => {
     }, workspacePrincipal)).rejects.toThrow("CLIENT_PORTAL_RESOURCE_NOT_FOUND");
     expect(taskUpdate).not.toHaveBeenCalled();
     expect(auditCreate).not.toHaveBeenCalled();
+  });
+
+  it("stores client completion submissions without changing task workflow state", async () => {
+    interactionCreate.mockResolvedValue({
+      id: "submission-1",
+      kind: "COMPLETION_SUBMISSION",
+      status: "PENDING",
+      body: "I uploaded the requested details.",
+      resourceType: "TASK",
+      resourceId: "task-1",
+      createdAt: new Date(),
+    });
+
+    await createClientPortalInteraction(portalPrincipal, {
+      kind: "COMPLETION_SUBMISSION",
+      resourceType: "TASK",
+      resourceId: "task-1",
+      content: "I uploaded the requested details.",
+    });
+
+    expect(taskFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "task-1", portalVisible: true }),
+    }));
+    expect(interactionCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ kind: "COMPLETION_SUBMISSION", status: "PENDING" }),
+    }));
+    expect(taskUpdate).not.toHaveBeenCalled();
+    expect(auditCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: "CLIENT_COMPLETION_SUBMITTED" }),
+    }));
+  });
+
+  it("rejects submissions on unpublished resources", async () => {
+    taskFindFirst.mockResolvedValue(null);
+
+    await expect(createClientPortalInteraction(portalPrincipal, {
+      kind: "COMPLETION_SUBMISSION",
+      resourceType: "TASK",
+      resourceId: "hidden-task",
+      content: "Done",
+    })).rejects.toThrow("CLIENT_PORTAL_RESOURCE_NOT_FOUND");
+
+    expect(interactionCreate).not.toHaveBeenCalled();
+  });
+
+  it("stores an authenticated acknowledgment and hash of the exact request text", async () => {
+    const statement = "I acknowledge the formation instruction.";
+    interactionFindFirst.mockResolvedValue({
+      id: "request-1",
+      body: statement,
+      resourceType: "TASK",
+      resourceId: "task-1",
+    });
+    interactionCreate.mockResolvedValue({
+      id: "ack-1",
+      kind: "ACKNOWLEDGMENT",
+      status: "ACKNOWLEDGED",
+      body: statement,
+      contentHash: "placeholder",
+      createdAt: new Date(),
+    });
+
+    await createClientPortalInteraction(portalPrincipal, {
+      kind: "ACKNOWLEDGMENT",
+      requestId: "request-1",
+    });
+
+    const { createHash } = await import("node:crypto");
+    const expectedHash = createHash("sha256").update(statement, "utf8").digest("hex");
+    expect(interactionUpdate).toHaveBeenCalledWith({
+      where: { id: "request-1" },
+      data: { status: "ACKNOWLEDGED" },
+    });
+    expect(interactionCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        actorUserId: portalPrincipal.userId,
+        parentInteractionId: "request-1",
+        body: statement,
+        contentHash: expectedHash,
+      }),
+    }));
+    expect(auditCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: "CLIENT_ACKNOWLEDGED" }),
+    }));
+  });
+
+  it("reviews a client submission without changing the underlying task", async () => {
+    interactionFindFirst.mockResolvedValue({ id: "submission-1", clientId: "client-1" });
+    interactionUpdate.mockResolvedValue({
+      id: "submission-1",
+      status: "ACCEPTED",
+      reviewedAt: new Date(),
+      reviewNote: null,
+    });
+
+    await reviewClientPortalCompletionSubmission(
+      "client-1",
+      "submission-1",
+      workspacePrincipal,
+      "ACCEPTED",
+    );
+
+    expect(interactionUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "submission-1" },
+      data: expect.objectContaining({ status: "ACCEPTED", reviewedByUserId: workspacePrincipal.userId }),
+    }));
+    expect(taskUpdate).not.toHaveBeenCalled();
+    expect(auditCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: "COMPLETION_ACCEPTED" }),
+    }));
   });
 
   it("queries only explicitly published workflow items and limits evidence to this portal user", async () => {

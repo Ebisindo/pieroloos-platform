@@ -35,6 +35,7 @@ export function setRateLimitStore(next: RateLimitStore) {
 
 export const PORTAL_READ_LIMIT: RateLimitPolicy = { name: "portal-read", limit: 120, windowMs: 60_000 };
 export const PORTAL_UPLOAD_LIMIT: RateLimitPolicy = { name: "portal-upload", limit: 10, windowMs: 60_000 };
+export const PORTAL_INTERACTION_LIMIT: RateLimitPolicy = { name: "portal-interaction", limit: 30, windowMs: 60_000 };
 
 // Returns a 429 response when the subject has exhausted the policy, otherwise null.
 export async function enforceRateLimit(

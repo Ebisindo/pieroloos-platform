@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ClientPortalInbox } from "@/components/portal/ClientPortalInbox";
 
 type PortalResourceType = "TASK" | "FORMATION_TASK" | "OBLIGATION";
 type PortalClient = {
@@ -25,9 +26,24 @@ type PortalClient = {
     status: string;
     visible: boolean;
   }>;
+  interactions: Array<{
+    id: string;
+    kind: string;
+    status: string | null;
+    resourceType: string | null;
+    resourceId: string | null;
+    parentInteractionId: string | null;
+    body: string;
+    contentHash: string | null;
+    reviewNote: string | null;
+    reviewedAt: Date | null;
+    createdAt: Date;
+    actor: { id: string; name: string | null; email: string };
+    parentInteraction: { body: string; kind: string } | null;
+  }>;
 };
 
-export function ClientPortalAccessManager({ clients }: { clients: PortalClient[] }) {
+export function ClientPortalAccessManager({ clients, canWrite }: { clients: PortalClient[]; canWrite: boolean }) {
   const router = useRouter();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -67,7 +83,7 @@ export function ClientPortalAccessManager({ clients }: { clients: PortalClient[]
               <button
                 type="button"
                 className="rounded-lg bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
-                disabled={busyKey !== null}
+                disabled={busyKey !== null || !canWrite}
                 onClick={() => send(
                   `/api/clients/${encodeURIComponent(client.id)}/portal-access`,
                   "POST",
@@ -94,7 +110,7 @@ export function ClientPortalAccessManager({ clients }: { clients: PortalClient[]
                     <button
                       type="button"
                       className="rounded-md border border-rose-300/20 px-3 py-1.5 text-xs text-rose-200 disabled:opacity-50"
-                      disabled={busyKey !== null}
+                      disabled={busyKey !== null || !canWrite}
                       onClick={() => send(
                         `/api/clients/${encodeURIComponent(client.id)}/portal-access/${encodeURIComponent(grant.id)}`,
                         "DELETE",
@@ -107,7 +123,7 @@ export function ClientPortalAccessManager({ clients }: { clients: PortalClient[]
               );
             })}
             <p className="text-xs leading-5 text-slate-500">
-              Clients sign in with OIDC or GitHub using this verified email. Status, published tasks, and evidence upload are enabled; all access can be revoked here.
+              Clients sign in with OIDC or GitHub using this verified email. They can view published requests, upload evidence, submit completion details, message the team, and acknowledge professional-provided text. Access can be revoked here.
             </p>
           </div>
 
@@ -126,7 +142,7 @@ export function ClientPortalAccessManager({ clients }: { clients: PortalClient[]
                       <button
                         type="button"
                         className={`rounded-md border px-3 py-1.5 text-xs disabled:opacity-50 ${resource.visible ? "border-cyan-300/20 text-cyan-100" : "border-white/10 text-slate-300"}`}
-                        disabled={busyKey !== null}
+                        disabled={busyKey !== null || !canWrite}
                         onClick={() => send(url, "PATCH", {
                           resourceType: resource.type,
                           resourceId: resource.id,
@@ -141,6 +157,12 @@ export function ClientPortalAccessManager({ clients }: { clients: PortalClient[]
               </ul>
             </div>
           ) : null}
+          <ClientPortalInbox
+            clientId={client.id}
+            interactions={client.interactions}
+            resources={client.resources}
+            canWrite={canWrite}
+          />
         </section>
       ))}
       {message ? <p role="status" className="text-sm text-slate-300">{message}</p> : null}
