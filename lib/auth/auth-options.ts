@@ -74,8 +74,17 @@ async function hasVerifiedPortalEmail(
   }
 }
 
+function resolveAuthSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build") {
+    throw new Error("NEXTAUTH_SECRET must be set in production.");
+  }
+  return "dev-secret-change-me";
+}
+
 export const authOptions: AuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-me",
+  secret: resolveAuthSecret(),
   session: { strategy: "jwt", maxAge: AUTH_SESSION_MAX_AGE_SECONDS },
   providers: [
     ...(githubConfigured
