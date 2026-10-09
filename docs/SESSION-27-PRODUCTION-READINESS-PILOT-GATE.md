@@ -8,10 +8,10 @@ This is a launch gate, not a feature session. Status is **NOT READY for pilot** 
 | Control | Status | Evidence / gap |
 | --- | --- | --- |
 | Tenant isolation tested | 🟡 | `authorized-workspace-transaction.test.ts`, `workspace-access.test.ts`, `client-portal-access.test.ts` use mocks. **Blocker:** run `database-integrity.integration.test.ts` against real Postgres in CI and add cross-tenant read/write cases per route family. |
-| Authorization tested | 🟡 | Per-route tests exist for engagement, control plane, cross-border, memberships. **Blocker:** portal routes lack route-level tests (grant revoked/expired/wrong client). |
+| Authorization tested | 🟡 | Per-route tests exist for engagement, control plane, cross-border, memberships, and now portal routes (`client-portal-routes.test.ts`: unauthenticated, no grant, capability flags, revoked, cross-origin). Download route not yet covered. |
 | Secrets controlled | ✅ | Auth secret now fails fast in production (`resolveAuthSecret`). Worker secret via `lib/auth/worker-secret.ts`. Remaining: store secrets in a manager, rotation runbook. |
 | Production headers | ✅ | `next.config.ts` sets nosniff, frame deny, referrer, permissions, HSTS, minimal CSP. **Follow-up:** full nonce-based CSP (see `node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`); verify on the deployed host. |
-| Rate limiting | ❌ **Blocker** | No limiter anywhere. Needs shared-store limiting (edge/WAF or Redis) on sign-in, uploads, portal APIs, worker endpoints. In-memory limiting is not valid on multiple instances. |
+| Rate limiting | 🟡 **Blocker (shared store)** | `lib/http/rate-limit.ts` limits portal reads/uploads/downloads per user (429 + Retry-After), with an injectable store. Default store is per-process; **inject a shared store (Redis) or enforce at the edge before multi-instance deploy**. Sign-in and staff APIs are not yet limited. |
 | Audit integrity | 🟡 | Audit tables exist for portal, documents, actions. No tamper evidence. Decide: DB-level append-only (revoke UPDATE/DELETE) or hash chaining, before pilot. |
 
 ## Reliability
@@ -22,7 +22,7 @@ This is a launch gate, not a feature session. Status is **NOT READY for pilot** 
 | Recovery procedure | ❌ **Blocker** | Needs a written runbook and one rehearsed restore into a scratch environment, with migration replay (`prisma migrate deploy`) verified. |
 | Worker failure handling | 🟡 | Worker routes and tests exist (`notification-worker`, `operational-escalation-worker`). Verify lease/timeout behaviour on crash. |
 | Notification retries | ✅ | Retry/redrive in `notification-worker.ts`, `notification-redrive-route.test.ts`. Confirm dead-letter alerting. |
-| Observability | ❌ **Blocker** | Only `console.error`. Needs structured logs, error tracking, health endpoint, alerts on worker failure and queue age. |
+| Observability | 🟡 **Blocker** | `GET /api/health` (DB reachability, no data leaked) added. Still needs structured logs, error tracking, and alerts on worker failure and queue age. |
 
 ## Product (must be proven with real data, not tests)
 
@@ -61,3 +61,6 @@ A pilot may run with manual invoicing if entitlements are enforced server-side. 
 
 - `next.config.ts`: production security headers.
 - `lib/auth/auth-options.ts`: refuse to start in production without `NEXTAUTH_SECRET`.
+- `lib/http/rate-limit.ts` + portal routes: per-user rate limiting.
+- `app/api/health/route.ts`: health endpoint.
+- `tests/client-portal-routes.test.ts`, `tests/health-route.test.ts`.

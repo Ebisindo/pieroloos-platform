@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceRateLimit, PORTAL_READ_LIMIT, PORTAL_UPLOAD_LIMIT } from "@/lib/http/rate-limit";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getClientPortalContext } from "@/lib/auth/client-portal-context";
 import { parseDocumentUpload } from "@/lib/http/document-upload";
@@ -13,6 +14,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
   const { clientId } = await params;
   const context = await getClientPortalContext(clientId);
   if (!context.userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const limited = await enforceRateLimit(PORTAL_READ_LIMIT, context.userId);
+  if (limited) return limited;
   if (!context.principal || !context.selectedGrant) {
     return NextResponse.json({ error: "Client portal access not found." }, { status: 404 });
   }
@@ -34,6 +37,8 @@ export async function POST(request: Request, { params }: RouteContext) {
   const { clientId } = await params;
   const context = await getClientPortalContext(clientId);
   if (!context.userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const limited = await enforceRateLimit(PORTAL_UPLOAD_LIMIT, context.userId);
+  if (limited) return limited;
   if (!context.principal || !context.selectedGrant) {
     return NextResponse.json({ error: "Client portal access not found." }, { status: 404 });
   }
