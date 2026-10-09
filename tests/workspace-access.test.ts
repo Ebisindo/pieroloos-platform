@@ -33,6 +33,8 @@ describe("workspace authorization boundaries", () => {
 
   it("derives the permission matrix from persisted role names", () => {
     expect(permissionsForRole("owner")).toContain("workspace:manage");
+    expect(permissionsForRole("owner")).toContain("documents:delete");
+    expect(permissionsForRole("advisor")).not.toContain("documents:delete");
     expect(permissionsForRole("admin")).toContain("workspace:manage");
     expect(permissionsForRole("admin")).not.toContain("settings:manage");
     expect(permissionsForRole("member")).not.toContain("documents:review");

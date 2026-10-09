@@ -62,43 +62,78 @@ export async function POST(
       id: parsed.data.documentId,
       workspaceId: principal.workspaceId,
       clientId: dossier.clientId,
+      status: "AVAILABLE",
+      scanStatus: "CLEAN",
+      deletedAt: null,
     },
     select: { id: true },
   });
   if (!document) return NextResponse.json({ error: "Evidence document was not found for this client and workspace." }, { status: 404 });
 
-  const result = await withAuthorizedWorkspaceTransaction(principal, "documents:write", async (transaction) => {
-    const updated = await transaction.crossBorderDossier.updateMany({
-      where: { id, workspaceId: principal.workspaceId, version: parsed.data.expectedVersion },
-      data: {
-        version: { increment: 1 },
-        status: dossier.status === "CHANGES_REQUESTED" ? "PREPARING" : dossier.status,
-        ...(dossier.status === "CHANGES_REQUESTED" ? {
-          reviewedByUserId: null,
-          reviewNote: null,
-          reviewedAt: null,
-        } : {}),
-      },
+  let result;
+  try {
+    result = await withAuthorizedWorkspaceTransaction(principal, "documents:write", async (transaction) => {
+      const currentDocument = await transaction.document.findFirst({
+        where: {
+          id: document.id,
+          workspaceId: principal.workspaceId,
+          clientId: dossier.clientId,
+          status: "AVAILABLE",
+          scanStatus: "CLEAN",
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!currentDocument) throw new Error("DOCUMENT_NOT_READY");
+      const updated = await transaction.crossBorderDossier.updateMany({
+        where: { id, workspaceId: principal.workspaceId, version: parsed.data.expectedVersion },
+        data: {
+          version: { increment: 1 },
+          status: dossier.status === "CHANGES_REQUESTED" ? "PREPARING" : dossier.status,
+          ...(dossier.status === "CHANGES_REQUESTED" ? {
+            reviewedByUserId: null,
+            reviewNote: null,
+            reviewedAt: null,
+          } : {}),
+        },
+      });
+      if (!updated.count) return null;
+      const evidence = await transaction.crossBorderControlEvidence.create({
+        data: {
+          controlId: control.id,
+          documentId: document.id,
+          linkedByUserId: principal.userId,
+        },
+      });
+      await transaction.documentAccessEvent.create({
+        data: {
+          documentId: document.id,
+          workspaceId: principal.workspaceId,
+          actorUserId: principal.userId,
+          action: "EVIDENCE_LINKED",
+          metadata: { dossierId: dossier.id, controlId: control.id },
+        },
+      });
+      await transaction.crossBorderDossierAuditEvent.create({
+        data: {
+          dossierId: dossier.id,
+          workspaceId: principal.workspaceId,
+          actorUserId: principal.userId,
+          eventType: "CONTROL_EVIDENCE_LINKED",
+          details: { controlId: control.id, documentId: document.id },
+        },
+      });
+      return evidence;
     });
-    if (!updated.count) return null;
-    const evidence = await transaction.crossBorderControlEvidence.create({
-      data: {
-        controlId: control.id,
-        documentId: document.id,
-        linkedByUserId: principal.userId,
-      },
-    });
-    await transaction.crossBorderDossierAuditEvent.create({
-      data: {
-        dossierId: dossier.id,
-        workspaceId: principal.workspaceId,
-        actorUserId: principal.userId,
-        eventType: "CONTROL_EVIDENCE_LINKED",
-        details: { controlId: control.id, documentId: document.id },
-      },
-    });
-    return evidence;
-  });
+  } catch (error) {
+    if (error instanceof Error && error.message === "DOCUMENT_NOT_READY") {
+      return NextResponse.json({ error: "Only security-scanned documents can be linked as evidence." }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
+      return NextResponse.json({ error: "Workspace authorization changed. Refresh and try again." }, { status: 409 });
+    }
+    throw error;
+  }
   if (!result) return NextResponse.json({ error: "Dossier changed. Refresh and retry." }, { status: 409 });
   return NextResponse.json({ data: result }, { status: 201 });
 }

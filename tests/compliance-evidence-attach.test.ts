@@ -53,6 +53,9 @@ describe("compliance evidence attachment", () => {
     transactionMock.mockReset().mockImplementation((callback) => callback({
       membership: { findUnique: vi.fn().mockResolvedValue({ role: "OWNER" }) },
       workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
+      complianceObligation: { findFirst: vi.fn().mockResolvedValue({ id: "obligation-1" }) },
+      document: { findFirst: vi.fn().mockResolvedValue({ id: "document-1" }) },
+      documentAccessEvent: { create: vi.fn().mockResolvedValue({ id: "access-1" }) },
       complianceEvidence: { create: evidenceCreateMock },
       complianceActivity: { create: activityCreateMock },
     }));

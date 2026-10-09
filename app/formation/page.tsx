@@ -2,6 +2,7 @@ import { FormationPlanWorkflow } from "@/components/formation/FormationPlanWorkf
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
+import { listDocuments } from "@/lib/services/document-storage-service";
 
 function parseJurisdictionIds(value: string) {
   try {
@@ -95,11 +96,7 @@ export default async function FormationPage() {
 
   const clientIds = [...new Set(savedPlans.map((plan) => plan.clientId))];
   const documents = context.principal.permissions.includes("documents:read") && clientIds.length
-    ? await prisma.document.findMany({
-        where: { workspaceId, clientId: { in: clientIds } },
-        select: { id: true, name: true, clientId: true },
-        orderBy: { createdAt: "desc" },
-      })
+    ? await listDocuments(context.principal, { clientIds })
     : [];
   const documentsByClient = new Map<string, Array<{ id: string; name: string }>>();
   for (const document of documents) {

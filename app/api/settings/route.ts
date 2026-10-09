@@ -27,6 +27,7 @@ export async function GET() {
     notificationsEnabled: settings.notificationsEnabled,
     complianceDueNotifications: settings.complianceDueNotifications,
     evidenceReviewNotifications: settings.evidenceReviewNotifications,
+    documentRetentionDays: settings.documentRetentionDays,
   }) : null;
 
   return NextResponse.json({ data: persistedSettings?.success ? persistedSettings.data : DEFAULT_WORKSPACE_SETTINGS });

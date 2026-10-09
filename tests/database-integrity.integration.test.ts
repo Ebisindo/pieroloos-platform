@@ -137,4 +137,163 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       workspaceId: otherWorkspace.id,
     });
   });
+
+  it("enforces document, version, evidence, and access-log workspace boundaries in PostgreSQL", async () => {
+    const suffix = crypto.randomUUID();
+    const firstOrganization = await createOrganization(`documents-first-${suffix}`);
+    const secondOrganization = await createOrganization(`documents-second-${suffix}`);
+    const firstWorkspace = await createWorkspace(firstOrganization.id, `documents-first-${suffix}`);
+    const secondWorkspace = await createWorkspace(secondOrganization.id, `documents-second-${suffix}`);
+    const firstClient = await prisma.client.create({
+      data: {
+        organizationId: firstOrganization.id,
+        workspaceId: firstWorkspace.id,
+        name: "First tenant client",
+      },
+    });
+
+    const secondClient = await prisma.client.create({
+      data: {
+        organizationId: secondOrganization.id,
+        workspaceId: secondWorkspace.id,
+        name: "Second tenant client",
+      },
+    });
+
+    async function createDocument(input: {
+      workspaceId: string;
+      clientId: string;
+      rootDocumentId?: string;
+      version?: number;
+    }) {
+      const id = crypto.randomUUID();
+      return prisma.document.create({
+        data: {
+          id,
+          workspaceId: input.workspaceId,
+          clientId: input.clientId,
+          rootDocumentId: input.rootDocumentId ?? id,
+          version: input.version ?? 1,
+          name: "Evidence.pdf",
+          mimeType: "application/pdf",
+          storageKey: `${input.workspaceId}/documents/${id}/v${input.version ?? 1}/evidence.pdf`,
+          sizeBytes: 5,
+          checksum: "a".repeat(64),
+          uploadedByUserId: "integration-user",
+        },
+      });
+    }
+
+    const secondDocument = await createDocument({
+      workspaceId: secondWorkspace.id,
+      clientId: secondClient.id,
+    });
+    await expect(createDocument({
+      workspaceId: firstWorkspace.id,
+      clientId: secondClient.id,
+    })).rejects.toMatchObject({ code: "P2003" });
+
+    const firstDocument = await createDocument({
+      workspaceId: firstWorkspace.id,
+      clientId: firstClient.id,
+    });
+    await expect(createDocument({
+      workspaceId: firstWorkspace.id,
+      clientId: firstClient.id,
+      rootDocumentId: firstDocument.id,
+      version: 1,
+    })).rejects.toMatchObject({ code: "P2002" });
+    await expect(createDocument({
+      workspaceId: firstWorkspace.id,
+      clientId: firstClient.id,
+      rootDocumentId: secondDocument.id,
+      version: 2,
+    })).rejects.toMatchObject({ code: "P2003" });
+
+    const obligation = await prisma.complianceObligation.create({
+      data: {
+        organizationId: firstOrganization.id,
+        workspaceId: firstWorkspace.id,
+        clientId: firstClient.id,
+        title: "File annual return",
+        type: "ANNUAL_FILING",
+      },
+    });
+    await expect(prisma.complianceEvidence.create({
+      data: {
+        workspaceId: firstWorkspace.id,
+        obligationId: obligation.id,
+        documentId: secondDocument.id,
+        evidenceClass: "E1",
+      },
+    })).rejects.toMatchObject({ code: "P2003" });
+    await expect(prisma.documentAccessEvent.create({
+      data: {
+        documentId: firstDocument.id,
+        workspaceId: secondWorkspace.id,
+        action: "DOWNLOAD_URL_ISSUED",
+      },
+    })).rejects.toMatchObject({ code: "P2003" });
+  });
+
+  it("enforces notification tenant scope, recipient-preference uniqueness, and attempt deletion", async () => {
+    const suffix = crypto.randomUUID();
+    const organization = await createOrganization(`notifications-${suffix}`);
+    const otherOrganization = await createOrganization(`notifications-other-${suffix}`);
+    const workspace = await createWorkspace(organization.id, `notifications-${suffix}`);
+    const user = await prisma.user.create({
+      data: { email: `notifications-${suffix}@integration.invalid` },
+    });
+
+    await prisma.membership.create({
+      data: { userId: user.id, organizationId: organization.id, role: "MEMBER" },
+    });
+    await prisma.notificationPreference.create({
+      data: {
+        workspaceId: workspace.id,
+        userId: user.id,
+        emailEnabled: true,
+        timezone: "America/New_York",
+      },
+    });
+    await expect(prisma.notificationPreference.create({
+      data: { workspaceId: workspace.id, userId: user.id },
+    })).rejects.toMatchObject({ code: "P2002" });
+
+    const notification = await prisma.complianceNotification.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        recipientUserId: user.id,
+        channel: "EMAIL",
+        subject: "Test delivery",
+        body: "Test",
+        scheduledFor: new Date(),
+        dedupeKey: `notification-${suffix}`,
+      },
+    });
+    await expect(prisma.complianceNotification.create({
+      data: {
+        organizationId: otherOrganization.id,
+        workspaceId: workspace.id,
+        channel: "IN_APP",
+        subject: "Cross-tenant delivery",
+        body: "Must fail",
+        scheduledFor: new Date(),
+        dedupeKey: `cross-tenant-${suffix}`,
+      },
+    })).rejects.toMatchObject({ code: "P2003" });
+
+    await prisma.notificationDeliveryAttempt.create({
+      data: {
+        notificationId: notification.id,
+        attemptNumber: 1,
+        status: "ATTEMPTING",
+      },
+    });
+    await prisma.complianceNotification.delete({ where: { id: notification.id } });
+    await expect(prisma.notificationDeliveryAttempt.count({
+      where: { notificationId: notification.id },
+    })).resolves.toBe(0);
+  });
 });

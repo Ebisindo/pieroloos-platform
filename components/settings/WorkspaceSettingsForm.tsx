@@ -104,6 +104,25 @@ export function WorkspaceSettingsForm({
               onChange={(event) => update("complianceReminderDays", Number(event.target.value))}
             />
           </label>
+          <label className="space-y-2 text-sm text-slate-300">
+            <span>Document retention policy (days)</span>
+            <input
+              className="min-h-11 w-full rounded-md border border-white/10 bg-[#0b1128] px-3 text-sm text-white"
+              type="number"
+              min={1}
+              max={36500}
+              value={settings.documentRetentionDays ?? ""}
+              placeholder="Required before document uploads"
+              disabled={!canManage}
+              onChange={(event) => update(
+                "documentRetentionDays",
+                event.target.value === "" ? null : Number(event.target.value),
+              )}
+            />
+            <span className="block text-xs text-slate-500">
+              New uploads require this policy. Retention starts on upload; deletion is blocked until it expires.
+            </span>
+          </label>
         </div>
       </section>
 

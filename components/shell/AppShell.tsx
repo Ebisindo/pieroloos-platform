@@ -5,14 +5,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Search, ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
-import { systemNavigation, workspaceNavigation } from "@/lib/navigation";
+import { portalNavigation, systemNavigation, workspaceNavigation } from "@/lib/navigation";
 import { cx } from "@/components/ui/primitives";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navigation = [...workspaceNavigation, ...systemNavigation];
+  const isClientPortal = pathname === "/portal" || pathname.startsWith("/portal/");
+  const navigation = isClientPortal
+    ? portalNavigation
+    : [...workspaceNavigation, ...systemNavigation];
 
   return (
     <div className="app-shell">
@@ -40,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <div className="workspace-label">WORKSPACE</div>
+        <div className="workspace-label">{isClientPortal ? "CLIENT PORTAL" : "WORKSPACE"}</div>
         <nav aria-label="Primary navigation">
           {navigation.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -77,7 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu size={20} />
             </button>
             <div className="context-path">
-              <span>Workspace</span>
+              <span>{isClientPortal ? "Client" : "Workspace"}</span>
               <span>/</span>
               <strong>{navigation.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.label ?? "Overview"}</strong>
             </div>
@@ -90,7 +93,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             <div className="security-state">
               <ShieldCheck size={16} />
-              <span>Protected workspace</span>
+              <span>{isClientPortal ? "Protected client access" : "Protected workspace"}</span>
             </div>
             <div className="avatar" aria-label="Current user">JE</div>
           </div>

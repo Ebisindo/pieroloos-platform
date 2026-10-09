@@ -196,5 +196,6 @@ export function canTransitionMarketEntry(from: MarketEntryStatus, to: MarketEntr
     PAUSED: ["ASSESSING", "IN_PROGRESS"],
     COMPLETED: [],
   };
-  return transitions[from].includes(to);
+  const nextStatuses = transitions[from] ?? [];
+  return nextStatuses.includes(to);
 }

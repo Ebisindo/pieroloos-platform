@@ -2,6 +2,7 @@ import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { CrossBorderDossierWorkflow } from "@/components/cross-border/CrossBorderDossierWorkflow";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
+import { listDocuments } from "@/lib/services/document-storage-service";
 
 export default async function CrossBorderPage() {
   const context = await getWorkspaceContext();
@@ -48,11 +49,7 @@ export default async function CrossBorderPage() {
       select: { id: true, name: true, country: true },
       orderBy: { country: "asc" },
     }),
-    prisma.document.findMany({
-      where: { workspaceId, clientId: { not: null } },
-      select: { id: true, name: true, clientId: true },
-      orderBy: { createdAt: "desc" },
-    }),
+    listDocuments(context.principal, { requireClient: true }),
     prisma.marketEntryPlan.findMany({
       where: { workspaceId },
       select: {

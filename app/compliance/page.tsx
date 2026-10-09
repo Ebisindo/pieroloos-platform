@@ -5,6 +5,7 @@ import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { buildComplianceControlSnapshot } from "@/lib/domain/compliance-control";
 import { prisma } from "@/lib/db/prisma";
+import { listDocuments } from "@/lib/services/document-storage-service";
 
 export default async function CompliancePage() {
   const context = await getWorkspaceContext();
@@ -59,11 +60,7 @@ export default async function CompliancePage() {
     where: { workspaceId: context.principal.workspaceId },
     select: { id: true, name: true, organizationName: true, firstName: true, lastName: true },
     orderBy: { createdAt: "desc" },
-  }), prisma.document.findMany({
-    where: { workspaceId: context.principal.workspaceId, clientId: { not: null } },
-    select: { id: true, name: true, clientId: true },
-    orderBy: { createdAt: "desc" },
-  }), prisma.membership.findMany({
+  }), listDocuments(context.principal, { requireClient: true }), prisma.membership.findMany({
     where: { organizationId: context.principal.organizationId },
     select: { userId: true, user: { select: { name: true, email: true } } },
     orderBy: { user: { email: "asc" } },

@@ -69,4 +69,9 @@ describe("market entry and cross-border readiness", () => {
     expect(canTransitionMarketEntry("ASSESSING", "COMPLETED")).toBe(false);
     expect(canTransitionMarketEntry("COMPLETED", "IN_PROGRESS")).toBe(false);
   });
+
+  it("rejects unknown market-entry statuses without crashing", () => {
+    expect(canTransitionMarketEntry("ASSESSING" as never, "UNKNOWN" as never)).toBe(false);
+    expect(canTransitionMarketEntry("UNKNOWN" as never, "ASSESSING")).toBe(false);
+  });
 });

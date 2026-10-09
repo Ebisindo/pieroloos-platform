@@ -29,6 +29,10 @@ export const systemNavigation = [
   { href: "/settings", label: "Settings", icon: Settings2 },
 ] as const;
 
+export const portalNavigation = [
+  { href: "/portal", label: "Client Portal", icon: BriefcaseBusiness },
+] as const;
+
 export const productModules = [
   { key: "clients", label: "Client Intake", href: "/clients", status: "operational" },
   { key: "business-profile", label: "Business Profile", href: "/clients", status: "foundation" },

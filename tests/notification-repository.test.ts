@@ -37,7 +37,7 @@ describe("notification repository", () => {
     notificationUpsertMock.mockReset();
   });
 
-  it("lists only the signed-in recipient's in-app notices in the active workspace", async () => {
+  it("lists only the signed-in recipient's channel deliveries in the active workspace", async () => {
     notificationFindManyMock.mockResolvedValue([{
       id: "notification-1",
       organizationId: "org-1",
@@ -60,9 +60,10 @@ describe("notification repository", () => {
         organizationId: "org-1",
         workspaceId: "workspace-1",
         recipientUserId: "user-1",
-        channel: "IN_APP",
+        status: { not: "CANCELLED" },
       }),
     }));
+    expect(notificationFindManyMock.mock.calls[0][0].where).not.toHaveProperty("channel");
   });
 
   it("requires compliance-read permission to view in-app notices", async () => {

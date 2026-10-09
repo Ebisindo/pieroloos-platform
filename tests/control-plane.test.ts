@@ -33,6 +33,12 @@ describe("Session 12 control plane", () => {
     expect(resolveAction(inProgress, "Replacement evidence uploaded").status).toBe("RESOLVED");
   });
 
+  it("rejects unknown action statuses without crashing", () => {
+    const unknownStatus = { ...base, status: "UNKNOWN" as never };
+    expect(() => transitionAction(unknownStatus, "OPEN")).toThrow();
+    expect(() => resolveAction(unknownStatus, "note")).toThrow();
+  });
+
   it("raises escalation when a critical action passes the threshold", () => {
     const assessment = assessEscalation(base, new Date("2026-09-26T13:00:00Z"));
     expect(assessment.shouldEscalate).toBe(true);

@@ -51,6 +51,7 @@ export default async function SettingsPage() {
     notificationsEnabled: settings.notificationsEnabled,
     complianceDueNotifications: settings.complianceDueNotifications,
     evidenceReviewNotifications: settings.evidenceReviewNotifications,
+    documentRetentionDays: settings.documentRetentionDays,
   }) : null;
   const initialSettings = parsedSettings?.success ? parsedSettings.data : DEFAULT_WORKSPACE_SETTINGS;
 

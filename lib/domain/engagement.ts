@@ -40,11 +40,12 @@ const transitions: Record<EngagementStatus, EngagementStatus[]> = {
 };
 
 export function canTransition(from: EngagementStatus, to: EngagementStatus) {
-  return transitions[from].includes(to);
+  const nextStatuses = transitions[from as keyof typeof transitions];
+  return Boolean(nextStatuses && nextStatuses.includes(to));
 }
 
 export function getNextStatuses(status: EngagementStatus) {
-  return transitions[status];
+  return transitions[status] ?? [];
 }
 
 export function assertTransition(from: EngagementStatus, to: EngagementStatus) {

@@ -22,6 +22,6 @@ export const documentMetadataSchema = z.object({
 });
 
 export const documentReviewSchema = z.object({
-  reviewStatus: z.enum(["UNREVIEWED", "IN_REVIEW", "VERIFIED", "REJECTED", "SUPERSEDED"]),
-  reviewedByUserId: z.string().min(1),
-});
+  reviewStatus: z.enum(["IN_REVIEW", "VERIFIED", "REJECTED"]),
+  reviewNote: z.string().trim().max(4000).optional(),
+}).strict();

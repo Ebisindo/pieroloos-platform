@@ -11,8 +11,10 @@ export type ComplianceNotification = {
   subject: string;
   body: string;
   scheduledFor: Date;
-  status: "QUEUED" | "SENT" | "FAILED" | "CANCELLED";
+  status: "QUEUED" | "PROCESSING" | "SENT" | "FAILED" | "DEAD_LETTER" | "CANCELLED";
   dedupeKey: string;
+  templateKey?: string;
+  templateVersion?: number;
   createdAt?: Date;
   sentAt?: Date;
   failedAt?: Date;
@@ -42,6 +44,8 @@ export function buildEscalationNotification(
     body: `Action "${action.title}" has escalated to level ${level}.`,
     scheduledFor: now,
     dedupeKey: `escalation:${action.id}:${level}`,
+    templateKey: "operational-action-escalation",
+    templateVersion: 1,
   };
 }
 

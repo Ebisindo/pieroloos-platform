@@ -3,9 +3,19 @@ import type { ObjectStorageAdapter, StoredObject } from "./object-storage";
 export class InMemoryObjectStorage implements ObjectStorageAdapter {
   private objects = new Map<string, Uint8Array>();
 
-  async put(input: { key: string; body: Uint8Array; contentType: string }): Promise<StoredObject> {
-    this.objects.set(input.key, input.body);
-    return { key: input.key, contentType: input.contentType, sizeBytes: input.body.byteLength };
+  async put(input: {
+    key: string;
+    body: Uint8Array;
+    contentType: string;
+    checksumSha256: string;
+  }): Promise<StoredObject> {
+    this.objects.set(input.key, new Uint8Array(input.body));
+    return {
+      key: input.key,
+      contentType: input.contentType,
+      sizeBytes: input.body.byteLength,
+      checksumSha256: input.checksumSha256,
+    };
   }
   async get(key: string) {
     const value = this.objects.get(key);
@@ -15,5 +25,8 @@ export class InMemoryObjectStorage implements ObjectStorageAdapter {
     });
   }
   async delete(key: string) { this.objects.delete(key); }
-  async createDownloadUrl(key: string) { return `memory://object/${encodeURIComponent(key)}`; }
+  async createDownloadUrl(key: string) {
+    if (!this.objects.has(key)) throw new Error("OBJECT_NOT_FOUND");
+    return `memory://object/${encodeURIComponent(key)}`;
+  }
 }

@@ -20,6 +20,7 @@ export const workspaceSettingsSchema = z.object({
   notificationsEnabled: z.boolean(),
   complianceDueNotifications: z.boolean(),
   evidenceReviewNotifications: z.boolean(),
+  documentRetentionDays: z.number().int().min(1).max(36500).nullable(),
 }).strict();
 
 export type WorkspaceSettingsInput = z.infer<typeof workspaceSettingsSchema>;
@@ -31,4 +32,5 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettingsInput = {
   notificationsEnabled: true,
   complianceDueNotifications: true,
   evidenceReviewNotifications: true,
+  documentRetentionDays: null,
 };

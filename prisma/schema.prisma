@@ -22,9 +22,93 @@ enum NotificationChannel {
 
 enum NotificationStatus {
   QUEUED
+  PROCESSING
   SENT
   FAILED
+  DEAD_LETTER
   CANCELLED
+}
+
+enum NotificationAttemptStatus {
+  ATTEMPTING
+  ACCEPTED
+  RETRYABLE_FAILURE
+  PERMANENT_FAILURE
+}
+
+enum BillingPlanTier {
+  FREE
+  FOUNDER
+  PROFESSIONAL
+  FIRM
+  ENTERPRISE
+}
+
+enum BillingEntitlementKind {
+  ACCESS
+  LIMIT
+  METERED
+  CREDIT
+}
+
+enum BillingSubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  PAUSED
+  CANCELED
+  ENDED
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+  CUSTOM
+}
+
+enum BillingInvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum BillingPaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum BillingCreditEntryType {
+  GRANT
+  PURCHASE
+  USAGE
+  EXPIRY
+  REFUND
+  ADJUSTMENT
+}
+
+enum BillingCreditDirection {
+  CREDIT
+  DEBIT
+}
+
+enum BillingInvoiceLineType {
+  SUBSCRIPTION
+  USAGE
+  CREDITS
+  PROFESSIONAL_REVIEW
+  OTHER
+}
+
+enum BillingWebhookStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
 }
 
 enum MarketEntryStatus {
@@ -44,6 +128,29 @@ enum EvidenceReviewStatus {
   PENDING
   VERIFIED
   CHANGES_REQUESTED
+}
+
+enum DocumentStorageStatus {
+  PENDING_SCAN
+  AVAILABLE
+  INFECTED
+  DELETED
+}
+
+enum DocumentScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
+  LEGACY_UNVERIFIED
+}
+
+enum DocumentReviewStatus {
+  UNREVIEWED
+  IN_REVIEW
+  VERIFIED
+  REJECTED
+  SUPERSEDED
 }
 
 enum CrossBorderDossierStatus {
@@ -171,6 +278,14 @@ model Organization {
   jurisdictions         Jurisdiction[]
   complianceObligations ComplianceObligation[]
   marketEntryPlans      MarketEntryPlan[]
+  billingSubscriptions  BillingSubscription[]
+  billingUsageEvents    BillingUsageEvent[]
+  billingCreditEntries  BillingCreditEntry[]
+  billingInvoices       BillingInvoice[]
+  billingPayments      BillingPayment[]
+  billingWebhookEvents BillingWebhookEvent[]
+  clientPortalGrants   ClientPortalGrant[]
+  clientPortalEvents   ClientPortalAuditEvent[]
 }
 
 model User {
@@ -180,9 +295,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships   Membership[]
-  assignedTasks Task[]       @relation("TaskAssignee")
-  activities    Activity[]   @relation("ActivityActor")
+  memberships             Membership[]
+  assignedTasks           Task[]                   @relation("TaskAssignee")
+  activities              Activity[]               @relation("ActivityActor")
+  notificationPreferences NotificationPreference[]
+  clientPortalGrants     ClientPortalGrant[]      @relation("ClientPortalGrantUser")
+  portalGrantsCreated    ClientPortalGrant[]      @relation("ClientPortalGrantCreatedBy")
+  clientPortalEvents     ClientPortalAuditEvent[] @relation("PortalAuditActor")
 }
 
 model Membership {
@@ -208,6 +327,8 @@ model Workspace {
   updatedAt      DateTime @updatedAt
 
   organization               Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  notificationPreferences    NotificationPreference[]
+  notifications              ComplianceNotification[]
   clients                    Client[]
   engagements                Engagement[]
   jurisdictions              Jurisdiction[]
@@ -220,12 +341,19 @@ model Workspace {
   marketEntryPlans           MarketEntryPlan[]
   marketReadinessAssessments MarketReadinessAssessment[]
   documents                  Document[]
+  documentAccessEvents       DocumentAccessEvent[]
+  complianceEvidence         ComplianceEvidence[]
   reports                    Report[]
   activities                 Activity[]
   tasks                      Task[]
   crossBorderDossiers        CrossBorderDossier[]
+  clientPortalGrants          ClientPortalGrant[]
+  clientPortalEvents          ClientPortalAuditEvent[]
+  billingUsageEvents         BillingUsageEvent[]
+  billingCreditEntries       BillingCreditEntry[]
 
   @@unique([organizationId, slug])
+  @@unique([organizationId, id])
   @@index([organizationId])
 }
 
@@ -255,7 +383,10 @@ model Client {
   documents             Document[]
   reports               Report[]
   crossBorderDossiers   CrossBorderDossier[]
+  portalAccessGrants    ClientPortalGrant[]
+  portalEvents          ClientPortalAuditEvent[]
 
+  @@unique([id, workspaceId])
   @@index([workspaceId])
 }
 
@@ -305,8 +436,10 @@ model Engagement {
   reports         Report[]
   activities      Activity[]
   complianceItems ComplianceItem[]
+  documents       Document[]
   roadmap         FormationRoadmap?
 
+  @@unique([id, workspaceId])
   @@index([workspaceId])
   @@index([clientId])
   @@index([status])
@@ -420,25 +553,71 @@ model Evidence {
 }
 
 model Document {
-  id          String   @id @default(cuid())
-  workspaceId String
-  clientId    String?
-  evidenceId  String?
-  name        String
-  mimeType    String?
-  storageKey  String?
-  sizeBytes   Int?
-  checksum    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                     String                @id @default(cuid())
+  workspaceId            String
+  clientId               String?
+  engagementId           String?
+  complianceObligationId String?
+  evidenceId             String?
+  rootDocumentId         String
+  previousVersionId      String?
+  version                Int                   @default(1)
+  latestVersion          Int                   @default(1)
+  name                   String
+  description            String?
+  documentType           String                @default("OTHER")
+  mimeType               String
+  storageKey             String                @unique
+  sizeBytes              Int
+  checksum               String
+  status                 DocumentStorageStatus @default(PENDING_SCAN)
+  scanStatus             DocumentScanStatus    @default(PENDING)
+  reviewStatus           DocumentReviewStatus  @default(UNREVIEWED)
+  uploadedByUserId       String
+  reviewedByUserId       String?
+  reviewedAt             DateTime?
+  reviewNote             String?
+  retainUntil            DateTime?
+  deletedAt              DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
   workspace                  Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client                     Client?                      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client                     Client?                      @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  engagement                 Engagement?                  @relation(fields: [engagementId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  complianceObligation       ComplianceObligation?        @relation(fields: [complianceObligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   evidence                   Evidence?                    @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  rootDocument               Document                     @relation("DocumentVersions", fields: [rootDocumentId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  versions                   Document[]                   @relation("DocumentVersions")
+  previousVersion            Document?                    @relation("DocumentPreviousVersion", fields: [previousVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  nextVersions               Document[]                   @relation("DocumentPreviousVersion")
+  accessEvents               DocumentAccessEvent[]
+  complianceEvidence         ComplianceEvidence[]
   crossBorderControlEvidence CrossBorderControlEvidence[]
 
-  @@index([workspaceId])
+  @@unique([rootDocumentId, version])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status, createdAt])
   @@index([clientId])
+  @@index([engagementId])
+  @@index([complianceObligationId])
+  @@index([retainUntil, deletedAt])
+}
+
+model DocumentAccessEvent {
+  id          String   @id @default(cuid())
+  documentId  String
+  workspaceId String
+  actorUserId String?
+  action      String
+  metadata    Json?
+  occurredAt  DateTime @default(now())
+
+  document  Document  @relation(fields: [documentId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, occurredAt])
+  @@index([documentId, occurredAt])
 }
 
 model Report {
@@ -492,6 +671,7 @@ model Task {
   status       TaskStatus @default(TODO)
   dueAt        DateTime?
   completedAt  DateTime?
+  portalVisible Boolean  @default(false)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -513,6 +693,7 @@ model WorkspaceSettings {
   notificationsEnabled        Boolean  @default(true)
   complianceDueNotifications  Boolean  @default(true)
   evidenceReviewNotifications Boolean  @default(true)
+  documentRetentionDays       Int?
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
 
@@ -633,6 +814,7 @@ model FormationTask {
   blockingReason             String?
   completionNote             String?
   completedAt                DateTime?
+  portalVisible              Boolean   @default(false)
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 
@@ -694,6 +876,7 @@ model ComplianceObligation {
   professionalReviewCompleted Boolean          @default(false)
   escalationLevel             Int              @default(0)
   requiresEvidence            Boolean          @default(false)
+  portalVisible               Boolean          @default(false)
   createdAt                   DateTime         @default(now())
   updatedAt                   DateTime         @updatedAt
 
@@ -705,7 +888,9 @@ model ComplianceObligation {
   activities    ComplianceActivity[]
   reminders     ComplianceReminder[]
   evidence      ComplianceEvidence[]
+  documents     Document[]
 
+  @@unique([id, workspaceId])
   @@index([organizationId, workspaceId, status])
   @@index([workspaceId, dueAt])
   @@index([clientId])
@@ -810,6 +995,7 @@ model ComplianceReminder {
 
 model ComplianceEvidence {
   id               String               @id @default(cuid())
+  workspaceId      String
   obligationId     String
   documentId       String
   evidenceClass    String
@@ -822,9 +1008,12 @@ model ComplianceEvidence {
   reviewedAt       DateTime?
   createdAt        DateTime             @default(now())
 
-  obligation ComplianceObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  document   Document             @relation(fields: [documentId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([obligationId, reviewStatus, validThrough])
+  @@index([workspaceId, createdAt])
 }
 
 model CrossBorderDossier {
@@ -957,27 +1146,128 @@ model OperationalActionAuditEvent {
 }
 
 model ComplianceNotification {
-  id              String              @id @default(cuid())
-  organizationId  String
-  workspaceId     String
-  obligationId    String?
-  actionId        String?
-  recipientUserId String?
-  channel         NotificationChannel
-  subject         String
-  body            String
-  scheduledFor    DateTime
-  status          NotificationStatus  @default(QUEUED)
-  sentAt          DateTime?
-  failedAt        DateTime?
-  failureReason   String?
-  dedupeKey       String
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id                String              @id @default(cuid())
+  organizationId    String
+  workspaceId       String
+  obligationId      String?
+  actionId          String?
+  recipientUserId   String?
+  channel           NotificationChannel
+  subject           String
+  body              String
+  scheduledFor      DateTime
+  status            NotificationStatus  @default(QUEUED)
+  sentAt            DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  dedupeKey         String
+  attemptCount      Int                 @default(0)
+  maxAttempts       Int                 @default(5)
+  nextAttemptAt     DateTime            @default(now())
+  lastAttemptAt     DateTime?
+  lockedAt          DateTime?
+  lockedBy          String?
+  providerMessageId String?
+  deliveryReceipt   String?
+  templateKey       String              @default("legacy-notification")
+  templateVersion   Int                 @default(1)
+  deadLetteredAt    DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  deliveryAttempts NotificationDeliveryAttempt[]
+  workspace        Workspace                     @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
 
   @@unique([organizationId, workspaceId, dedupeKey])
   @@index([organizationId, workspaceId, scheduledFor])
   @@index([organizationId, workspaceId, status])
+  @@index([status, scheduledFor, nextAttemptAt, lockedAt])
+}
+
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  userId          String
+  inAppEnabled    Boolean  @default(true)
+  emailEnabled    Boolean  @default(false)
+  quietHoursStart String?
+  quietHoursEnd   String?
+  timezone        String   @default("UTC")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model NotificationDeliveryAttempt {
+  id                String                    @id @default(cuid())
+  notificationId    String
+  attemptNumber     Int
+  status            NotificationAttemptStatus
+  startedAt         DateTime                  @default(now())
+  completedAt       DateTime?
+  providerMessageId String?
+  failureCode       String?
+  failureMessage    String?
+
+  notification ComplianceNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, attemptNumber])
+  @@index([status, startedAt])
+}
+
+model ClientPortalGrant {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  workspaceId        String
+  clientId           String
+  userId             String
+  grantedByUserId    String
+  canViewStatus      Boolean  @default(true)
+  canViewTasks       Boolean  @default(true)
+  canUploadEvidence  Boolean  @default(true)
+  expiresAt          DateTime?
+  revokedAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  user         User         @relation("ClientPortalGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy    User         @relation("ClientPortalGrantCreatedBy", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+  events       ClientPortalAuditEvent[]
+
+  @@unique([clientId, userId])
+  @@index([userId, revokedAt, expiresAt])
+  @@index([organizationId, workspaceId, clientId, revokedAt])
+}
+
+model ClientPortalAuditEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  clientId       String
+  grantId        String?
+  actorUserId    String
+  action         String
+  resourceId     String?
+  metadata       Json?
+  occurredAt     DateTime @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace          @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  client       Client             @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  grant        ClientPortalGrant? @relation(fields: [grantId], references: [id], onDelete: SetNull)
+  actor        User               @relation("PortalAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([clientId, occurredAt])
+  @@index([actorUserId, occurredAt])
 }
 
 model OperationalEscalationEvent {
@@ -993,4 +1283,201 @@ model OperationalEscalationEvent {
   @@unique([actionId, toLevel])
   @@index([organizationId, workspaceId, occurredAt])
   @@index([actionId, occurredAt])
+}
+
+model BillingPlan {
+  id          String          @id @default(cuid())
+  key         String          @unique
+  name        String
+  tier        BillingPlanTier
+  version     Int             @default(1)
+  active      Boolean         @default(true)
+  description String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  entitlements BillingPlanEntitlement[]
+  subscriptions BillingSubscription[]
+
+  @@index([tier, active])
+}
+
+model BillingPlanEntitlement {
+  id          String                 @id @default(cuid())
+  planId      String
+  key         String
+  kind        BillingEntitlementKind
+  enabled     Boolean                @default(true)
+  limit       Int?
+  unit        String?
+  description String?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  plan BillingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, key])
+  @@index([key, enabled])
+}
+
+model BillingSubscription {
+  id                    String                    @id @default(cuid())
+  organizationId        String
+  planId                String
+  status                BillingSubscriptionStatus @default(ACTIVE)
+  interval              BillingInterval           @default(MONTH)
+  provider              String?
+  providerSubscriptionId String?
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  trialEndsAt           DateTime?
+  cancelAtPeriodEnd     Boolean                   @default(false)
+  canceledAt            DateTime?
+  endedAt               DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         BillingPlan  @relation(fields: [planId], references: [id], onDelete: Restrict)
+  invoices     BillingInvoice[]
+
+  @@unique([provider, providerSubscriptionId])
+  @@index([organizationId, status, currentPeriodEnd])
+  @@index([planId])
+}
+
+model BillingUsageEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  workspaceId    String?
+  entitlementKey String
+  quantity       Int
+  unit           String?
+  idempotencyKey String
+  metadata       Json?
+  occurredAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?   @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, entitlementKey, occurredAt])
+  @@index([workspaceId, entitlementKey, occurredAt])
+}
+
+model BillingCreditEntry {
+  id             String                @id @default(cuid())
+  organizationId String
+  workspaceId    String?
+  entryType      BillingCreditEntryType
+  direction      BillingCreditDirection
+  amount         Int
+  creditType     String
+  idempotencyKey String
+  reference      String?
+  description    String?
+  metadata       Json?
+  occurredAt     DateTime              @default(now())
+  createdAt      DateTime              @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?   @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, creditType, occurredAt])
+  @@index([workspaceId, creditType, occurredAt])
+}
+
+model BillingInvoice {
+  id                 String              @id @default(cuid())
+  organizationId     String
+  subscriptionId     String?
+  provider           String?
+  providerInvoiceId  String?
+  invoiceNumber      String?
+  status             BillingInvoiceStatus @default(DRAFT)
+  currency           String
+  amountDueMinor     BigInt               @default(0)
+  amountPaidMinor    BigInt               @default(0)
+  amountRemainingMinor BigInt             @default(0)
+  periodStart        DateTime?
+  periodEnd          DateTime?
+  dueAt              DateTime?
+  issuedAt           DateTime?
+  paidAt             DateTime?
+  voidedAt           DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription BillingSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  payments     BillingPayment[]
+  lines        BillingInvoiceLine[]
+
+  @@unique([provider, providerInvoiceId])
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId, status, createdAt])
+  @@index([subscriptionId])
+}
+
+model BillingInvoiceLine {
+  id               String                 @id @default(cuid())
+  invoiceId        String
+  lineType         BillingInvoiceLineType
+  description      String
+  quantity         Int
+  unitAmountMinor  BigInt
+  totalAmountMinor BigInt
+  entitlementKey   String?
+  metadata         Json?
+  createdAt        DateTime               @default(now())
+
+  invoice BillingInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, lineType])
+}
+
+model BillingPayment {
+  id                  String               @id @default(cuid())
+  organizationId      String
+  invoiceId           String?
+  provider            String?
+  providerPaymentId   String?
+  status              BillingPaymentStatus @default(PENDING)
+  currency            String
+  amountMinor         BigInt
+  refundedAmountMinor BigInt               @default(0)
+  failureCode         String?
+  failureMessage      String?
+  paidAt              DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoice      BillingInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerPaymentId])
+  @@index([organizationId, status, createdAt])
+  @@index([invoiceId])
+}
+
+model BillingWebhookEvent {
+  id              String             @id @default(cuid())
+  organizationId  String?
+  provider        String
+  providerEventId String
+  eventType       String
+  payloadHash     String
+  status          BillingWebhookStatus @default(RECEIVED)
+  attemptCount    Int                @default(0)
+  receivedAt      DateTime           @default(now())
+  processedAt     DateTime?
+  lastErrorCode   String?
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerEventId])
+  @@index([status, receivedAt])
+  @@index([organizationId, receivedAt])
 }

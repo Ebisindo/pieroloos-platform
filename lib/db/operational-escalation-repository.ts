@@ -70,6 +70,33 @@ export const operationalEscalationRepository: EscalationRepository = {
           scheduledFor: notification.scheduledFor,
           status: "QUEUED",
           dedupeKey: notification.dedupeKey,
+          templateKey: notification.templateKey ?? "legacy-notification",
+          templateVersion: notification.templateVersion ?? 1,
+        },
+        update: {},
+      });
+      await transaction.complianceNotification.upsert({
+        where: {
+          organizationId_workspaceId_dedupeKey: {
+            organizationId: notification.organizationId,
+            workspaceId: notification.workspaceId,
+            dedupeKey: `${notification.dedupeKey}:email`,
+          },
+        },
+        create: {
+          organizationId: notification.organizationId,
+          workspaceId: notification.workspaceId,
+          obligationId: notification.obligationId,
+          actionId: notification.actionId,
+          recipientUserId: notification.recipientUserId,
+          channel: "EMAIL",
+          subject: notification.subject,
+          body: notification.body,
+          scheduledFor: notification.scheduledFor,
+          status: "QUEUED",
+          dedupeKey: `${notification.dedupeKey}:email`,
+          templateKey: notification.templateKey ?? "legacy-notification",
+          templateVersion: notification.templateVersion ?? 1,
         },
         update: {},
       });

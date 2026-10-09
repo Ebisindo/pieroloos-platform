@@ -1,13 +1,34 @@
-import { PageHeader, EmptyState } from "@/components/ui/primitives";
+import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
+import { ClientPortalAccessManager } from "@/components/portal/ClientPortalAccessManager";
+import { getWorkspaceContext } from "@/lib/auth/workspace-context";
+import { listWorkspacePortalClients } from "@/lib/services/client-portal-service";
 
-export default function Page() {
+export default async function ClientsPage() {
+  const context = await getWorkspaceContext();
+  if (!context.userId) {
+    return <WorkspaceAccessState title="Sign in to manage clients" description="Client records and client portal access require an authenticated workspace member." href="/signin?callbackUrl=/clients" action="Sign in" />;
+  }
+  if (!context.activeWorkspace || !context.principal) {
+    return <WorkspaceAccessState title="Workspace selection required" description="Select an active workspace to manage client portal access." />;
+  }
+  if (!context.principal.permissions.includes("client:read")) {
+    return <WorkspaceAccessState title="Client access required" description="Your workspace role cannot manage client portal access." />;
+  }
+
+  const clients = await listWorkspacePortalClients(context.principal);
   return (
-    <div className="page-stack">
-      <PageHeader eyebrow="CLIENT OPERATIONS" title="Clients" description="Structured client records and intake workflows." />
-      <EmptyState
-        title="Clients workspace is initialized"
-        description="The application shell and domain foundation are ready. The next implementation slice will connect this module to persistent application data."
-      />
-    </div>
+    <main className="page-stack">
+      <header>
+        <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">Client operations</p>
+        <h1 className="mt-2 text-3xl font-semibold text-white">Client portal access</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+          Grant client-scoped status and evidence access, publish only the requests clients should see, and revoke access when collaboration ends.
+        </p>
+      </header>
+      <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4 text-sm leading-6 text-amber-100">
+        Client-visible requests are opt-in and hidden by default. Portal clients can view status and published work, and upload evidence; they cannot change task states, approve work, message professionals, or sign documents in this release.
+      </div>
+      <ClientPortalAccessManager clients={clients} />
+    </main>
   );
 }

@@ -24,6 +24,8 @@ function mapRecord(record: Prisma.ComplianceNotificationGetPayload<object>): Com
     scheduledFor: record.scheduledFor,
     status: record.status,
     dedupeKey: record.dedupeKey,
+    templateKey: record.templateKey,
+    templateVersion: record.templateVersion,
     createdAt: record.createdAt,
     sentAt: record.sentAt ?? undefined,
     failedAt: record.failedAt ?? undefined,
@@ -40,7 +42,6 @@ export const notificationRepository = {
         organizationId: principal.organizationId,
         workspaceId: principal.workspaceId,
         recipientUserId: principal.userId,
-        channel: "IN_APP",
         status: { not: "CANCELLED" },
         scheduledFor: { lte: new Date() },
       },
@@ -83,6 +84,8 @@ export const notificationRepository = {
       scheduledFor: input.scheduledFor,
       status: input.status ?? "QUEUED",
       dedupeKey: input.dedupeKey,
+      templateKey: input.templateKey ?? "legacy-notification",
+      templateVersion: input.templateVersion ?? 1,
     };
     const record = await prisma.complianceNotification.upsert({
       where: {

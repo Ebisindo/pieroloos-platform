@@ -50,11 +50,15 @@ Implementation status, controls, and outstanding verification are tracked in [Se
 
 Move documents and evidence onto durable, access-controlled storage with lifecycle, integrity, and recovery controls suitable for production.
 
+Implementation status, deployment prerequisites, and remaining controls are tracked in [Session 21 — Secure Documents & Evidence Storage](./SESSION-21-SECURE-DOCUMENTS-EVIDENCE-STORAGE.md).
+
 **Exit gate:** Upload, retrieval, authorization, integrity verification, retention/deletion, and recovery behavior are tested; evidence references remain correctly scoped; storage credentials and access are managed outside application source.
 
 ### 22 — Notification & Background Job Infrastructure
 
 Make notifications and asynchronous work durable, observable, retryable, and safe under duplicate delivery or worker interruption.
+
+Implementation, provider configuration, and operational exit-gate status are tracked in [Session 22 — Notification & Background Job Infrastructure](./SESSION-22-NOTIFICATION-BACKGROUND-JOBS.md).
 
 **Exit gate:** Jobs have persistence, idempotency, bounded retries, failure visibility, and operational controls; notification delivery outcomes can be inspected; worker failure and recovery are tested.
 
@@ -68,17 +72,23 @@ Establish governed jurisdiction and obligation data with source provenance, effe
 
 Add AI only over governed data and workflows, with traceable source grounding, clear limits, human review, and controls for uncertain or unsafe outputs.
 
+Initial provider-neutral explainability contracts and their rollout limits are tracked in [Session 24 — AI Intelligence & Explainability](./SESSION-24-AI-INTELLIGENCE-EXPLAINABILITY.md).
+
 **Exit gate:** AI outputs are attributable to retrieved sources and their versions; uncertainty and limitations are visible; consequential decisions remain reviewable by authorized humans; evaluations cover quality, failure modes, and regressions.
 
 ### 25 — Billing, Entitlements & Monetization
 
 Introduce commercial plans and billing only after the underlying access, data, and operational boundaries are trustworthy.
 
+The configurable billing model and its explicit rollout limits are tracked in [Session 25 — Billing, Entitlements & Monetization](./SESSION-25-BILLING-ENTITLEMENTS-MONETIZATION.md).
+
 **Exit gate:** Entitlements are enforced server-side; billing state changes are authenticated, idempotent, and auditable; plan changes, failures, cancellation, and access reconciliation are tested.
 
 ### 26 — Client Portal & External Collaboration
 
 Enable carefully bounded collaboration with clients and external participants without weakening workspace isolation or evidence controls.
+
+The first grant-scoped, read-only status/task and evidence-upload slice, including its intentionally narrow boundary, is tracked in [Session 26 — Client Portal & External Collaboration](./SESSION-26-CLIENT-PORTAL-EXTERNAL-COLLABORATION.md).
 
 **Exit gate:** External identities receive only explicitly granted, revocable access; portal actions are authorized and auditable; sharing, invitation, removal, and evidence-access boundaries have negative tests.
 

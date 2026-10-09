@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Database, FileCheck2, ShieldCheck, Workflow } from "lucide-react";
 import { ActionQueue } from "@/components/control-plane/ActionQueue";
 import { NotificationInbox } from "@/components/control-plane/NotificationInbox";
+import { NotificationPreferencesForm } from "@/components/control-plane/NotificationPreferencesForm";
 import { GlassPanel, MetricCard, PageHeader, SectionHeader, StatusBadge } from "@/components/ui/primitives";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { listActiveOperationalActions } from "@/lib/db/operational-action-query";
@@ -14,7 +15,7 @@ export default async function CommandCenterPage() {
   const canReadWorkspace = context.principal?.permissions.includes("workspace:read") ?? false;
   const canReadActions = context.principal?.permissions.includes("compliance:read") ?? false;
   const canManageActions = context.principal?.permissions.includes("compliance:write") ?? false;
-  const [counts, activeActions, assignees, notifications] = await Promise.all([
+  const [counts, activeActions, assignees, notifications, notificationPreferences] = await Promise.all([
     context.principal && canReadWorkspace
       ? Promise.all([
         prisma.client.count({
@@ -33,6 +34,29 @@ export default async function CommandCenterPage() {
       }).then((members) => members.map(({ userId, user }) => ({ userId, ...user })))
       : [],
     context.principal && canReadActions ? notificationRepository.listForRecipient(context.principal) : [],
+    context.principal && canReadActions
+      ? prisma.notificationPreference.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: context.principal.workspaceId,
+            userId: context.principal.userId,
+          },
+        },
+        select: {
+          inAppEnabled: true,
+          emailEnabled: true,
+          quietHoursStart: true,
+          quietHoursEnd: true,
+          timezone: true,
+        },
+      }).then((preference) => preference ?? {
+        inAppEnabled: true,
+        emailEnabled: false,
+        quietHoursStart: null,
+        quietHoursEnd: null,
+        timezone: "UTC",
+      })
+      : null,
   ]);
 
   return (
@@ -93,6 +117,9 @@ export default async function CommandCenterPage() {
           <GlassPanel>
             <SectionHeader title="Notifications" description="Operational updates addressed to you in this workspace." />
             <NotificationInbox notifications={notifications} />
+            {notificationPreferences ? (
+              <NotificationPreferencesForm initialPreferences={notificationPreferences} />
+            ) : null}
           </GlassPanel>
         </div>
       </div>

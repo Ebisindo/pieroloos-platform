@@ -13,6 +13,7 @@ export const PERMISSIONS = [
   "evidence:read",
   "evidence:write",
   "evidence:review",
+  "evidence:delete",
   "report:read",
   "report:write",
   "compliance:read",

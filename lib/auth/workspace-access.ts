@@ -5,7 +5,7 @@ export type WorkspacePermission =
   | "client:read" | "client:write"
   | "jurisdictions:read" | "jurisdictions:write"
   | "formation:read" | "formation:write" | "engagement:read" | "engagement:write"
-  | "documents:read" | "documents:write" | "documents:review"
+  | "documents:read" | "documents:write" | "documents:review" | "documents:delete"
   | "compliance:read" | "compliance:write"
   | "reports:read" | "reports:write" | "audit:read";
 
@@ -32,6 +32,7 @@ const permissionMap: Record<WorkspacePermission, Permission> = {
   "documents:read": "evidence:read",
   "documents:write": "evidence:write",
   "documents:review": "evidence:review",
+  "documents:delete": "evidence:delete",
   "compliance:read": "compliance:read",
   "compliance:write": "compliance:write",
   "reports:read": "report:read",

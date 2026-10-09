@@ -105,7 +105,14 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
     const requirement = taskRecord.evidenceRequirements.find((item) => item.key === parsed.data.evidenceRequirementKey);
     if (!requirement) return NextResponse.json({ error: "Evidence requirement not found." }, { status: 404 });
     const document = await prisma.document.findFirst({
-      where: { id: parsed.data.evidenceId, workspaceId: principal.workspaceId, clientId: plan.clientId },
+      where: {
+        id: parsed.data.evidenceId,
+        workspaceId: principal.workspaceId,
+        clientId: plan.clientId,
+        status: "AVAILABLE",
+        scanStatus: "CLEAN",
+        deletedAt: null,
+      },
       select: { id: true },
     });
     if (!document) return NextResponse.json({ error: "Document not found for this client and workspace." }, { status: 404 });
@@ -116,7 +123,9 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
     : parsed.data.action === "SATISFY_EVIDENCE"
       ? "documents:write"
       : "formation:write";
-  const updatedTask = await withAuthorizedWorkspaceTransaction(principal, permission, async (transaction) => {
+  let updatedTask;
+  try {
+    updatedTask = await withAuthorizedWorkspaceTransaction(principal, permission, async (transaction) => {
     if (parsed.data.action === "REVIEW_APPROVE") {
       await transaction.formationReview.create({
         data: {
@@ -130,6 +139,31 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
 
     let updated;
     if (parsed.data.action === "SATISFY_EVIDENCE") {
+      const document = await transaction.document.findFirst({
+        where: {
+          id: parsed.data.evidenceId,
+          workspaceId: principal.workspaceId,
+          clientId: plan.clientId,
+          status: "AVAILABLE",
+          scanStatus: "CLEAN",
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!document) throw new Error("DOCUMENT_NOT_READY");
+      await transaction.documentAccessEvent.create({
+        data: {
+          documentId: document.id,
+          workspaceId: principal.workspaceId,
+          actorUserId: principal.userId,
+          action: "EVIDENCE_LINKED",
+          metadata: {
+            formationPlanId: plan.id,
+            taskId,
+            evidenceRequirementKey: parsed.data.evidenceRequirementKey,
+          },
+        },
+      });
       updated = await transaction.formationTask.update({
         where: { id: taskId },
         data: {
@@ -201,7 +235,16 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
     });
 
     return updated;
-  });
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "DOCUMENT_NOT_READY") {
+      return NextResponse.json({ error: "Only security-scanned documents can satisfy evidence requirements." }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
+      return NextResponse.json({ error: "Workspace authorization changed. Refresh and try again." }, { status: 409 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({ data: updatedTask });
 }

@@ -66,7 +66,7 @@ export function ActionQueue({
       {error ? <p className="action-error" role="alert">{error}</p> : null}
       <ol className="action-list" aria-label="Active operational actions">
         {actions.map((action) => {
-          const availableTransitions = ACTION_TRANSITIONS[action.status]
+          const availableTransitions = (ACTION_TRANSITIONS[action.status] ?? [])
             .filter((status) => status !== "ASSIGNED" && status !== "RESOLVED");
           const selectedAssignee = selectedAssignees[action.id] ?? action.assigneeUserId ?? "";
           const assigneeLabel = assignees.find((assignee) => assignee.userId === action.assigneeUserId);
@@ -81,7 +81,7 @@ export function ActionQueue({
                 </p>
               </div>
               <div className="action-details">
-                <StatusBadge tone={statusTone[action.status]}>{statusLabel[action.status]}</StatusBadge>
+                <StatusBadge tone={statusTone[action.status] ?? "neutral"}>{statusLabel[action.status] ?? action.status}</StatusBadge>
                 <StatusBadge tone={action.priority === "CRITICAL" ? "danger" : action.priority === "HIGH" ? "warning" : "neutral"}>
                   {action.priority}
                 </StatusBadge>
@@ -143,7 +143,7 @@ export function ActionQueue({
                       ))}
                     </div>
                   ) : null}
-                  {ACTION_TRANSITIONS[action.status].includes("RESOLVED") ? (
+                  {(ACTION_TRANSITIONS[action.status] ?? []).includes("RESOLVED") ? (
                     <form
                       className="action-control"
                       onSubmit={(event) => {

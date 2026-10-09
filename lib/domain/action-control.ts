@@ -49,7 +49,8 @@ export function canTransitionAction(
   from: ControlActionStatus,
   to: ControlActionStatus,
 ) {
-  return ACTION_TRANSITIONS[from].includes(to);
+  const nextStatuses = ACTION_TRANSITIONS[from] ?? [];
+  return nextStatuses.includes(to);
 }
 
 export function transitionAction(
