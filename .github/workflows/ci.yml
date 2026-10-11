@@ -42,7 +42,8 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Create disposable shadow database
-        run: psql "$DATABASE_URL_CI" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE pieroloos_shadow;'
+        # psql rejects Prisma's "?schema=" query parameter, so strip it for the admin connection.
+        run: psql "${DATABASE_URL_CI%%\?*}" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE pieroloos_shadow;'
 
       - name: Validate, migrate, and verify PostgreSQL
         run: npm run db:deploy -- ci
