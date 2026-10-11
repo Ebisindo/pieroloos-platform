@@ -175,7 +175,7 @@ export function JurisdictionLensWorkflow({
           <header className="section-header">
             <div>
               <h2 id="comparison-results-heading">Comparison results</h2>
-              <p>Internal analytical indicators only. Missing observations remain unknown, not zero.</p>
+              <p>Internal analytical indicators only, not legal or regulatory conclusions. Missing observations remain unknown, not zero. Evidence below primary (E3) always requires professional review.</p>
             </div>
             <span className="status-badge status-success">Saved</span>
           </header>
@@ -190,7 +190,7 @@ export function JurisdictionLensWorkflow({
                     <td className="py-3 pr-4 font-medium text-white">{resultNames.get(result.jurisdictionId) ?? result.jurisdictionId}</td>
                     <td className="px-4 text-cyan-100">{result.analyticalIndicator ?? "Unknown"}</td>
                     <td className="px-4 text-slate-300">{result.confidence}%</td>
-                    <td className="pl-4 text-xs text-amber-200">{result.professionalReviewRequired ? "Required" : "Not flagged"}</td>
+                    <td className="pl-4 text-xs text-amber-200">{result.professionalReviewRequired ? "Professional review required" : "Not flagged; still not advice"}</td>
                   </tr>
                 ))}
               </tbody>

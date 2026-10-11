@@ -36,6 +36,8 @@ http://localhost:3000/api/auth/callback/oidc
 
 Sign-in is allowed only for users already present in the database with an organization membership. `PLATFORM_SUPERADMIN_EMAILS` is a comma-separated list of platform superadmin email addresses; it does not bypass the membership requirement. Protected workflows should resolve organization, workspace, and role permissions from the database.
 
+`GET /api/partnerships/inquiries` requires a signed-in platform superadmin (401 or 403 otherwise). `POST` on the same path is public and protected by origin checks, rate limits and validation. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full boundary list.
+
 ## Verify
 
 ```bash

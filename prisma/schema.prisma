@@ -1535,3 +1535,37 @@ model BillingWebhookEvent {
   @@index([status, receivedAt])
   @@index([organizationId, receivedAt])
 }
+
+enum PartnershipInquiryType {
+  PROFESSIONAL_SERVICES
+  TECHNOLOGY_PROVIDER
+  FINANCIAL_INSTITUTION
+  INSTITUTIONAL_PARTNER
+  STRATEGIC_SPONSOR_INVESTOR
+  DISTRIBUTION_ECOSYSTEM
+}
+
+enum PartnershipInquiryStatus {
+  NEW
+  IN_REVIEW
+  CLOSED
+}
+
+// Public submissions; intentionally not tenant-scoped. Readable only by platform superadmins.
+model PartnershipInquiry {
+  id                String                   @id @default(cuid())
+  partnerType       PartnershipInquiryType
+  contactName       String
+  email             String
+  organisationName  String
+  websiteUrl        String?
+  country           String?
+  message           String
+  consentAcceptedAt DateTime
+  status            PartnershipInquiryStatus @default(NEW)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+}

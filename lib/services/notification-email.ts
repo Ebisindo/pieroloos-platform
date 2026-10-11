@@ -23,7 +23,7 @@ function requiredSetting(name: string) {
 
 function renderTemplate(notification: EmailNotification) {
   if (notification.templateVersion !== 1 ||
-    !["operational-action-escalation", "legacy-notification"].includes(notification.templateKey)) {
+    !["operational-action-escalation", "legacy-notification", "partnership-inquiry"].includes(notification.templateKey)) {
     throw new Error("NOTIFICATION_TEMPLATE_UNAVAILABLE");
   }
 

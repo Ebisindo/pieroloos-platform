@@ -86,7 +86,7 @@ export function ClientIntakeForm() {
   const field = (label: string, key: keyof typeof initial, options?: { required?: boolean; textarea?: boolean; placeholder?: string }) => (
     <label className="block space-y-2">
       <span className="text-sm font-medium text-slate-200">
-        {label}{options?.required ? <span className="ml-1 text-amber-300">*</span> : null}
+        {label}{options?.required ? <span aria-hidden="true" className="ml-1 text-amber-300">*</span> : null}
       </span>
       {options?.textarea ? (
         <textarea
@@ -95,7 +95,7 @@ export function ClientIntakeForm() {
           onChange={(e) => update(key, e.target.value)}
           placeholder={options.placeholder}
           rows={4}
-          className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/10"
+          className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white transition focus:border-cyan-300/50"
         />
       ) : (
         <input
@@ -103,7 +103,7 @@ export function ClientIntakeForm() {
           value={form[key]}
           onChange={(e) => update(key, e.target.value)}
           placeholder={options?.placeholder}
-          className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/10"
+          className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white transition focus:border-cyan-300/50"
         />
       )}
     </label>
@@ -158,7 +158,7 @@ export function ClientIntakeForm() {
       <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-5 md:flex-row md:items-center md:justify-between">
         <div aria-live="polite" className="text-sm text-slate-400">
           {state === "success" && <span className="text-emerald-300">{message}</span>}
-          {state === "error" && <span className="text-rose-300">{message}</span>}
+          {state === "error" && <span role="alert" className="text-rose-300">{message}</span>}
           {state === "idle" && "Required fields are marked with *."}
           {state === "saving" && "Validating and creating the client record…"}
         </div>

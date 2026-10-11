@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { EvidenceBadge } from "@/components/jurisdiction/EvidenceBadge";
+import { TrustBoundaryNotice } from "@/components/evidence/TrustBoundaryNotice";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import type { EvidenceClass } from "@/lib/domain/jurisdiction";
@@ -84,6 +85,10 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
         </div>
         <span className="status-badge status-info">{context.activeWorkspace.name}</span>
       </header>
+
+      <TrustBoundaryNotice
+        gaps={jurisdiction.evidence.length === 0 ? ["NO_EVIDENCE"] : undefined}
+      />
 
       <section className="border-y border-white/10 py-5">
         <h2 className="text-sm font-semibold text-white">Profile overview</h2>

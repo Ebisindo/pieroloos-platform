@@ -1,16 +1,27 @@
  "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Search, ShieldCheck, X } from "lucide-react";
-import { useState } from "react";
-import { portalNavigation, systemNavigation, workspaceNavigation } from "@/lib/navigation";
+import { useEffect, useState } from "react";
+import { isPublicRoute, portalNavigation, systemNavigation, workspaceNavigation } from "@/lib/navigation";
 import { cx } from "@/components/ui/primitives";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen]);
+
+  if (isPublicRoute(pathname)) return <>{children}</>;
 
   const isClientPortal = pathname === "/portal" || pathname.startsWith("/portal/");
   const navigation = isClientPortal
@@ -19,25 +30,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-shell">
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       <div className="app-backdrop" aria-hidden="true">
         <div className="star-field" />
         <div className="ambient-orbit ambient-orbit-a" />
         <div className="ambient-orbit ambient-orbit-b" />
       </div>
 
-      <aside className={cx("sidebar", mobileOpen && "sidebar-open")}>
+      <aside id="primary-sidebar" className={cx("sidebar", mobileOpen && "sidebar-open")}>
         <div className="brand-lockup">
-          <Image
-            src="/brand/pierolocorp-logo.jpg"
-            alt="PieroloCorp"
-            width={44}
-            height={44}
-            className="brand-logo"
-          />
-          <div>
-            <div className="brand-name">PIEROLOOS</div>
-            <div className="brand-subtitle">Corporate Intelligence</div>
-          </div>
+          <Link href="/" aria-label="PieroloOS home" onClick={() => setMobileOpen(false)}>
+            <BrandLogo size="md" />
+          </Link>
           <button className="icon-button mobile-close" onClick={() => setMobileOpen(false)} aria-label="Close navigation">
             <X size={19} />
           </button>
@@ -52,6 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 onClick={() => setMobileOpen(false)}
                 className={cx("nav-item", active && "nav-active")}
               >
@@ -73,10 +78,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {mobileOpen ? <button className="mobile-scrim" onClick={() => setMobileOpen(false)} aria-label="Close navigation" /> : null}
 
-      <main className="main-shell">
+      <main id="main-content" className="main-shell">
         <header className="topbar">
           <div className="topbar-left">
-            <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation">
+            <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="primary-sidebar">
               <Menu size={20} />
             </button>
             <div className="context-path">

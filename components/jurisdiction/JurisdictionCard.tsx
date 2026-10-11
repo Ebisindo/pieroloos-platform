@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Jurisdiction } from "@/lib/domain/jurisdiction";
+import { weakestEvidenceClass } from "@/lib/domain/trust-boundary";
 import { EvidenceBadge } from "./EvidenceBadge";
 
 export function JurisdictionCard({
@@ -13,7 +14,8 @@ export function JurisdictionCard({
 	onSelect: (id: string) => void;
 	disabled?: boolean;
 }) {
-	const evidenceClass = jurisdiction.factors[0]?.evidenceClass;
+	// Show the weakest factor so a strong record cannot mask weak or missing evidence.
+	const evidenceClass = weakestEvidenceClass(jurisdiction.factors.map((factor) => factor.evidenceClass));
 
 	return (
 			<article className={`h-full rounded-lg border p-5 transition-colors ${selected ? "border-cyan-300/40 bg-cyan-300/[0.06]" : "border-white/10 bg-white/[0.035] hover:border-white/20 hover:bg-white/[0.055]"}`}>
@@ -29,7 +31,12 @@ export function JurisdictionCard({
 							{jurisdiction.profileSummary || "No profile summary available."}
 						</p>
 					</div>
-					{evidenceClass ? <EvidenceBadge evidenceClass={evidenceClass} /> : null}
+					<div className="flex flex-col items-end gap-1 text-right">
+						<EvidenceBadge evidenceClass={evidenceClass} />
+						<span className="text-[10px] text-slate-400">
+							{jurisdiction.factors.length ? "Weakest recorded evidence" : "No evidence recorded; unverified"}
+						</span>
+					</div>
 				</div>
 				<div className="mt-5 flex flex-wrap items-center justify-between gap-3">
 					<Link href={`/jurisdictions/${encodeURIComponent(jurisdiction.id)}`} className="text-xs font-medium text-cyan-200 hover:text-cyan-100">
