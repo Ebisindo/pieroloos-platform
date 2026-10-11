@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 
 function sha256Hex(buffer: ArrayBuffer) {
   return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export function ClientEvidenceUpload({ clientId }: { clientId: string }) {
+  const { t } = useLocale();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -16,7 +18,7 @@ export function ClientEvidenceUpload({ clientId }: { clientId: string }) {
     const form = event.currentTarget;
     const file = form.elements.namedItem("file");
     if (!(file instanceof HTMLInputElement) || !file.files?.[0]) {
-      setMessage("Choose a file to upload.");
+      setMessage(t("app.portal.uploadChooseFile"));
       return;
     }
 
@@ -32,11 +34,11 @@ export function ClientEvidenceUpload({ clientId }: { clientId: string }) {
         body,
       });
       const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Evidence upload failed.");
-      setMessage("Upload received and quarantined for security scanning.");
+      if (!response.ok) throw new Error(result.error ?? t("app.portal.uploadFailed"));
+      setMessage(t("app.portal.uploadReceived"));
       form.reset();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Evidence upload failed.");
+      setMessage(error instanceof Error ? error.message : t("app.portal.uploadFailed"));
     } finally {
       setBusy(false);
     }
@@ -45,7 +47,7 @@ export function ClientEvidenceUpload({ clientId }: { clientId: string }) {
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-white/10 bg-white/[0.025] p-4">
       <label className="block text-sm font-medium text-white" htmlFor={`portal-file-${clientId}`}>
-        Upload requested evidence
+        {t("app.portal.uploadTitle")}
       </label>
       <input
         id={`portal-file-${clientId}`}
@@ -56,10 +58,10 @@ export function ClientEvidenceUpload({ clientId }: { clientId: string }) {
         className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-300/10 file:px-3 file:py-2 file:text-cyan-100"
       />
       <button type="submit" disabled={busy} className="rounded-lg bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">
-        {busy ? "Uploading…" : "Upload evidence"}
+        {busy ? t("app.portal.uploading") : t("app.portal.uploadButton")}
       </button>
       {message ? <p role="status" className="text-sm text-slate-300">{message}</p> : null}
-      <p className="text-xs text-slate-500">Uploads are quarantined until the professional workspace’s security scanner approves them.</p>
+      <p className="text-xs text-slate-500">{t("app.portal.uploadSecurity")}</p>
     </form>
   );
 }

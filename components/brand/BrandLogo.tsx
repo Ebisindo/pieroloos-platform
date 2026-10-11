@@ -13,6 +13,7 @@ type BrandLogoProps = {
   decorative?: boolean;
   priority?: boolean;
   className?: string;
+  descriptor?: string;
 };
 
 export function BrandLogo({
@@ -21,6 +22,7 @@ export function BrandLogo({
   decorative = false,
   priority = false,
   className,
+  descriptor = BRAND_DESCRIPTOR,
 }: BrandLogoProps) {
   const mark = (
     <span className={cx("brand-mark", `brand-mark-${size}`)}>
@@ -43,7 +45,7 @@ export function BrandLogo({
       {mark}
       <span className="brand-text">
         <span className="brand-name">{BRAND_NAME.toUpperCase()}</span>
-        <span className="brand-subtitle">{BRAND_DESCRIPTOR}</span>
+        <span className="brand-subtitle">{descriptor}</span>
       </span>
     </span>
   );

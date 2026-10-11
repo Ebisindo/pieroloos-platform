@@ -5,16 +5,18 @@ import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasPermission } from "@/lib/auth/roles";
 import { prisma } from "@/lib/db/prisma";
 import { DEFAULT_WORKSPACE_SETTINGS, workspaceSettingsSchema } from "@/lib/validation/settings";
+import { getRequestTranslator } from "@/lib/i18n/request";
 
 export default async function SettingsPage() {
+  const t = await getRequestTranslator();
   const context = await getWorkspaceContext();
   if (!context.userId) {
     return (
       <WorkspaceAccessState
-        title="Sign in to manage Settings"
-        description="Workspace preferences are available to authenticated members."
+        title={t("app.settings.signInTitle")}
+        description={t("app.settings.signInDescription")}
         href="/signin?callbackUrl=/settings"
-        action="Sign in"
+        action={t("navigation.signIn")}
       />
     );
   }
@@ -22,8 +24,8 @@ export default async function SettingsPage() {
   if (!context.workspaces.length) {
     return (
       <WorkspaceAccessState
-        title="Workspace membership required"
-        description="This account is not associated with a workspace. Ask an organization owner to provision your membership."
+        title={t("app.settings.membershipRequired")}
+        description={t("app.settings.membershipDescription")}
       />
     );
   }
@@ -32,9 +34,9 @@ export default async function SettingsPage() {
     return (
       <div className="page-stack">
         <header>
-          <p className="eyebrow">WORKSPACE CONFIGURATION</p>
-          <h1>Settings</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Choose the workspace whose preferences you want to manage.</p>
+          <p className="eyebrow">{t("app.settings.eyebrow")}</p>
+          <h1>{t("navigation.settings")}</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{t("app.settings.chooseWorkspace")}</p>
         </header>
         <WorkspaceSelector workspaces={context.workspaces} />
       </div>
@@ -59,9 +61,9 @@ export default async function SettingsPage() {
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <p className="eyebrow">WORKSPACE CONFIGURATION</p>
-          <h1>Settings</h1>
-          <p>Workspace defaults and operational notification controls.</p>
+          <p className="eyebrow">{t("app.settings.eyebrow")}</p>
+          <h1>{t("navigation.settings")}</h1>
+          <p>{t("app.settings.pageDescription")}</p>
         </div>
         <span className="status-badge status-info">{context.activeWorkspace.name}</span>
       </header>

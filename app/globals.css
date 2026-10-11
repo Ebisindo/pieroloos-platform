@@ -243,6 +243,8 @@ h1 { font-family:var(--font-display); font-size:clamp(27px,3vw,39px); line-heigh
 .public-nav { display:flex; gap:22px; margin-left:auto; font-size:13px; color:var(--color-text-muted); }
 .public-nav a:hover { color:var(--color-text); }
 .public-signin { min-height:34px; }
+.language-select { min-height:36px; max-width:160px; padding:0 28px 0 10px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface-strong); color:var(--color-text); font-size:12px; cursor:pointer; }
+.locale-preview-notice { width:min(1120px,100%); margin:0 auto; padding:0 24px 12px; color:var(--color-text-muted); font-size:11px; line-height:1.5; }
 .public-hero { padding:clamp(56px,10vw,120px) 0 clamp(40px,7vw,80px); }
 .public-hero-inner { text-align:left; }
 .public-hero-title { font-family:var(--font-display); font-size:clamp(34px,6vw,64px); line-height:1.05; letter-spacing:-.035em; }
@@ -324,8 +326,11 @@ select.form-input { appearance:auto; }
   .public-split { grid-template-columns:1fr; gap:20px; }
 }
 @media (max-width: 760px) {
-  .public-nav { display:none; }
-  .public-signin { margin-left:auto; }
+  .public-header-inner { flex-wrap:wrap; gap:10px; padding-top:10px; }
+  .public-nav { order:4; width:100%; margin-left:0; gap:18px; overflow-x:auto; padding:2px 0 10px; white-space:nowrap; }
+  .public-signin { margin-left:0; }
+  .language-select { margin-left:auto; max-width:136px; }
+  .locale-preview-notice { padding:0 16px 10px; }
   .public-container { padding:0 16px; }
   .journey-list, .capability-grid, .public-footer-grid, .benefit-list, .funding-summary, .form-grid { grid-template-columns:1fr; }
   .public-cta { width:100%; }

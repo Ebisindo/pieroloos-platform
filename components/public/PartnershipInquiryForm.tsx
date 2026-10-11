@@ -1,16 +1,18 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
+import type { MessageKey } from "@/lib/i18n/messages";
 import {
   PARTNERSHIP_INQUIRY_TYPES,
-  PARTNERSHIP_INQUIRY_TYPE_LABELS,
   PARTNERSHIP_MESSAGE_MAX,
 } from "@/lib/partnerships/inquiry-options";
 
 type FieldErrors = Partial<Record<string, string[]>>;
-type Status = { kind: "idle" } | { kind: "submitting" } | { kind: "success" } | { kind: "error"; message: string };
+type Status = { kind: "idle" } | { kind: "submitting" } | { kind: "success" } | { kind: "error"; message: MessageKey };
 
 export function PartnershipInquiryForm() {
+  const { t } = useLocale();
   const uid = useId();
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -22,7 +24,7 @@ export function PartnershipInquiryForm() {
     "aria-describedby": errors[name] ? id(`${name}-error`) : undefined,
   });
   const fieldError = (name: string) =>
-    errors[name] ? <p id={id(`${name}-error`)} className="form-error">{errors[name]?.[0]}</p> : null;
+    errors[name] ? <p id={id(`${name}-error`)} className="form-error">{t("form.validation.invalid")}</p> : null;
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,77 +56,82 @@ export function PartnershipInquiryForm() {
       }
       const payload = await response.json().catch(() => null) as { error?: string; issues?: FieldErrors } | null;
       if (response.status === 422 && payload?.issues) {
-        setErrors(payload.issues);
-        setStatus({ kind: "error", message: "Please correct the highlighted fields." });
+        setErrors(Object.fromEntries(Object.entries(payload.issues).map(([field, messages]) => [field, messages?.length ? [t("form.validation.invalid")] : []])));
+        setStatus({ kind: "error", message: "form.error.correctFields" });
       } else if (response.status === 429) {
-        setStatus({ kind: "error", message: "Too many submissions. Please try again later." });
+        setStatus({ kind: "error", message: "form.error.tooMany" });
       } else {
-        setStatus({ kind: "error", message: "We could not submit your inquiry. Please try again later." });
+        setStatus({ kind: "error", message: "form.error.submit" });
       }
     } catch {
-      setStatus({ kind: "error", message: "Network error. Your inquiry was not sent; please try again." });
+      setStatus({ kind: "error", message: "form.error.network" });
     }
   }
 
   if (status.kind === "success") {
     return (
       <div role="status" className="form-success">
-        <h3>Inquiry received</h3>
-        <p>
-          Thank you. Your inquiry has been recorded for manual review. This is not an agreement or partnership, and a reply
-          is not guaranteed.
-        </p>
+        <h3>{t("form.success.title")}</h3>
+        <p>{t("form.success.body")}</p>
         <button type="button" className="button button-secondary" onClick={() => setStatus({ kind: "idle" })}>
-          Submit another inquiry
+          {t("form.success.another")}
         </button>
       </div>
     );
   }
 
   const submitting = status.kind === "submitting";
+  const typeLabelKeys = {
+    PROFESSIONAL_SERVICES: "form.type.professional",
+    TECHNOLOGY_PROVIDER: "form.type.technology",
+    FINANCIAL_INSTITUTION: "form.type.financial",
+    INSTITUTIONAL_PARTNER: "form.type.institutional",
+    STRATEGIC_SPONSOR_INVESTOR: "form.type.sponsor",
+    DISTRIBUTION_ECOSYSTEM: "form.type.distribution",
+  } as const;
 
   return (
     <form onSubmit={onSubmit} noValidate aria-busy={submitting} className="inquiry-form">
       <div className="form-grid">
         <div className="form-field">
-          <label htmlFor={id("partnerType")}>Partner type <span aria-hidden="true">*</span></label>
+          <label htmlFor={id("partnerType")}>{t("form.partnerType")} <span aria-hidden="true">*</span></label>
           <select id={id("partnerType")} name="partnerType" required defaultValue="" className="form-input" {...errorProps("partnerType")}>
-            <option value="" disabled>Select a category</option>
+            <option value="" disabled>{t("form.categoryPlaceholder")}</option>
             {PARTNERSHIP_INQUIRY_TYPES.map((type) => (
-              <option key={type} value={type}>{PARTNERSHIP_INQUIRY_TYPE_LABELS[type]}</option>
+              <option key={type} value={type}>{t(typeLabelKeys[type])}</option>
             ))}
           </select>
           {fieldError("partnerType")}
         </div>
         <div className="form-field">
-          <label htmlFor={id("organisationName")}>Organisation <span aria-hidden="true">*</span></label>
+          <label htmlFor={id("organisationName")}>{t("form.organisation")} <span aria-hidden="true">*</span></label>
           <input id={id("organisationName")} name="organisationName" required maxLength={160} autoComplete="organization" className="form-input" {...errorProps("organisationName")} />
           {fieldError("organisationName")}
         </div>
         <div className="form-field">
-          <label htmlFor={id("contactName")}>Your name <span aria-hidden="true">*</span></label>
+          <label htmlFor={id("contactName")}>{t("form.yourName")} <span aria-hidden="true">*</span></label>
           <input id={id("contactName")} name="contactName" required maxLength={120} autoComplete="name" className="form-input" {...errorProps("contactName")} />
           {fieldError("contactName")}
         </div>
         <div className="form-field">
-          <label htmlFor={id("email")}>Email <span aria-hidden="true">*</span></label>
+          <label htmlFor={id("email")}>{t("form.email")} <span aria-hidden="true">*</span></label>
           <input id={id("email")} name="email" type="email" required maxLength={254} autoComplete="email" className="form-input" {...errorProps("email")} />
           {fieldError("email")}
         </div>
         <div className="form-field">
-          <label htmlFor={id("websiteUrl")}>Website (optional)</label>
+          <label htmlFor={id("websiteUrl")}>{t("form.website")}</label>
           <input id={id("websiteUrl")} name="websiteUrl" type="url" inputMode="url" maxLength={2048} placeholder="https://" autoComplete="url" className="form-input" {...errorProps("websiteUrl")} />
           {fieldError("websiteUrl")}
         </div>
         <div className="form-field">
-          <label htmlFor={id("country")}>Country (optional)</label>
+          <label htmlFor={id("country")}>{t("form.country")}</label>
           <input id={id("country")} name="country" maxLength={80} autoComplete="country-name" className="form-input" {...errorProps("country")} />
           {fieldError("country")}
         </div>
       </div>
 
       <div className="form-field">
-        <label htmlFor={id("message")}>How would you like to take part? <span aria-hidden="true">*</span></label>
+        <label htmlFor={id("message")}>{t("form.message")} <span aria-hidden="true">*</span></label>
         <textarea
           id={id("message")}
           name="message"
@@ -135,30 +142,30 @@ export function PartnershipInquiryForm() {
           className="form-input"
           {...errorProps("message")}
         />
-        <p className="form-hint">{messageLength} / {PARTNERSHIP_MESSAGE_MAX}. Do not include confidential or personal data beyond what is needed.</p>
+        <p className="form-hint">{t("form.messageHint", { count: messageLength, max: PARTNERSHIP_MESSAGE_MAX })}</p>
         {fieldError("message")}
       </div>
 
       <div className="form-honeypot" aria-hidden="true">
-        <label>Leave this field empty<input name="hp" tabIndex={-1} autoComplete="off" /></label>
+        <label>{t("form.leaveEmpty")}<input name="hp" tabIndex={-1} autoComplete="off" /></label>
       </div>
 
       <div className="form-field">
         <label className="form-check">
           <input type="checkbox" name="consent" required {...errorProps("consent")} />
-          <span>I agree that PieroloOS may store this inquiry and contact me about it. <span aria-hidden="true">*</span></span>
+          <span>{t("form.consent")} <span aria-hidden="true">*</span></span>
         </label>
         {fieldError("consent")}
       </div>
 
-      <p className="form-hint">Fields marked * are required. Submitting an inquiry does not create a partnership or any commitment.</p>
+      <p className="form-hint">{t("form.requiredNote")}</p>
 
       <div aria-live="assertive">
-        {status.kind === "error" ? <p role="alert" className="form-error form-error-banner">{status.message}</p> : null}
+        {status.kind === "error" ? <p role="alert" className="form-error form-error-banner">{t(status.message)}</p> : null}
       </div>
 
       <button type="submit" className="button button-primary public-cta" disabled={submitting}>
-        {submitting ? "Submitting…" : "Submit inquiry"}
+        {submitting ? t("form.submitting") : t("form.submit")}
       </button>
     </form>
   );

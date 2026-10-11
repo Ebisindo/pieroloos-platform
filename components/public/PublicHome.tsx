@@ -1,74 +1,90 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { productModules } from "@/lib/navigation";
 
 type Availability = "Available" | "Foundation" | "Planned";
 
-const journey: { title: string; body: string; status: Availability; via: string }[] = [
-  { title: "Define business intent", body: "Capture goals, activities, ownership and context through structured client intake.", status: "Available", via: "Client Intake" },
-  { title: "Explore entity architecture", body: "Frame entity and structure options as considerations for professional review.", status: "Foundation", via: "Business Profile, Market Expansion" },
-  { title: "Evaluate jurisdictions", body: "Compare jurisdictions with visible evidence quality, provenance and limitations.", status: "Foundation", via: "Jurisdiction Lens" },
-  { title: "Assess relevant risks", body: "Surface readiness gaps and cross-border considerations as observations, not conclusions.", status: "Foundation", via: "Market readiness, Cross-border Preparation" },
-  { title: "Build a formation roadmap", body: "Turn decisions into staged plans, tasks and evidence requirements.", status: "Foundation", via: "Formation Roadmap" },
-  { title: "Organise compliance requirements", body: "Track obligations, owners, reminders and supporting evidence in one place.", status: "Foundation", via: "Compliance" },
-  { title: "Escalate to qualified professionals", body: "Route matters to licensed advisers for review. A curated professional network is not yet live.", status: "Planned", via: "Advisor review workflows today; partner network planned" },
-  { title: "Support ongoing administration", body: "Keep engagements, actions and notifications organised after formation.", status: "Foundation", via: "Engagements, Compliance, Reports" },
-  { title: "Prepare for growth and expansion", body: "Plan new markets and cross-border structures with the same evidence discipline.", status: "Foundation", via: "Market Expansion, Cross-border Preparation" },
-];
+const journey = [
+  { key: "intent", title: "home.journey.intent.title", body: "home.journey.intent.body", via: "home.journey.intent.via", status: "Available" },
+  { key: "entity", title: "home.journey.entity.title", body: "home.journey.entity.body", via: "home.journey.entity.via", status: "Foundation" },
+  { key: "jurisdiction", title: "home.journey.jurisdiction.title", body: "home.journey.jurisdiction.body", via: "home.journey.jurisdiction.via", status: "Foundation" },
+  { key: "risks", title: "home.journey.risks.title", body: "home.journey.risks.body", via: "home.journey.risks.via", status: "Foundation" },
+  { key: "roadmap", title: "home.journey.roadmap.title", body: "home.journey.roadmap.body", via: "home.journey.roadmap.via", status: "Foundation" },
+  { key: "compliance", title: "home.journey.compliance.title", body: "home.journey.compliance.body", via: "home.journey.compliance.via", status: "Foundation" },
+  { key: "professionals", title: "home.journey.professionals.title", body: "home.journey.professionals.body", via: "home.journey.professionals.via", status: "Planned" },
+  { key: "administration", title: "home.journey.administration.title", body: "home.journey.administration.body", via: "home.journey.administration.via", status: "Foundation" },
+  { key: "growth", title: "home.journey.growth.title", body: "home.journey.growth.body", via: "home.journey.growth.via", status: "Foundation" },
+] as const satisfies readonly { key: string; title: MessageKey; body: MessageKey; via: MessageKey; status: Availability }[];
 
 const planned = [
-  { title: "Professional partner network", body: "Vetted professionals and a structured referral workflow. See the partnership page for status." },
-  { title: "Self-serve subscriptions and billing", body: "Plan, entitlement and invoicing data structures exist; customer-facing billing does not." },
-  { title: "AI-assisted analysis", body: "Explainability rules are defined; no AI analysis is offered to customers yet." },
-];
+  { key: "partner", title: "home.planned.partner.title", body: "home.planned.partner.body" },
+  { key: "billing", title: "home.planned.billing.title", body: "home.planned.billing.body" },
+  { key: "ai", title: "home.planned.ai.title", body: "home.planned.ai.body" },
+] as const satisfies readonly { key: string; title: MessageKey; body: MessageKey }[];
 
 const operationalOrFoundation = (status: string): Availability => (status === "operational" ? "Available" : "Foundation");
 
+const moduleLabels = {
+  clients: "module.clientIntake",
+  "business-profile": "module.businessProfile",
+  jurisdiction: "module.jurisdictionLens",
+  expansion: "module.marketExpansion",
+  "cross-border": "module.crossBorder",
+  formation: "module.formationRoadmap",
+  compliance: "module.compliance",
+  reports: "module.reportGenerator",
+  engagements: "module.engagementRecords",
+} as const;
+
 function StatusPill({ status }: { status: Availability }) {
+  const { t } = useLocale();
   const tone = status === "Available" ? "status-success" : status === "Foundation" ? "status-info" : "status-neutral";
-  return <span className={`status-badge ${tone}`}>{status}</span>;
+  const key = status === "Available" ? "status.available" : status === "Foundation" ? "status.foundation" : "status.planned";
+  return <span className={`status-badge ${tone}`}>{t(key)}</span>;
 }
 
 export function PublicHome() {
+  const { t } = useLocale();
   return (
     <>
       <section className="public-hero" aria-labelledby="hero-title">
         <div className="public-container public-hero-inner">
-          <p className="eyebrow">BUSINESS INTELLIGENCE &amp; FORMATION PLATFORM</p>
+          <p className="eyebrow">{t("home.eyebrow")}</p>
           <h1 id="hero-title" className="public-hero-title">
-            Build the right business.
-            <span className="public-hero-accent">From idea to infrastructure.</span>
+            {t("home.hero.title")}
+            <span className="public-hero-accent">{t("home.hero.accent")}</span>
           </h1>
-          <p className="public-lead">
-            PieroloOS brings business intent, entity architecture, jurisdiction intelligence, compliance workflows and
-            professional expertise into one structured platform.
-          </p>
+          <p className="public-lead">{t("home.hero.description")}</p>
           <div className="public-cta-row">
             <Link href="/signin?callbackUrl=/clients/new" className="button button-primary public-cta">
-              Start Your Business Journey <ArrowRight size={16} aria-hidden="true" />
+              {t("home.hero.primaryAction")} <ArrowRight size={16} aria-hidden="true" />
             </Link>
-            <Link href="#journey" className="button button-secondary public-cta">Explore PieroloOS</Link>
+            <Link href="#journey" className="button button-secondary public-cta">{t("home.hero.secondaryAction")}</Link>
           </div>
-          <p className="public-note">Sign-in is required. PieroloOS supports human review and does not replace legal, tax or financial professionals.</p>
+          <p className="public-note">{t("home.hero.note")}</p>
         </div>
       </section>
 
       <section id="journey" className="public-section" aria-labelledby="journey-title">
         <div className="public-container">
-          <p className="eyebrow">THE JOURNEY</p>
-          <h2 id="journey-title" className="public-h2">Nine steps from intent to infrastructure</h2>
-          <p className="public-section-lead">Each step shows what exists in the platform today and what is still planned.</p>
+          <p className="eyebrow">{t("home.journey.eyebrow")}</p>
+          <h2 id="journey-title" className="public-h2">{t("home.journey.title")}</h2>
+          <p className="public-section-lead">{t("home.journey.description")}</p>
           <ol className="journey-list">
             {journey.map((step, index) => (
-              <li key={step.title} className="glass-panel journey-step">
+              <li key={step.key} className="glass-panel journey-step">
                 <span className="journey-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
                 <div>
                   <div className="journey-head">
-                    <h3>{step.title}</h3>
+                    <h3>{t(step.title)}</h3>
                     <StatusPill status={step.status} />
                   </div>
-                  <p>{step.body}</p>
-                  <p className="journey-via">{step.via}</p>
+                  <p>{t(step.body)}</p>
+                  <p className="journey-via">{t(step.via)}</p>
                 </div>
               </li>
             ))}
@@ -78,31 +94,28 @@ export function PublicHome() {
 
       <section id="capabilities" className="public-section" aria-labelledby="capabilities-title">
         <div className="public-container">
-          <p className="eyebrow">CAPABILITIES</p>
-          <h2 id="capabilities-title" className="public-h2">What the platform does today</h2>
-          <p className="public-section-lead">
-            <strong>Available</strong> modules are in use in the workspace. <strong>Foundation</strong> modules exist with core
-            workflows but are still maturing.
-          </p>
+          <p className="eyebrow">{t("home.capabilities.eyebrow")}</p>
+          <h2 id="capabilities-title" className="public-h2">{t("home.capabilities.title")}</h2>
+          <p className="public-section-lead">{t("home.capabilities.description")}</p>
           <ul className="capability-grid">
             {productModules.map((module) => (
               <li key={module.key} className="glass-panel capability-card">
                 <div className="journey-head">
-                  <h3>{module.label}</h3>
+                  <h3>{t(moduleLabels[module.key])}</h3>
                   <StatusPill status={operationalOrFoundation(module.status)} />
                 </div>
               </li>
             ))}
           </ul>
-          <h3 className="public-h3">Planned, not yet available</h3>
+          <h3 className="public-h3">{t("home.capabilities.plannedTitle")}</h3>
           <ul className="capability-grid">
             {planned.map((item) => (
-              <li key={item.title} className="glass-panel capability-card">
+              <li key={item.key} className="glass-panel capability-card">
                 <div className="journey-head">
-                  <h3>{item.title}</h3>
+                  <h3>{t(item.title)}</h3>
                   <StatusPill status="Planned" />
                 </div>
-                <p>{item.body}</p>
+                <p>{t(item.body)}</p>
               </li>
             ))}
           </ul>
@@ -112,20 +125,13 @@ export function PublicHome() {
       <section id="professionals" className="public-section" aria-labelledby="professionals-title">
         <div className="public-container public-split">
           <div>
-            <p className="eyebrow">PROFESSIONAL ECOSYSTEM</p>
-            <h2 id="professionals-title" className="public-h2">Software organises. Professionals decide.</h2>
+            <p className="eyebrow">{t("home.professionals.eyebrow")}</p>
+            <h2 id="professionals-title" className="public-h2">{t("home.professionals.title")}</h2>
           </div>
           <div className="public-prose">
-            <p>
-              Formation, tax and compliance decisions carry legal consequences. PieroloOS prepares drafts and analyses,
-              tracks evidence and workflow, and keeps every decision with a qualified human reviewer.
-            </p>
-            <p>
-              The intended ecosystem includes licensed lawyers, accountants, corporate service providers and other
-              regulated specialists working inside shared, auditable workflows. That network is being designed; no
-              partnerships are announced at this time.
-            </p>
-            <Link href="/partners" className="public-link">How partnership is planned <ArrowRight size={14} aria-hidden="true" /></Link>
+            <p>{t("home.professionals.body")}</p>
+            <p>{t("home.professionals.network")}</p>
+            <Link href="/partners" className="public-link">{t("home.professionals.link")} <ArrowRight size={14} aria-hidden="true" /></Link>
           </div>
         </div>
       </section>
@@ -133,9 +139,9 @@ export function PublicHome() {
       <section className="public-section" aria-labelledby="partner-cta-title">
         <div className="public-container">
           <div className="glass-panel public-cta-panel">
-            <h2 id="partner-cta-title" className="public-h2">Are you a professional serving founders?</h2>
-            <p className="public-section-lead">Help shape how advisers and clients collaborate on formation and compliance.</p>
-            <Link href="/partners#partner-with-us" className="button button-primary public-cta">Partner With Us</Link>
+            <h2 id="partner-cta-title" className="public-h2">{t("home.partner.title")}</h2>
+            <p className="public-section-lead">{t("home.partner.body")}</p>
+            <Link href="/partners#partner-with-us" className="button button-primary public-cta">{t("partners.hero.primaryAction")}</Link>
           </div>
         </div>
       </section>

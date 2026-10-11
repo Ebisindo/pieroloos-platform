@@ -5,12 +5,26 @@ import { useState } from "react";
 import type { OperationalAction, ControlActionStatus } from "@/lib/domain/action-control";
 import { ACTION_TRANSITIONS } from "@/lib/domain/action-control";
 import { StatusBadge } from "@/components/ui/primitives";
+import { useLocale } from "@/components/i18n/LocaleProvider";
+import type { MessageKey } from "@/lib/i18n/messages";
+import { formatDate } from "@/lib/i18n/messages";
 
 type Assignee = { userId: string; name: string | null; email: string };
 
-const statusLabel: Record<ControlActionStatus, string> = {
-  OPEN: "Open", ASSIGNED: "Assigned", IN_PROGRESS: "In progress", BLOCKED: "Blocked",
-  PENDING_REVIEW: "Pending review", RESOLVED: "Resolved", CANCELLED: "Cancelled",
+const statusLabel: Record<ControlActionStatus, MessageKey> = {
+  OPEN: "app.actions.statusOpen",
+  ASSIGNED: "app.actions.statusAssigned",
+  IN_PROGRESS: "app.actions.statusInProgress",
+  BLOCKED: "app.actions.statusBlocked",
+  PENDING_REVIEW: "app.actions.statusPendingReview",
+  RESOLVED: "app.actions.statusResolved",
+  CANCELLED: "app.actions.statusCancelled",
+};
+const priorityLabel: Record<string, MessageKey> = {
+  CRITICAL: "app.actions.priorityCritical",
+  HIGH: "app.actions.priorityHigh",
+  MEDIUM: "app.actions.priorityMedium",
+  LOW: "app.actions.priorityLow",
 };
 
 const statusTone: Record<ControlActionStatus, "neutral" | "success" | "warning" | "danger" | "info"> = {
@@ -32,6 +46,7 @@ export function ActionQueue({
   canManage?: boolean;
   assignees?: Assignee[];
 }) {
+  const { locale, t } = useLocale();
   const router = useRouter();
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
@@ -48,23 +63,23 @@ export function ActionQueue({
         body: JSON.stringify({ ...body, expectedUpdatedAt: action.updatedAt.toISOString() }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Unable to update operational action.");
+      if (!response.ok) throw new Error(result.error ?? t("app.actions.updateError"));
       router.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to update operational action.");
+      setError(cause instanceof Error ? cause.message : t("app.actions.updateError"));
     } finally {
       setBusyId("");
     }
   }
 
   if (!actions.length) {
-    return <div className="empty-inline">No active operational actions require attention.</div>;
+    return <div className="empty-inline">{t("app.actions.none")}</div>;
   }
 
   return (
     <>
       {error ? <p className="action-error" role="alert">{error}</p> : null}
-      <ol className="action-list" aria-label="Active operational actions">
+      <ol className="action-list" aria-label={t("app.actions.ariaLabel")}>
         {actions.map((action) => {
           const availableTransitions = (ACTION_TRANSITIONS[action.status] ?? [])
             .filter((status) => status !== "ASSIGNED" && status !== "RESOLVED");
@@ -77,18 +92,18 @@ export function ActionQueue({
                 <h3 className="action-title">{action.title}</h3>
                 {action.description ? <p className="action-description">{action.description}</p> : null}
                 <p className="action-assignee">
-                  {assigneeLabel ? `Assigned to ${assigneeLabel.name || assigneeLabel.email}` : "Unassigned"}
+                  {assigneeLabel ? t("app.actions.assignedTo", { assignee: assigneeLabel.name || assigneeLabel.email }) : t("app.actions.unassigned")}
                 </p>
               </div>
               <div className="action-details">
-                <StatusBadge tone={statusTone[action.status] ?? "neutral"}>{statusLabel[action.status] ?? action.status}</StatusBadge>
+                <StatusBadge tone={statusTone[action.status] ?? "neutral"}>{statusLabel[action.status] ? t(statusLabel[action.status]) : action.status}</StatusBadge>
                 <StatusBadge tone={action.priority === "CRITICAL" ? "danger" : action.priority === "HIGH" ? "warning" : "neutral"}>
-                  {action.priority}
+                  {priorityLabel[action.priority] ? t(priorityLabel[action.priority]) : action.priority}
                 </StatusBadge>
-                {action.escalationLevel > 0 ? <StatusBadge tone="danger">Escalation {action.escalationLevel}</StatusBadge> : null}
+                {action.escalationLevel > 0 ? <StatusBadge tone="danger">{t("app.actions.escalation", { level: action.escalationLevel })}</StatusBadge> : null}
                 {action.dueAt ? (
                   <time className="action-due" dateTime={action.dueAt.toISOString()}>
-                    Due {action.dueAt.toISOString().replace("T", " ").slice(0, 16)} UTC
+                    {t("app.actions.due")} {formatDate(action.dueAt, locale, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} {t("app.notifications.utc")}
                   </time>
                 ) : null}
               </div>
@@ -104,7 +119,7 @@ export function ActionQueue({
                         }
                       }}
                     >
-                      <label htmlFor={`assignee-${action.id}`}>Assign to</label>
+                      <label htmlFor={`assignee-${action.id}`}>{t("app.actions.assignTo")}</label>
                       <select
                         id={`assignee-${action.id}`}
                         className="form-input"
@@ -115,7 +130,7 @@ export function ActionQueue({
                           [action.id]: event.target.value,
                         }))}
                       >
-                        <option value="" disabled>{assignees.length ? "Select a team member" : "No team members available"}</option>
+                        <option value="" disabled>{assignees.length ? t("app.actions.selectMember") : t("app.actions.noMembers")}</option>
                         {assignees.map((assignee) => (
                           <option key={assignee.userId} value={assignee.userId}>
                             {assignee.name || assignee.email}
@@ -123,13 +138,13 @@ export function ActionQueue({
                         ))}
                       </select>
                       <button className="button" type="submit" disabled={busyId === action.id || !selectedAssignee}>
-                        Assign
+                        {t("app.actions.assign")}
                       </button>
                     </form>
                   ) : null}
                   {availableTransitions.length ? (
                     <div className="action-control action-transition-control">
-                      <span>Update status</span>
+                      <span>{t("app.actions.updateStatus")}</span>
                       {availableTransitions.map((status) => (
                         <button
                           className="button"
@@ -138,7 +153,7 @@ export function ActionQueue({
                           disabled={busyId === action.id}
                           onClick={() => void sendAction(action, "transition", { status })}
                         >
-                          {statusLabel[status]}
+                          {t(statusLabel[status])}
                         </button>
                       ))}
                     </div>
@@ -152,7 +167,7 @@ export function ActionQueue({
                         if (resolutionNote) void sendAction(action, "resolve", { resolutionNote });
                       }}
                     >
-                      <label htmlFor={`resolution-${action.id}`}>Resolution note</label>
+                      <label htmlFor={`resolution-${action.id}`}>{t("app.actions.resolutionNote")}</label>
                       <textarea
                         id={`resolution-${action.id}`}
                         className="form-input"
@@ -167,7 +182,7 @@ export function ActionQueue({
                         }))}
                       />
                       <button className="button" type="submit" disabled={busyId === action.id || !resolutionNotes[action.id]?.trim()}>
-                        Resolve
+                        {t("app.actions.resolve")}
                       </button>
                     </form>
                   ) : null}

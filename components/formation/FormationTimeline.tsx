@@ -3,6 +3,7 @@
 import { Check, CirclePlay, FileCheck2, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 import { FormationStatusBadge } from "./FormationStatusBadge";
 
 type Task = {
@@ -45,6 +46,7 @@ export function FormationTimeline({
   canManage: boolean;
   canReview: boolean;
 }) {
+  const { t } = useLocale();
   const router = useRouter();
   const [busyTask, setBusyTask] = useState("");
   const [message, setMessage] = useState("");
@@ -60,10 +62,10 @@ export function FormationTimeline({
         body: JSON.stringify({ action, ...extra }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Unable to update formation task.");
+      if (!response.ok) throw new Error(result.error ?? t("app.formation.error"));
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to update formation task.");
+      setMessage(error instanceof Error ? error.message : t("app.formation.error"));
     } finally {
       setBusyTask("");
     }
@@ -97,7 +99,7 @@ export function FormationTimeline({
                     </div>
                     {task.requiresProfessionalReview && (
                       <p className="mt-3 text-[10px] uppercase tracking-[0.15em] text-amber-300">
-                        Professional review gate
+                        {t("app.formation.reviewGate")}
                       </p>
                     )}
                     {task.blockingReason && (
@@ -108,18 +110,18 @@ export function FormationTimeline({
                         {task.evidenceRequirements.map((requirement) => (
                           <div key={requirement.key} className="flex flex-wrap items-center gap-2 text-xs">
                             <span className={requirement.satisfied ? "text-emerald-300" : "text-slate-400"}>
-                              {requirement.satisfied ? "Evidence attached" : "Required evidence"}: {requirement.label}
+                              {requirement.satisfied ? t("app.formation.evidenceAttached") : t("app.formation.requiredEvidence")}: {requirement.label}
                             </span>
                             {canManage && !requirement.satisfied ? (
                               <>
-                                <label className="sr-only" htmlFor={`evidence-${task.id}-${requirement.key}`}>Document for {requirement.label}</label>
+                                <label className="sr-only" htmlFor={`evidence-${task.id}-${requirement.key}`}>{t("app.formation.documentFor", { label: requirement.label })}</label>
                                 <select
                                   id={`evidence-${task.id}-${requirement.key}`}
                                   className="min-h-9 min-w-48 rounded-md border border-white/10 bg-[#0b1128] px-2 text-xs text-white"
                                   value={selectedDocuments[`${task.id}:${requirement.key}`] ?? ""}
                                   onChange={(event) => setSelectedDocuments((current) => ({ ...current, [`${task.id}:${requirement.key}`]: event.target.value }))}
                                 >
-                                  <option value="">Select client document</option>
+                                  <option value="">{t("app.formation.selectDocument")}</option>
                                   {documents.map((document) => (
                                     <option key={document.id} value={document.id}>{document.name}</option>
                                   ))}
@@ -127,8 +129,8 @@ export function FormationTimeline({
                                 <button
                                   className="icon-button"
                                   type="button"
-                                  title="Attach evidence"
-                                  aria-label={`Attach evidence for ${requirement.label}`}
+                                  title={t("app.formation.attachEvidence")}
+                                  aria-label={`${t("app.formation.attachEvidence")} ${requirement.label}`}
                                   disabled={busyTask === task.id || !selectedDocuments[`${task.id}:${requirement.key}`]}
                                   onClick={() => runAction(task.id, "SATISFY_EVIDENCE", {
                                     evidenceRequirementKey: requirement.key,
@@ -147,16 +149,16 @@ export function FormationTimeline({
                       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
                         {["PENDING", "READY"].includes(task.status) ? (
                           <button className="button gap-2" type="button" disabled={busyTask === task.id} onClick={() => runAction(task.id, "START")}>
-                            <CirclePlay size={14} /> Start
+                            <CirclePlay size={14} /> {t("app.formation.startTask")}
                           </button>
                         ) : null}
                         {task.requiresProfessionalReview && !task.reviewCompleted && canReview ? (
                           <button className="button gap-2" type="button" disabled={busyTask === task.id} onClick={() => runAction(task.id, "REVIEW_APPROVE")}>
-                            <ShieldCheck size={14} /> Approve review
+                            <ShieldCheck size={14} /> {t("app.formation.approveReview")}
                           </button>
                         ) : null}
                         <button className="button button-primary gap-2" type="button" disabled={busyTask === task.id} onClick={() => runAction(task.id, "COMPLETE")}>
-                          <Check size={14} /> Complete
+                          <Check size={14} /> {t("app.formation.complete")}
                         </button>
                       </div>
                     ) : null}

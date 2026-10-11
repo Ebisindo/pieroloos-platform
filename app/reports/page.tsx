@@ -1,12 +1,14 @@
 import { PageHeader, EmptyState } from "@/components/ui/primitives";
+import { getRequestTranslator } from "@/lib/i18n/request";
 
-export default function Page() {
+export default async function Page() {
+  const t = await getRequestTranslator();
   return (
     <div className="page-stack">
-      <PageHeader eyebrow="OUTPUT" title="Reports" description="Generate structured reports from client, evidence, jurisdiction, formation, and compliance data." />
+      <PageHeader eyebrow={t("app.reports.eyebrow")} title={t("app.reports.title")} description={t("app.reports.description")} />
       <EmptyState
-        title="Reports workspace is initialized"
-        description="The application shell and domain foundation are ready. The next implementation slice will connect this module to persistent application data."
+        title={t("app.reports.emptyTitle")}
+        description={t("app.reports.emptyDescription")}
       />
     </div>
   );

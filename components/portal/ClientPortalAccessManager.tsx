@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 import { ClientPortalInbox } from "@/components/portal/ClientPortalInbox";
 
 type PortalResourceType = "TASK" | "FORMATION_TASK" | "OBLIGATION";
@@ -44,6 +45,7 @@ type PortalClient = {
 };
 
 export function ClientPortalAccessManager({ clients, canWrite }: { clients: PortalClient[]; canWrite: boolean }) {
+  const { t } = useLocale();
   const router = useRouter();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -58,11 +60,11 @@ export function ClientPortalAccessManager({ clients, canWrite }: { clients: Port
         body: body ? JSON.stringify(body) : undefined,
       });
       const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Portal update failed.");
+      if (!response.ok) throw new Error(result.error ?? t("app.portal.updateFailed"));
       router.refresh();
-      setMessage("Client portal settings updated.");
+      setMessage(t("app.portal.updated"));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Portal update failed.");
+      setMessage(error instanceof Error ? error.message : t("app.portal.updateFailed"));
     } finally {
       setBusyKey(null);
     }
@@ -71,13 +73,13 @@ export function ClientPortalAccessManager({ clients, canWrite }: { clients: Port
   return (
     <div className="space-y-5">
       {clients.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-slate-400">No client records are available in this workspace.</p>
+        <p className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-slate-400">{t("app.portal.adminNoClients")}</p>
       ) : clients.map((client) => (
         <section key={client.id} className="space-y-4 rounded-2xl border border-white/10 bg-slate-900/50 p-5">
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-white">{client.displayName}</h2>
-              <p className="mt-1 text-sm text-slate-400">{client.email ?? "No client email recorded"}</p>
+              <p className="mt-1 text-sm text-slate-400">{client.email ?? t("app.portal.noClientEmail")}</p>
             </div>
             {client.email ? (
               <button
@@ -90,21 +92,21 @@ export function ClientPortalAccessManager({ clients, canWrite }: { clients: Port
                   { email: client.email },
                 )}
               >
-                Grant portal access
+                {t("app.portal.grant")}
               </button>
             ) : null}
           </header>
 
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-slate-200">Client access</h3>
+            <h3 className="text-sm font-medium text-slate-200">{t("app.portal.clientAccess")}</h3>
             {client.grants.length === 0 ? (
-              <p className="text-sm text-slate-500">No access grants.</p>
+              <p className="text-sm text-slate-500">{t("app.portal.noGrants")}</p>
             ) : client.grants.map((grant) => {
               return (
                 <div key={grant.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2">
                   <div>
                     <p className="text-sm text-white">{grant.user.name ?? grant.user.email}</p>
-                    <p className="text-xs text-slate-500">{grant.user.email} · {grant.active ? "Active" : "Revoked or expired"}</p>
+                    <p className="text-xs text-slate-500">{grant.user.email} · {grant.active ? t("app.portal.active") : t("app.portal.revokedExpired")}</p>
                   </div>
                   {grant.active ? (
                     <button
@@ -116,20 +118,20 @@ export function ClientPortalAccessManager({ clients, canWrite }: { clients: Port
                         "DELETE",
                       )}
                     >
-                      Revoke
+                      {t("app.portal.revoke")}
                     </button>
                   ) : null}
                 </div>
               );
             })}
             <p className="text-xs leading-5 text-slate-500">
-              Clients sign in with OIDC or GitHub using this verified email. They can view published requests, upload evidence, submit completion details, message the team, and acknowledge professional-provided text. Access can be revoked here.
+              {t("app.portal.accessHelp")}
             </p>
           </div>
 
           {client.resources.length ? (
             <div className="space-y-2">
-              <h3 className="text-sm font-medium text-slate-200">Publish client-visible requests</h3>
+              <h3 className="text-sm font-medium text-slate-200">{t("app.portal.publishRequests")}</h3>
               <ul className="divide-y divide-white/10 rounded-lg border border-white/10">
                 {client.resources.map((resource) => {
                   const url = `/api/clients/${encodeURIComponent(client.id)}/portal-visibility`;
@@ -149,7 +151,7 @@ export function ClientPortalAccessManager({ clients, canWrite }: { clients: Port
                           visible: !resource.visible,
                         })}
                       >
-                        {resource.visible ? "Unpublish" : "Publish"}
+                        {resource.visible ? t("app.portal.unpublish") : t("app.portal.publish")}
                       </button>
                     </li>
                   );

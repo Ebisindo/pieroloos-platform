@@ -18,6 +18,7 @@ Client Intake → Business Profile → Engagement → Jurisdiction Lens → Form
 - **Site URL:** `SITE_URL` (optional) enables canonical URLs, sitemap entries and Organization JSON-LD. Unset means they are omitted, not guessed.
 - **Fonts:** `next/font/google` (Inter, Space Grotesk) in `app/layout.tsx`; this needs network access at build time.
 - **Honesty rule:** public copy distinguishes Available, Foundation and Planned capabilities (`productModules` in `lib/navigation.ts`) and states no partners, customers or approvals.
+- **Internationalization:** `lib/i18n/` contains the default English locale, proposed locale registry, typed catalogs, fallback and formatting helpers. The existing public homepage and partnership page use those catalogs with a route-preserving language selector; authenticated workflows remain outside the translated scope. See [INTERNATIONALIZATION.md](INTERNATIONALIZATION.md).
 
 ## Database and service architecture
 

@@ -3,6 +3,9 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/shell/AppShell";
 import { BootLayer } from "@/components/shell/BootLayer";
+import { LocaleProvider } from "@/components/i18n/LocaleProvider";
+import { getRequestLocale } from "@/lib/i18n/request";
+import { locales } from "@/lib/i18n/config";
 import { getSiteUrl } from "@/lib/site";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -22,13 +25,16 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await getRequestLocale();
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+    <html lang={locales[locale].htmlLang} dir={locales[locale].direction} className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body>
-        <BootLayer>
-          <AppShell>{children}</AppShell>
-        </BootLayer>
+        <LocaleProvider initialLocale={locale}>
+          <BootLayer>
+            <AppShell>{children}</AppShell>
+          </BootLayer>
+        </LocaleProvider>
       </body>
     </html>
   );

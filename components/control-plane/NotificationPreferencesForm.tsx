@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 
 export type NotificationPreferences = {
   inAppEnabled: boolean;
@@ -15,6 +16,7 @@ export function NotificationPreferencesForm({
 }: {
   initialPreferences: NotificationPreferences;
 }) {
+  const { t } = useLocale();
   const [preferences, setPreferences] = useState(initialPreferences);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -30,11 +32,11 @@ export function NotificationPreferencesForm({
         body: JSON.stringify(preferences),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Unable to save notification preferences.");
+      if (!response.ok) throw new Error(result.error ?? t("app.notificationPreferences.saveError"));
       setPreferences(result.data);
-      setMessage("Notification preferences saved.");
+      setMessage(t("app.notificationPreferences.saved"));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to save notification preferences.");
+      setMessage(error instanceof Error ? error.message : t("app.notificationPreferences.saveError"));
     } finally {
       setSaving(false);
     }
@@ -48,7 +50,7 @@ export function NotificationPreferencesForm({
           checked={preferences.inAppEnabled}
           onChange={(event) => setPreferences({ ...preferences, inAppEnabled: event.target.checked })}
         />
-        In-app notifications
+        {t("app.notificationPreferences.inApp")}
       </label>
       <label>
         <input
@@ -56,10 +58,10 @@ export function NotificationPreferencesForm({
           checked={preferences.emailEnabled}
           onChange={(event) => setPreferences({ ...preferences, emailEnabled: event.target.checked })}
         />
-        Email notifications (opt in)
+        {t("app.notificationPreferences.emailOptIn")}
       </label>
       <label>
-        Timezone
+        {t("app.notificationPreferences.timezone")}
         <input
           value={preferences.timezone}
           maxLength={100}
@@ -69,7 +71,7 @@ export function NotificationPreferencesForm({
       </label>
       <div className="notification-quiet-hours">
         <label>
-          Quiet hours start
+          {t("app.notificationPreferences.quietStart")}
           <input
             type="time"
             value={preferences.quietHoursStart ?? ""}
@@ -77,7 +79,7 @@ export function NotificationPreferencesForm({
           />
         </label>
         <label>
-          Quiet hours end
+          {t("app.notificationPreferences.quietEnd")}
           <input
             type="time"
             value={preferences.quietHoursEnd ?? ""}
@@ -86,7 +88,7 @@ export function NotificationPreferencesForm({
         </label>
       </div>
       <button className="button button-secondary" type="submit" disabled={saving}>
-        {saving ? "Saving…" : "Save preferences"}
+        {saving ? t("app.notificationPreferences.saving") : t("app.notificationPreferences.save")}
       </button>
       {message ? <p role="status">{message}</p> : null}
     </form>

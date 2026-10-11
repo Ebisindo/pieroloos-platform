@@ -9,8 +9,23 @@ import { listActiveOperationalActions } from "@/lib/db/operational-action-query"
 import { notificationRepository } from "@/lib/db/notification-repository";
 import { prisma } from "@/lib/db/prisma";
 import { productModules } from "@/lib/navigation";
+import { getRequestTranslator } from "@/lib/i18n/request";
+import type { MessageKey } from "@/lib/i18n/messages";
+
+const moduleLabelKeys: Record<(typeof productModules)[number]["key"], MessageKey> = {
+  clients: "module.clientIntake",
+  "business-profile": "module.businessProfile",
+  jurisdiction: "module.jurisdictionLens",
+  expansion: "module.marketExpansion",
+  "cross-border": "module.crossBorder",
+  formation: "module.formationRoadmap",
+  compliance: "module.compliance",
+  reports: "module.reportGenerator",
+  engagements: "module.engagementRecords",
+};
 
 export default async function CommandCenterPage() {
+  const t = await getRequestTranslator();
   const context = await getWorkspaceContext();
   const canReadWorkspace = context.principal?.permissions.includes("workspace:read") ?? false;
   const canReadActions = context.principal?.permissions.includes("compliance:read") ?? false;
@@ -62,40 +77,40 @@ export default async function CommandCenterPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="EXECUTIVE OPERATING VIEW"
-        title="Business Formation"
-        description="A single operational surface for clients, engagements, evidence, workflows, and professional-service delivery."
-        actions={<Link href="/clients/new" className="button button-primary">New client</Link>}
+        eyebrow={t("app.dashboard.eyebrow")}
+        title={t("navigation.businessFormation")}
+        description={t("app.dashboard.description")}
+        actions={<Link href="/clients/new" className="button button-primary">{t("app.dashboard.newClient")}</Link>}
       />
 
       <div className="metric-grid">
-        <MetricCard label="Active clients" value={counts ? String(counts[0]) : "N/A"} detail={counts ? "With active engagements" : "Select an active workspace"} tone="gold" />
-        <MetricCard label="Engagements" value={counts ? String(counts[1]) : "N/A"} detail={counts ? "Currently active" : "Select an active workspace"} tone="violet" />
-        <MetricCard label="Reports" value={counts ? String(counts[2]) : "N/A"} detail={counts ? "In this workspace" : "Select an active workspace"} tone="cyan" />
-        <MetricCard label="Compliance" value="Ready" detail="Control layer initialized" tone="gold" />
+        <MetricCard label={t("app.dashboard.activeClients")} value={counts ? String(counts[0]) : t("app.dashboard.notAvailable")} detail={counts ? t("app.dashboard.withActiveEngagements") : t("app.dashboard.selectWorkspace")} tone="gold" />
+        <MetricCard label={t("app.dashboard.engagements")} value={counts ? String(counts[1]) : t("app.dashboard.notAvailable")} detail={counts ? t("app.dashboard.currentlyActive") : t("app.dashboard.selectWorkspace")} tone="violet" />
+        <MetricCard label={t("app.dashboard.reports")} value={counts ? String(counts[2]) : t("app.dashboard.notAvailable")} detail={counts ? t("app.dashboard.inWorkspace") : t("app.dashboard.selectWorkspace")} tone="cyan" />
+        <MetricCard label={t("app.dashboard.compliance")} value={t("app.dashboard.ready")} detail={t("app.dashboard.controlLayerInitialized")} tone="gold" />
       </div>
 
       <div className="dashboard-grid">
         <div className="stack">
           <GlassPanel>
-            <SectionHeader title="Operational actions" description="Open work prioritized by urgency, deadline, and escalation." />
+            <SectionHeader title={t("app.dashboard.operationalActions")} description={t("app.dashboard.actionsDescription")} />
             {activeActions ? (
               <ActionQueue actions={activeActions} canManage={canManageActions} assignees={assignees} />
             ) : (
               <div className="empty-inline">
-                {context.principal ? "Compliance access is required to view actions." : "Select an active workspace to view actions."}
+                {context.principal ? t("app.dashboard.complianceAccessRequired") : t("app.dashboard.selectWorkspaceActions")}
               </div>
             )}
           </GlassPanel>
           <GlassPanel>
-            <SectionHeader title="Operational loop" description="The initial PieroloOS workflow is now represented as connected modules." />
+            <SectionHeader title={t("app.dashboard.operationalLoop")} description={t("app.dashboard.loopDescription")} />
             <div className="workflow-list">
               {productModules.map((module, index) => (
                 <Link href={module.href} className="workflow-row" key={module.key}>
                   <div className="workflow-index">{String(index + 1).padStart(2, "0")}</div>
                   <div className="workflow-copy">
-                    <strong>{module.label}</strong>
-                    <span>{module.status === "operational" ? "Operational foundation" : "Domain foundation ready"}</span>
+                    <strong>{t(moduleLabelKeys[module.key])}</strong>
+                    <span>{module.status === "operational" ? t("app.dashboard.operationalFoundation") : t("app.dashboard.domainFoundationReady")}</span>
                   </div>
                   <ArrowUpRight size={17} />
                 </Link>
@@ -106,16 +121,16 @@ export default async function CommandCenterPage() {
 
         <div className="stack">
           <GlassPanel>
-            <SectionHeader title="System state" />
+            <SectionHeader title={t("app.dashboard.systemState")} />
             <div className="state-list">
-              <div><span><Database size={16} /> Data architecture</span><StatusBadge tone="success">Ready</StatusBadge></div>
-              <div><span><ShieldCheck size={16} /> Authority model</span><StatusBadge tone="success">Defined</StatusBadge></div>
-              <div><span><FileCheck2 size={16} /> Evidence layer</span><StatusBadge tone="success">Defined</StatusBadge></div>
-              <div><span><Workflow size={16} /> Workflow engine</span><StatusBadge tone="info">Foundation</StatusBadge></div>
+              <div><span><Database size={16} /> {t("app.dashboard.dataArchitecture")}</span><StatusBadge tone="success">{t("app.dashboard.ready")}</StatusBadge></div>
+              <div><span><ShieldCheck size={16} /> {t("app.dashboard.authorityModel")}</span><StatusBadge tone="success">{t("app.dashboard.defined")}</StatusBadge></div>
+              <div><span><FileCheck2 size={16} /> {t("app.dashboard.evidenceLayer")}</span><StatusBadge tone="success">{t("app.dashboard.defined")}</StatusBadge></div>
+              <div><span><Workflow size={16} /> {t("app.dashboard.workflowEngine")}</span><StatusBadge tone="info">{t("app.dashboard.foundation")}</StatusBadge></div>
             </div>
           </GlassPanel>
           <GlassPanel>
-            <SectionHeader title="Notifications" description="Operational updates addressed to you in this workspace." />
+            <SectionHeader title={t("app.settings.notifications")} description={t("app.dashboard.notificationsDescription")} />
             <NotificationInbox notifications={notifications} />
             {notificationPreferences ? (
               <NotificationPreferencesForm initialPreferences={notificationPreferences} />

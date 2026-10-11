@@ -6,6 +6,8 @@ import { TrustBoundaryNotice } from "@/components/evidence/TrustBoundaryNotice";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import type { EvidenceClass } from "@/lib/domain/jurisdiction";
+import { formatDate } from "@/lib/i18n/messages";
+import { getRequestLocale, getRequestTranslator } from "@/lib/i18n/request";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -28,21 +30,22 @@ function profileText(profile: unknown, key: string) {
   return typeof value === "string" ? value : undefined;
 }
 
-function displayValue(value: number | string | boolean | null) {
-  if (value === null) return "Unknown";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+function displayValue(value: number | string | boolean | null, yesLabel: string, noLabel: string, unknownLabel: string) {
+  if (value === null) return unknownLabel;
+  if (typeof value === "boolean") return value ? yesLabel : noLabel;
   return String(value);
 }
 
 export default async function JurisdictionDetailPage({ params }: PageProps) {
+  const [t, locale] = await Promise.all([getRequestTranslator(), getRequestLocale()]);
   const { id } = await params;
   const context = await getWorkspaceContext();
   if (!context.userId) redirect(`/signin?callbackUrl=${encodeURIComponent(`/jurisdictions/${id}`)}`);
   if (!context.activeWorkspace || !context.principal) {
-    return <WorkspaceAccessState title="Workspace selection required" description="Select an active workspace to view jurisdiction details." />;
+    return <WorkspaceAccessState title={t("app.jurisdiction.selectWorkspace")} description={t("app.jurisdiction.description")} />;
   }
   if (!context.principal.permissions.includes("jurisdictions:read")) {
-    return <WorkspaceAccessState title="Jurisdiction access required" description="Your workspace role cannot view jurisdiction details." />;
+    return <WorkspaceAccessState title={t("app.jurisdiction.accessRequired")} description={t("app.jurisdiction.description")} />;
   }
 
   const jurisdiction = await prisma.jurisdiction.findFirst({
@@ -71,8 +74,8 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
 
   return (
     <div className="page-stack">
-      <nav aria-label="Breadcrumb" className="text-sm text-slate-400">
-        <Link className="hover:text-white" href="/jurisdictions">Jurisdiction Lens</Link>
+      <nav aria-label={t("navigation.breadcrumb")} className="text-sm text-slate-400">
+        <Link className="hover:text-white" href="/jurisdictions">{t("navigation.jurisdictionLens")}</Link>
         <span aria-hidden="true" className="px-2">/</span>
         <span className="text-slate-200">{jurisdiction.name}</span>
       </nav>
@@ -81,7 +84,7 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
         <div>
           <p className="eyebrow">{jurisdiction.countryCode ?? jurisdiction.code ?? jurisdiction.country}</p>
           <h1>{jurisdiction.name}</h1>
-          <p>{[jurisdiction.country, region].filter(Boolean).join(" · ") || "Jurisdiction profile"}</p>
+          <p>{[jurisdiction.country, region].filter(Boolean).join(" · ") || t("app.jurisdiction.profile")}</p>
         </div>
         <span className="status-badge status-info">{context.activeWorkspace.name}</span>
       </header>
@@ -91,22 +94,22 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
       />
 
       <section className="border-y border-white/10 py-5">
-        <h2 className="text-sm font-semibold text-white">Profile overview</h2>
+        <h2 className="text-sm font-semibold text-white">{t("app.jurisdiction.profileOverview")}</h2>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-400">
-          {summary || "No jurisdiction profile summary has been recorded."}
+          {summary || t("app.jurisdiction.profileSummaryMissing")}
         </p>
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-500">
-          {jurisdiction.reviewDate ? <span>Last review: {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(jurisdiction.reviewDate)}</span> : null}
-          <span>{jurisdiction.observations.length} observed criteria</span>
-          <span>{jurisdiction.evidence.length} evidence records</span>
+          {jurisdiction.reviewDate ? <span>{t("app.jurisdiction.reviewDate", { date: formatDate(jurisdiction.reviewDate, locale, { dateStyle: "medium" }) })}</span> : null}
+          <span>{t("app.jurisdiction.observedCriteria", { count: jurisdiction.observations.length })}</span>
+          <span>{t("app.jurisdiction.evidenceRecords", { count: jurisdiction.evidence.length })}</span>
         </div>
       </section>
 
       <section className="space-y-3">
         <header className="section-header">
           <div>
-            <h2>Observed criteria</h2>
-            <p>Recorded observations and assumptions for this jurisdiction.</p>
+            <h2>{t("app.jurisdiction.criteria")}</h2>
+            <p>{t("app.jurisdiction.criteriaDescription")}</p>
           </div>
         </header>
         {jurisdiction.observations.length ? (
@@ -119,7 +122,7 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
                     <ul className="mt-2 space-y-1 text-xs leading-5 text-slate-400">
                       {observation.assumptions.map((assumption, index) => <li key={`${observation.id}:${index}`}>{assumption}</li>)}
                     </ul>
-                  ) : <p className="mt-1 text-xs text-slate-500">No assumptions recorded.</p>}
+                  ) : <p className="mt-1 text-xs text-slate-500">{t("app.jurisdiction.noAssumptions")}</p>}
                   {observation.evidenceIds.length ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {observation.evidenceIds.map((evidenceId) => {
@@ -129,21 +132,21 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
                             <EvidenceBadge evidenceClass={evidenceClasses[evidence.evidenceClass] ?? "E0"} />
                             {evidence.source ?? evidence.title}
                           </span>
-                        ) : <span key={evidenceId} className="text-xs text-slate-500">Unresolved evidence reference</span>;
+                        ) : <span key={evidenceId} className="text-xs text-slate-500">{t("app.jurisdiction.unresolvedEvidence")}</span>;
                       })}
                     </div>
                   ) : null}
                 </div>
-                <span className="text-sm font-medium text-slate-200">{displayValue(observation.value)}</span>
+                <span className="text-sm font-medium text-slate-200">{displayValue(observation.value, t("app.jurisdiction.yes"), t("app.jurisdiction.no"), t("app.jurisdiction.unknown"))}</span>
                 <span className={observation.reviewRequired ? "status-badge status-warning" : "status-badge status-neutral"}>
-                  {observation.reviewRequired ? "Review required" : "Not flagged"}
+                  {observation.reviewRequired ? t("app.jurisdiction.reviewRequired") : t("app.jurisdiction.notFlagged")}
                 </span>
               </article>
             ))}
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-white/10 p-8 text-sm text-slate-400">
-            No criterion observations have been recorded for this jurisdiction.
+            {t("app.jurisdiction.noCriteria")}
           </div>
         )}
       </section>
@@ -151,10 +154,10 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
       <section className="space-y-3">
         <header className="section-header">
           <div>
-            <h2>Evidence register</h2>
-            <p>Sources attached directly to this jurisdiction profile.</p>
+            <h2>{t("app.jurisdiction.evidenceRegister")}</h2>
+            <p>{t("app.jurisdiction.evidenceDescription")}</p>
           </div>
-          <span className="text-xs text-slate-500">{jurisdiction.evidence.length} records</span>
+          <span className="text-xs text-slate-500">{t("app.jurisdiction.records", { count: jurisdiction.evidence.length })}</span>
         </header>
         {jurisdiction.evidence.length ? (
           <div className="divide-y divide-white/10 border-y border-white/10">
@@ -163,8 +166,8 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
                 <div className="min-w-0">
                   <h3 className="truncate text-sm font-medium text-white">{item.title}</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    {item.source ?? item.sourceType ?? "Source not specified"}
-                    {item.publicationDate ? ` · Published ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(item.publicationDate)}` : ""}
+                    {item.source ?? item.sourceType ?? t("app.jurisdiction.sourceMissing")}
+                    {item.publicationDate ? ` · ${t("app.jurisdiction.published", { date: formatDate(item.publicationDate, locale, { dateStyle: "medium" }) })}` : ""}
                   </p>
                 </div>
                 <EvidenceBadge evidenceClass={evidenceClasses[item.evidenceClass] ?? "E0"} />
@@ -173,7 +176,7 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-white/10 p-8 text-sm text-slate-400">
-            No evidence sources have been attached yet. Missing information remains unknown, not a zero score.
+            {t("app.jurisdiction.noEvidenceSources")}
           </div>
         )}
       </section>
@@ -181,10 +184,10 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
       <section className="space-y-3">
         <header className="section-header">
           <div>
-            <h2>Decision and plan trail</h2>
-            <p>Human-recorded working jurisdiction decisions and related formation plans.</p>
+            <h2>{t("app.jurisdiction.decisionTrail")}</h2>
+            <p>{t("app.jurisdiction.decisionTrailDescription")}</p>
           </div>
-          <Link href="/formation" className="button">Open Formation</Link>
+          <Link href="/formation" className="button">{t("app.jurisdiction.openFormation")}</Link>
         </header>
         {context.principal.permissions.includes("formation:read") && jurisdiction.workingDecisions.length ? (
           <div className="divide-y divide-white/10 border-y border-white/10">
@@ -192,15 +195,15 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
               <article key={decision.id} className="py-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium text-white">
-                    Selected {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(decision.decidedAt)}
+                    {t("app.jurisdiction.selected", { date: formatDate(decision.decidedAt, locale, { dateStyle: "medium" }) })}
                   </p>
                   <span className="status-badge status-warning">
-                    {decision.professionalReviewCompleted ? "Review completed" : "Professional review pending"}
+                    {decision.professionalReviewCompleted ? t("app.jurisdiction.reviewCompleted") : t("app.jurisdiction.reviewPending")}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
-                  Methodology {decision.comparisonSnapshot.methodologyVersion}
-                  {decision.rationale ? ` · ${decision.rationale}` : " · No rationale recorded"}
+                  {t("app.jurisdiction.methodology", { version: decision.comparisonSnapshot.methodologyVersion })}
+                  {decision.rationale ? ` · ${decision.rationale}` : ` · ${t("app.jurisdiction.noRationale")}`}
                 </p>
                 {decision.formationPlans.length ? (
                   <ul className="mt-3 space-y-2">
@@ -217,13 +220,13 @@ export default async function JurisdictionDetailPage({ params }: PageProps) {
           </div>
         ) : (
           <p className="rounded-lg border border-dashed border-white/10 p-6 text-sm text-slate-400">
-            No working jurisdiction decisions have been recorded for this workspace.
+            {t("app.jurisdiction.noWorkingDecisions")}
           </p>
         )}
       </section>
 
       <aside className="rounded-lg border border-amber-300/10 bg-amber-300/[0.035] p-4 text-xs leading-5 text-slate-400">
-        Evidence and observations support internal comparison only. They are not legal, tax, regulatory, banking, or other professional conclusions.
+        {t("app.jurisdiction.trustBoundary")}
       </aside>
     </div>
   );

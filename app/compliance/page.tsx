@@ -6,16 +6,18 @@ import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { buildComplianceControlSnapshot } from "@/lib/domain/compliance-control";
 import { prisma } from "@/lib/db/prisma";
 import { listDocuments } from "@/lib/services/document-storage-service";
+import { getRequestTranslator } from "@/lib/i18n/request";
 
 export default async function CompliancePage() {
+  const t = await getRequestTranslator();
   const context = await getWorkspaceContext();
   if (!context.userId) {
     return (
       <WorkspaceAccessState
-        title="Sign in to view Compliance"
-        description="Compliance obligations are available to authenticated workspace members."
+        title={t("app.compliance.signInTitle")}
+        description={t("app.compliance.signInDescription")}
         href="/signin?callbackUrl=/compliance"
-        action="Sign in"
+        action={t("navigation.signIn")}
       />
     );
   }
@@ -23,8 +25,8 @@ export default async function CompliancePage() {
   if (!context.principal || !context.activeWorkspace) {
     return (
       <WorkspaceAccessState
-        title="Workspace selection required"
-        description="Select an active workspace to view its compliance obligations."
+        title={t("app.compliance.workspaceRequired")}
+        description={t("app.compliance.workspaceDescription")}
       />
     );
   }
@@ -32,8 +34,8 @@ export default async function CompliancePage() {
   if (!context.principal.permissions.includes("compliance:read")) {
     return (
       <WorkspaceAccessState
-        title="Compliance access required"
-        description="Your workspace role does not include permission to view compliance obligations."
+        title={t("app.compliance.accessRequired")}
+        description={t("app.compliance.accessDescription")}
       />
     );
   }
@@ -70,7 +72,7 @@ export default async function CompliancePage() {
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
       <div className="rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.04] p-4 text-sm text-slate-300">
-        Active workspace: <span className="font-medium text-white">{context.activeWorkspace.name}</span>
+        {t("app.compliance.activeWorkspace", { name: context.activeWorkspace.name })}
       </div>
       {obligations
         .filter((obligation) => obligation.escalationLevel > 0)

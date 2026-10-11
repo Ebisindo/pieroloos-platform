@@ -3,6 +3,7 @@ import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import { listDocuments } from "@/lib/services/document-storage-service";
+import { getRequestTranslator } from "@/lib/i18n/request";
 
 function parseJurisdictionIds(value: string) {
   try {
@@ -14,22 +15,23 @@ function parseJurisdictionIds(value: string) {
 }
 
 export default async function FormationPage() {
+  const t = await getRequestTranslator();
   const context = await getWorkspaceContext();
   if (!context.userId) {
     return (
       <WorkspaceAccessState
-        title="Sign in to view Formation"
-        description="Formation plans are available to authenticated workspace members."
+        title={t("signin.title")}
+        description={t("app.formation.authRequired")}
         href="/signin?callbackUrl=/formation"
-        action="Sign in"
+        action={t("navigation.signIn")}
       />
     );
   }
   if (!context.principal || !context.activeWorkspace) {
-    return <WorkspaceAccessState title="Workspace selection required" description="Select a workspace to view formation plans." />;
+    return <WorkspaceAccessState title={t("navigation.workspace")} description={t("app.formation.workspaceRequired")} />;
   }
   if (!context.principal.permissions.includes("formation:read")) {
-    return <WorkspaceAccessState title="Formation access required" description="Your workspace role cannot view formation plans." />;
+    return <WorkspaceAccessState title={t("app.formation.accessRequired")} description={t("app.formation.accessRequired")} />;
   }
 
   const workspaceId = context.principal.workspaceId;
@@ -146,9 +148,9 @@ export default async function FormationPage() {
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <p className="eyebrow">FORMATION OPERATIONS</p>
-          <h1>Formation Roadmap</h1>
-          <p>Build auditable plans from saved jurisdiction comparisons and move work through evidence and review gates.</p>
+          <p className="eyebrow">{t("navigation.formation")}</p>
+          <h1>{t("module.formationRoadmap")}</h1>
+          <p>{t("app.formation.pageDescription")}</p>
         </div>
         <span className="status-badge status-info">{context.activeWorkspace.name}</span>
       </header>
@@ -159,7 +161,7 @@ export default async function FormationPage() {
         canReview={context.principal.permissions.includes("documents:review")}
       />
       <aside className="rounded-lg border border-amber-300/10 bg-amber-300/[0.035] p-5 text-sm leading-6 text-slate-400">
-        Plans coordinate work only. They do not establish legal validity, tax treatment, regulatory approval, banking approval, or government acceptance.
+        {t("app.formation.disclaimer")}
       </aside>
     </div>
   );

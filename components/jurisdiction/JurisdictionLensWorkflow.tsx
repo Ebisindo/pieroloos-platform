@@ -4,6 +4,7 @@ import { ArrowRight, Scale } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 import type { Jurisdiction } from "@/lib/domain/jurisdiction";
 import { JurisdictionCard } from "@/components/jurisdiction/JurisdictionCard";
 
@@ -30,6 +31,7 @@ export function JurisdictionLensWorkflow({
   canCompare: boolean;
   canCreateFormation: boolean;
 }) {
+  const { t } = useLocale();
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [profileId, setProfileId] = useState("");
@@ -75,12 +77,12 @@ export function JurisdictionLensWorkflow({
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Unable to compare selected jurisdictions.");
+      if (!response.ok) throw new Error(result.error ?? t("app.jurisdiction.compareError"));
       setComparison({ id: result.data.snapshot.id, results: result.data.results });
       setFormationJurisdictionId(selectedIds[0]);
-      setMessage("Comparison saved to this workspace.");
+      setMessage(t("app.jurisdiction.savedComparison"));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to compare selected jurisdictions.");
+      setMessage(error instanceof Error ? error.message : t("app.jurisdiction.compareError"));
     } finally {
       setBusy(false);
     }
@@ -101,11 +103,11 @@ export function JurisdictionLensWorkflow({
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Unable to create formation plan.");
+      if (!response.ok) throw new Error(result.error ?? t("app.jurisdiction.createPlanError"));
       router.push("/formation");
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to create formation plan.");
+      setMessage(error instanceof Error ? error.message : t("app.jurisdiction.createPlanError"));
     } finally {
       setBusy(false);
     }
@@ -119,14 +121,14 @@ export function JurisdictionLensWorkflow({
         <section className="glass-panel space-y-4 p-5" aria-labelledby="comparison-heading">
           <div className="section-header">
             <div>
-              <h2 id="comparison-heading">Compare selected jurisdictions</h2>
-              <p>Select at least two cards. Comparisons preserve unknown data and are saved to this workspace.</p>
+              <h2 id="comparison-heading">{t("app.jurisdiction.compareTitle")}</h2>
+              <p>{t("app.jurisdiction.compareDescription")}</p>
             </div>
             <Scale size={18} aria-hidden="true" className="text-cyan-200" />
           </div>
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <label className="space-y-2 text-sm text-slate-300">
-              <span>Business profile for Formation handoff</span>
+              <span>{t("app.jurisdiction.profile")}</span>
               <select
                 className="form-input"
                 value={profileId}
@@ -135,7 +137,7 @@ export function JurisdictionLensWorkflow({
                   setComparison(null);
                 }}
               >
-                <option value="">No profile selected</option>
+                <option value="">{t("app.jurisdiction.noProfile")}</option>
                 {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
               </select>
             </label>
@@ -145,15 +147,15 @@ export function JurisdictionLensWorkflow({
               disabled={busy || selectedIds.length < 2}
               onClick={compareSelected}
             >
-              <Scale size={15} /> {busy ? "Working…" : `Compare ${selectedIds.length || ""}`}
+              <Scale size={15} /> {busy ? t("app.jurisdiction.working") : t("app.jurisdiction.compare", { count: selectedIds.length })}
             </button>
           </div>
           {!profiles.length ? (
-            <p className="text-xs text-amber-200/80">No business profiles are available. Comparisons can still be saved, but Formation requires a client business profile.</p>
+            <p className="text-xs text-amber-200/80">{t("app.jurisdiction.noProfiles")}</p>
           ) : null}
         </section>
       ) : (
-        <p className="text-sm text-slate-500">Your role can view jurisdiction cards but cannot save comparisons.</p>
+        <p className="text-sm text-slate-500">{t("app.jurisdiction.readOnly")}</p>
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -174,23 +176,23 @@ export function JurisdictionLensWorkflow({
         <section className="space-y-4 border-t border-white/10 pt-5" aria-labelledby="comparison-results-heading">
           <header className="section-header">
             <div>
-              <h2 id="comparison-results-heading">Comparison results</h2>
-              <p>Internal analytical indicators only, not legal or regulatory conclusions. Missing observations remain unknown, not zero. Evidence below primary (E3) always requires professional review.</p>
+              <h2 id="comparison-results-heading">{t("app.jurisdiction.results")}</h2>
+              <p>{t("app.jurisdiction.resultNotice")}</p>
             </div>
-            <span className="status-badge status-success">Saved</span>
+            <span className="status-badge status-success">{t("app.jurisdiction.saved")}</span>
           </header>
           <div className="overflow-x-auto border-y border-white/10">
             <table className="w-full min-w-[580px] text-left text-sm">
               <thead className="border-b border-white/10 text-xs uppercase text-slate-500">
-                <tr><th className="py-3 pr-4">Jurisdiction</th><th className="py-3 px-4">Indicator</th><th className="py-3 px-4">Confidence</th><th className="py-3 pl-4">Review</th></tr>
+                <tr><th className="py-3 pr-4">{t("app.jurisdiction.title")}</th><th className="py-3 px-4">{t("app.jurisdiction.indicator")}</th><th className="py-3 px-4">{t("app.jurisdiction.confidence")}</th><th className="py-3 pl-4">{t("app.jurisdiction.review")}</th></tr>
               </thead>
               <tbody>
                 {comparison.results.map((result) => (
                   <tr key={result.jurisdictionId} className="border-b border-white/5 last:border-0">
                     <td className="py-3 pr-4 font-medium text-white">{resultNames.get(result.jurisdictionId) ?? result.jurisdictionId}</td>
-                    <td className="px-4 text-cyan-100">{result.analyticalIndicator ?? "Unknown"}</td>
+                    <td className="px-4 text-cyan-100">{result.analyticalIndicator ?? t("app.jurisdiction.unknown")}</td>
                     <td className="px-4 text-slate-300">{result.confidence}%</td>
-                    <td className="pl-4 text-xs text-amber-200">{result.professionalReviewRequired ? "Professional review required" : "Not flagged; still not advice"}</td>
+                    <td className="pl-4 text-xs text-amber-200">{result.professionalReviewRequired ? t("app.jurisdiction.reviewRequired") : t("app.jurisdiction.notAdvice")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -200,7 +202,7 @@ export function JurisdictionLensWorkflow({
           {canCreateFormation ? (
             <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
               <label className="space-y-2 text-sm text-slate-300">
-                <span>Working jurisdiction</span>
+                <span>{t("app.jurisdiction.workingJurisdiction")}</span>
                 <select className="form-input" value={formationJurisdictionId} onChange={(event) => setFormationJurisdictionId(event.target.value)}>
                   {comparison.results.map((result) => (
                     <option key={result.jurisdictionId} value={result.jurisdictionId}>{resultNames.get(result.jurisdictionId) ?? result.jurisdictionId}</option>
@@ -208,29 +210,29 @@ export function JurisdictionLensWorkflow({
                 </select>
               </label>
               <label className="space-y-2 text-sm text-slate-300 sm:col-span-2">
-                <span>Decision rationale</span>
+                <span>{t("app.formation.rationale")}</span>
                 <textarea
                   className="form-input min-h-20"
                   value={rationale}
                   onChange={(event) => setRationale(event.target.value)}
                   maxLength={5000}
-                  placeholder="Why is this the working jurisdiction for this formation plan?"
+                  placeholder={t("app.jurisdiction.rationalePlaceholder")}
                 />
               </label>
               <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
-                {!profileId ? <p className="text-xs text-amber-200/80">Select a business profile before creating a Formation plan.</p> : <span />}
+                {!profileId ? <p className="text-xs text-amber-200/80">{t("app.jurisdiction.selectProfileFirst")}</p> : <span />}
                 <button
                   className="button button-primary gap-2"
                   type="button"
                   disabled={busy || !profileId}
                   onClick={createFormationPlan}
                 >
-                  Continue to Formation <ArrowRight size={15} />
+                  {t("app.jurisdiction.continueFormation")} <ArrowRight size={15} />
                 </button>
               </div>
             </div>
           ) : (
-            <Link href="/formation" className="button gap-2">Open Formation <ArrowRight size={15} /></Link>
+            <Link href="/formation" className="button gap-2">{t("app.jurisdiction.openFormation")} <ArrowRight size={15} /></Link>
           )}
         </section>
       ) : null}

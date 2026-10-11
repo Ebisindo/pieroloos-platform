@@ -1,66 +1,81 @@
+"use client";
+
 import Link from "next/link";
-import { BRAND_TAGLINE, BrandLogo } from "@/components/brand/BrandLogo";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { publicNavigation } from "@/lib/navigation";
+import { useLocale } from "@/components/i18n/LocaleProvider";
+import { LanguageSelector } from "@/components/i18n/LanguageSelector";
+import { locales } from "@/lib/i18n/config";
+
+const navigationLabelKeys = [
+  "navigation.journey",
+  "navigation.capabilities",
+  "navigation.professionals",
+  "navigation.partners",
+] as const;
 
 export function PublicHeader() {
+  const { locale, t } = useLocale();
   return (
     <header className="public-header">
       <div className="public-container public-header-inner">
-        <Link href="/" aria-label="PieroloOS home">
-          <BrandLogo size="sm" />
+        <Link href="/" aria-label={t("navigation.home")}>
+          <BrandLogo size="sm" descriptor={t("brand.descriptor")} />
         </Link>
-        <nav aria-label="Public navigation" className="public-nav">
-          {publicNavigation.map((item) => (
-            <Link key={item.href} href={item.href}>{item.label}</Link>
+        <nav aria-label={t("navigation.public")} className="public-nav">
+          {publicNavigation.map((item, index) => (
+            <Link key={item.href} href={item.href}>{t(navigationLabelKeys[index])}</Link>
           ))}
         </nav>
-        <Link href="/signin" className="button button-secondary public-signin">Sign in</Link>
+        <LanguageSelector />
+        <Link href="/signin" className="button button-secondary public-signin">{t("navigation.signIn")}</Link>
       </div>
+      {locales[locale].status === "proposed" ? (
+        <p className="locale-preview-notice" role="status">{t("language.reviewNotice")}</p>
+      ) : null}
     </header>
   );
 }
 
 export function PublicFooter() {
+  const { t } = useLocale();
   return (
     <footer className="public-footer">
       <div className="public-container">
         <div className="public-footer-grid">
           <div>
-            <BrandLogo size="sm" />
-            <p className="public-footer-tagline">{BRAND_TAGLINE}</p>
+            <BrandLogo size="sm" descriptor={t("brand.descriptor")} />
+            <p className="public-footer-tagline">{t("brand.tagline")}</p>
           </div>
-          <nav aria-label="Footer navigation">
-            <h2 className="public-footer-heading">Explore</h2>
+          <nav aria-label={t("navigation.footer")}>
+            <h2 className="public-footer-heading">{t("navigation.explore")}</h2>
             <ul>
-              {publicNavigation.map((item) => (
-                <li key={item.href}><Link href={item.href}>{item.label}</Link></li>
+              {publicNavigation.map((item, index) => (
+                <li key={item.href}><Link href={item.href}>{t(navigationLabelKeys[index])}</Link></li>
               ))}
             </ul>
           </nav>
-          <nav aria-label="Get started">
-            <h2 className="public-footer-heading">Get started</h2>
+          <nav aria-label={t("navigation.getStarted")}>
+            <h2 className="public-footer-heading">{t("navigation.getStarted")}</h2>
             <ul>
-              <li><Link href="/signin?callbackUrl=/clients/new">Start Your Business Journey</Link></li>
-              <li><Link href="/partners#partner-with-us">Partner With Us</Link></li>
-              <li><Link href="/signin">Sign in</Link></li>
+              <li><Link href="/signin?callbackUrl=/clients/new">{t("home.hero.primaryAction")}</Link></li>
+              <li><Link href="/partners#partner-with-us">{t("partners.hero.primaryAction")}</Link></li>
+              <li><Link href="/signin">{t("navigation.signIn")}</Link></li>
             </ul>
           </nav>
         </div>
-        <p className="public-disclaimer">
-          PieroloOS organizes information, prepares drafts and analyses, and supports human review. It is software, not a law firm,
-          tax adviser, accounting firm or financial adviser, and it does not guarantee incorporation, registration or approval outcomes.
-          Consult qualified professionals before acting on any jurisdiction, tax or compliance information.
-        </p>
-        <p className="public-copyright">&copy; {new Date().getFullYear()} PieroloOS. All rights reserved.</p>
+        <p className="public-disclaimer">{t("footer.disclaimer")}</p>
+        <p className="public-copyright">&copy; {new Date().getFullYear()} PieroloOS. {t("footer.copyright")}</p>
       </div>
     </footer>
   );
 }
 
 export function PublicShell({ children }: { children: React.ReactNode }) {
+  const { t } = useLocale();
   return (
     <div className="public-shell">
-      <a href="#main-content" className="skip-link">Skip to main content</a>
+      <a href="#main-content" className="skip-link">{t("navigation.skip")}</a>
       <div className="app-backdrop" aria-hidden="true">
         <div className="star-field" />
         <div className="ambient-orbit ambient-orbit-a" />

@@ -7,8 +7,27 @@ import { useEffect, useState } from "react";
 import { isPublicRoute, portalNavigation, systemNavigation, workspaceNavigation } from "@/lib/navigation";
 import { cx } from "@/components/ui/primitives";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { useLocale } from "@/components/i18n/LocaleProvider";
+import { LanguageSelector } from "@/components/i18n/LanguageSelector";
+import { locales } from "@/lib/i18n/config";
+import type { MessageKey } from "@/lib/i18n/messages";
+
+const navigationKeys = {
+  "/command-center": "navigation.businessFormation",
+  "/clients": "navigation.clients",
+  "/jurisdictions": "navigation.jurisdictionLens",
+  "/expansion": "navigation.marketExpansion",
+  "/cross-border": "navigation.crossBorder",
+  "/formation": "navigation.formation",
+  "/compliance": "navigation.compliance",
+  "/reports": "navigation.reports",
+  "/engagements": "navigation.engagements",
+  "/settings": "navigation.settings",
+  "/portal": "navigation.clientPortal",
+} as const satisfies Record<string, MessageKey>;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { locale, t } = useLocale();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -30,7 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-shell">
-      <a href="#main-content" className="skip-link">Skip to main content</a>
+      <a href="#main-content" className="skip-link">{t("navigation.skip")}</a>
       <div className="app-backdrop" aria-hidden="true">
         <div className="star-field" />
         <div className="ambient-orbit ambient-orbit-a" />
@@ -39,16 +58,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <aside id="primary-sidebar" className={cx("sidebar", mobileOpen && "sidebar-open")}>
         <div className="brand-lockup">
-          <Link href="/" aria-label="PieroloOS home" onClick={() => setMobileOpen(false)}>
+          <Link href="/" aria-label={t("navigation.home")} onClick={() => setMobileOpen(false)}>
             <BrandLogo size="md" />
           </Link>
-          <button className="icon-button mobile-close" onClick={() => setMobileOpen(false)} aria-label="Close navigation">
+          <button className="icon-button mobile-close" onClick={() => setMobileOpen(false)} aria-label={t("navigation.close")}>
             <X size={19} />
           </button>
         </div>
 
-        <div className="workspace-label">{isClientPortal ? "CLIENT PORTAL" : "WORKSPACE"}</div>
-        <nav aria-label="Primary navigation">
+        <div className="workspace-label">{t(isClientPortal ? "navigation.clientPortal" : "navigation.workspace")}</div>
+        <nav aria-label={t("navigation.primary")}>
           {navigation.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
@@ -61,7 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className={cx("nav-item", active && "nav-active")}
               >
                 <Icon size={18} strokeWidth={1.8} />
-                <span>{item.label}</span>
+                <span>{t(navigationKeys[item.href as keyof typeof navigationKeys])}</span>
               </Link>
             );
           })}
@@ -70,35 +89,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="sidebar-footer">
           <div className="system-health">
             <span className="status-dot" />
-            <span>Core systems nominal</span>
+            <span>{t("navigation.coreSystems")}</span>
           </div>
           <div className="version">PIEROLOOS v0.1 FOUNDATION</div>
         </div>
       </aside>
 
-      {mobileOpen ? <button className="mobile-scrim" onClick={() => setMobileOpen(false)} aria-label="Close navigation" /> : null}
+      {mobileOpen ? <button className="mobile-scrim" onClick={() => setMobileOpen(false)} aria-label={t("navigation.close")} /> : null}
 
       <main id="main-content" className="main-shell">
         <header className="topbar">
           <div className="topbar-left">
-            <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="primary-sidebar">
+            <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label={t("navigation.open")} aria-expanded={mobileOpen} aria-controls="primary-sidebar">
               <Menu size={20} />
             </button>
             <div className="context-path">
-              <span>{isClientPortal ? "Client" : "Workspace"}</span>
+              <span>{isClientPortal ? t("navigation.client") : t("navigation.workspace")}</span>
               <span>/</span>
-              <strong>{navigation.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.label ?? "Overview"}</strong>
+              <strong>{(() => {
+                const activeHref = navigation.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.href;
+                return activeHref ? t(navigationKeys[activeHref as keyof typeof navigationKeys]) : t("navigation.overview");
+              })()}</strong>
             </div>
           </div>
           <div className="topbar-actions">
-            <button className="search-button" aria-label="Search workspace">
+            <button className="search-button" aria-label={t("navigation.search")}>
               <Search size={17} />
-              <span>Search</span>
+              <span>{t("navigation.searchText")}</span>
               <kbd>⌘ K</kbd>
             </button>
+            <LanguageSelector />
+            {locales[locale].status === "proposed" ? <span className="language-preview-chip">{t("language.preview")}</span> : null}
             <div className="security-state">
               <ShieldCheck size={16} />
-              <span>{isClientPortal ? "Protected client access" : "Protected workspace"}</span>
+              <span>{t(isClientPortal ? "navigation.protectedClient" : "navigation.protectedWorkspace")}</span>
             </div>
             <div className="avatar" aria-label="Current user">JE</div>
           </div>

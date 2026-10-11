@@ -2,6 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
+import type { MessageKey } from "@/lib/i18n/messages";
+import { formatDate } from "@/lib/i18n/messages";
 
 type PortalResource = { id: string; type: "TASK" | "FORMATION_TASK" | "OBLIGATION"; title: string };
 type PortalInteraction = {
@@ -28,6 +31,7 @@ export function ClientPortalCollaboration({
   resources: PortalResource[];
   interactions: PortalInteraction[];
 }) {
+  const { locale, t } = useLocale();
   const router = useRouter();
   const [messageContent, setMessageContent] = useState("");
   const [completionContent, setCompletionContent] = useState<Record<string, string>>({});
@@ -45,23 +49,30 @@ export function ClientPortalCollaboration({
         body: JSON.stringify(payload),
       });
       const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Unable to send portal response.");
+      if (!response.ok) throw new Error(result.error ?? t("app.portal.submitError"));
       setMessageContent("");
       setCompletionContent({});
       router.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to send portal response.");
+      setError(cause instanceof Error ? cause.message : t("app.portal.submitError"));
     } finally {
       setBusy(false);
     }
   }
 
+  const kindKeys: Record<string, MessageKey> = {
+    MESSAGE: "app.portal.kindMessage",
+    COMPLETION_SUBMISSION: "app.portal.kindCompletion",
+    ACKNOWLEDGMENT_REQUEST: "app.portal.kindAcknowledgmentRequest",
+    ACKNOWLEDGMENT: "app.portal.kindAcknowledgment",
+  };
+
   return (
     <section className="space-y-5 rounded-xl border border-white/10 p-5">
       <div>
-        <h3 className="font-medium text-white">Messages and client actions</h3>
+        <h3 className="font-medium text-white">{t("app.portal.collaborationTitle")}</h3>
         <p className="mt-1 text-xs leading-5 text-slate-400">
-          Your updates are shared with your professional team. Submitting a request does not complete or change its workflow status.
+          {t("app.portal.collaborationDescription")}
         </p>
       </div>
 
@@ -70,19 +81,19 @@ export function ClientPortalCollaboration({
           {interactions.map((item) => (
             <li key={item.id} className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
               <div className="flex flex-wrap justify-between gap-2 text-xs text-slate-400">
-                <span>{item.actor.name ?? item.actor.email} · {item.kind.replaceAll("_", " ").toLowerCase()}</span>
+                <span>{item.actor.name ?? item.actor.email} · {kindKeys[item.kind] ? t(kindKeys[item.kind]) : item.kind.replaceAll("_", " ").toLowerCase()}</span>
                 <time dateTime={new Date(item.createdAt).toISOString()}>
-                  {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.createdAt))}
+                  {formatDate(new Date(item.createdAt), locale, { dateStyle: "medium", timeStyle: "short" })}
                 </time>
               </div>
               {item.parentInteraction ? (
                 <p className="mt-2 border-l-2 border-cyan-300/20 pl-3 text-sm text-slate-400">
-                  Requested: {item.parentInteraction.body}
+                  {t("app.portal.requested")} {item.parentInteraction.body}
                 </p>
               ) : null}
               <p className="mt-2 whitespace-pre-wrap text-sm text-slate-200">{item.body}</p>
               {item.status ? <p className="mt-2 text-xs uppercase tracking-wide text-cyan-100">{item.status.replaceAll("_", " ")}</p> : null}
-              {item.reviewNote ? <p className="mt-2 text-sm text-amber-100">Professional note: {item.reviewNote}</p> : null}
+              {item.reviewNote ? <p className="mt-2 text-sm text-amber-100">{t("app.portal.professionalNote")} {item.reviewNote}</p> : null}
               {item.kind === "ACKNOWLEDGMENT_REQUEST" && item.status === "PENDING" ? (
                 <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
                   <label className="flex items-start gap-2 text-xs leading-5 text-slate-300">
@@ -93,7 +104,7 @@ export function ClientPortalCollaboration({
                         event.target.checked ? [...existing, item.id] : existing.filter((id) => id !== item.id),
                       )}
                     />
-                    I confirm that I have read and acknowledge the exact statement above.
+                    {t("app.portal.acknowledgmentConfirm")}
                   </label>
                   <button
                     type="button"
@@ -101,10 +112,10 @@ export function ClientPortalCollaboration({
                     disabled={busy || !acknowledged.includes(item.id)}
                     onClick={() => submit({ kind: "ACKNOWLEDGMENT", requestId: item.id })}
                   >
-                    Record acknowledgment
+                    {t("app.portal.recordAcknowledgment")}
                   </button>
                   <p className="text-xs text-slate-500">
-                    This records an authenticated acknowledgment, not a legally binding electronic signature.
+                    {t("app.portal.acknowledgmentDisclaimer")}
                   </p>
                 </div>
               ) : null}
@@ -114,7 +125,7 @@ export function ClientPortalCollaboration({
             </li>
           ))}
         </ol>
-      ) : <p className="text-sm text-slate-500">No messages or responses yet.</p>}
+      ) : <p className="text-sm text-slate-500">{t("app.portal.noMessages")}</p>}
 
       {resources.map((resource) => {
         const key = `${resource.type}:${resource.id}`;
@@ -124,8 +135,8 @@ export function ClientPortalCollaboration({
             <p className="text-sm font-medium text-slate-200">{resource.title}</p>
             <textarea
               className="mt-2 min-h-20 w-full rounded-md border border-white/10 bg-slate-950 p-2 text-sm text-white"
-              aria-label={`Completion details for ${resource.title}`}
-              placeholder="Describe what you have completed or provide an update"
+              aria-label={t("app.portal.completionDetails", { title: resource.title })}
+              placeholder={t("app.portal.completionPlaceholder")}
               value={value}
               onChange={(event) => setCompletionContent((current) => ({ ...current, [key]: event.target.value }))}
               maxLength={4000}
@@ -141,7 +152,7 @@ export function ClientPortalCollaboration({
                 content: value,
               })}
             >
-              Submit for professional review
+              {t("app.portal.submitReview")}
             </button>
           </div>
         );
@@ -154,7 +165,7 @@ export function ClientPortalCollaboration({
           if (messageContent.trim()) void submit({ kind: "MESSAGE", content: messageContent });
         }}
       >
-        <label htmlFor={`portal-message-${clientId}`} className="block text-sm font-medium text-slate-200">Send a message</label>
+        <label htmlFor={`portal-message-${clientId}`} className="block text-sm font-medium text-slate-200">{t("app.portal.sendMessage")}</label>
         <textarea
           id={`portal-message-${clientId}`}
           className="min-h-20 w-full rounded-md border border-white/10 bg-slate-950 p-2 text-sm text-white"
@@ -164,7 +175,7 @@ export function ClientPortalCollaboration({
           required
         />
         <button type="submit" disabled={busy || !messageContent.trim()} className="rounded-md bg-cyan-300 px-3 py-2 text-xs font-semibold text-slate-950 disabled:opacity-50">
-          Send message
+          {t("app.portal.send")}
         </button>
       </form>
       {error ? <p role="alert" className="text-sm text-rose-200">{error}</p> : null}

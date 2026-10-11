@@ -4,6 +4,7 @@ import { ArrowRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 import { FormationTimeline } from "@/components/formation/FormationTimeline";
 
 type Candidate = {
@@ -60,6 +61,7 @@ export function FormationPlanWorkflow({
   canManage: boolean;
   canReview: boolean;
 }) {
+  const { locale, t } = useLocale();
   const router = useRouter();
   const [candidateKey, setCandidateKey] = useState("");
   const [saving, setSaving] = useState(false);
@@ -83,12 +85,12 @@ export function FormationPlanWorkflow({
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Unable to create formation plan.");
+      if (!response.ok) throw new Error(result.error ?? t("app.formation.error"));
       setCandidateKey("");
-      setMessage("Formation plan created.");
+      setMessage(t("app.formation.created"));
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to create formation plan.");
+      setMessage(error instanceof Error ? error.message : t("app.formation.error"));
     } finally {
       setSaving(false);
     }
@@ -100,69 +102,69 @@ export function FormationPlanWorkflow({
         <form className="glass-panel space-y-4 p-5" onSubmit={createPlan}>
           <div className="section-header">
             <div>
-              <h2>Start a formation plan</h2>
-              <p>Choose a jurisdiction from a saved comparison. The decision and plan are recorded together.</p>
+              <h2>{t("app.formation.start")}</h2>
+              <p>{t("app.formation.createDescription")}</p>
             </div>
             <Plus size={18} aria-hidden="true" className="text-amber-300" />
           </div>
           {candidates.length ? (
             <>
               <label className="block space-y-2 text-sm text-slate-300">
-                <span>Comparison candidate</span>
+                <span>{t("app.formation.candidate")}</span>
                 <select
                   className="min-h-11 w-full rounded-md border border-white/10 bg-[#0b1128] px-3 text-sm text-white"
                   value={candidateKey}
                   onChange={(event) => setCandidateKey(event.target.value)}
                   required
                 >
-                  <option value="" disabled>Select a client and jurisdiction</option>
+                  <option value="" disabled>{t("app.formation.selectCandidate")}</option>
                   {candidates.map((option) => (
                     <option key={`${option.comparisonSnapshotId}:${option.jurisdictionId}`} value={`${option.comparisonSnapshotId}:${option.jurisdictionId}`}>
-                      {option.clientName} · {option.profileName} · {option.jurisdictionName} · {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(option.comparedAt))}
+                      {option.clientName} · {option.profileName} · {option.jurisdictionName} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(option.comparedAt))}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="block space-y-2 text-sm text-slate-300">
-                <span>Decision rationale</span>
+                <span>{t("app.formation.rationale")}</span>
                 <textarea
                   className="min-h-20 w-full rounded-md border border-white/10 bg-[#0b1128] px-3 py-2 text-sm text-white"
                   name="rationale"
                   maxLength={5000}
-                  placeholder="Record the reason for selecting this working jurisdiction."
+                  placeholder={t("app.formation.rationalePlaceholder")}
                 />
               </label>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p role="status" className="text-sm text-slate-400">{message}</p>
                 <button className="button button-primary gap-2" type="submit" disabled={saving || !candidate}>
-                  {saving ? "Creating…" : "Create plan"} <ArrowRight size={15} />
+                  {saving ? t("app.formation.creating") : t("app.formation.createPlan")} <ArrowRight size={15} />
                 </button>
               </div>
             </>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
-              <p>No saved comparisons with a client business profile are available.</p>
-              <Link className="button gap-2" href="/jurisdictions">Open jurisdiction lens <ArrowRight size={14} /></Link>
+              <p>{t("app.formation.noCandidates")}</p>
+              <Link className="button gap-2" href="/jurisdictions">{t("app.formation.openJurisdictions")} <ArrowRight size={14} /></Link>
             </div>
           )}
         </form>
       ) : (
-        <p className="text-sm text-slate-500">You have read-only formation access.</p>
+        <p className="text-sm text-slate-500">{t("app.formation.readOnly")}</p>
       )}
 
       {message && !canManage ? <p role="status" className="text-sm text-rose-300">{message}</p> : null}
 
       {plans.length === 0 ? (
         <div className="rounded-lg border border-dashed border-white/10 p-10 text-center">
-          <h2 className="text-base font-medium text-white">No formation plans yet</h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-400">Plans appear here after a working jurisdiction is selected from a saved comparison.</p>
+          <h2 className="text-base font-medium text-white">{t("app.formation.noPlans")}</h2>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-400">{t("app.formation.noPlansDescription")}</p>
         </div>
       ) : plans.map((plan) => (
         <article key={plan.id} className="space-y-4 border-t border-white/10 pt-5">
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-white">{plan.clientName}</h2>
-              <p className="mt-1 text-sm text-slate-400">{plan.jurisdictionName} · Updated {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(plan.updatedAt))}</p>
+              <p className="mt-1 text-sm text-slate-400">{plan.jurisdictionName} · {t("app.formation.updated")} {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(plan.updatedAt))}</p>
             </div>
             <span className="status-badge status-info">{plan.status.replaceAll("_", " ")}</span>
           </header>
