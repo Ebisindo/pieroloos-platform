@@ -1,0 +1,9 @@
+-- PostgreSQL truncated these index names at 63 characters; align them with Prisma's expected names.
+ALTER INDEX "ClientPortalAuditEvent_organizationId_workspaceId_occurredAt_id"
+  RENAME TO "ClientPortalAuditEvent_organizationId_workspaceId_occurredA_idx";
+ALTER INDEX "ClientPortalGrant_organizationId_workspaceId_clientId_revokedAt"
+  RENAME TO "ClientPortalGrant_organizationId_workspaceId_clientId_revok_idx";
+ALTER INDEX "ClientPortalInteraction_clientId_resourceType_resourceId_create"
+  RENAME TO "ClientPortalInteraction_clientId_resourceType_resourceId_cr_idx";
+ALTER INDEX "ClientPortalInteraction_organizationId_workspaceId_clientId_cre"
+  RENAME TO "ClientPortalInteraction_organizationId_workspaceId_clientId_idx";

@@ -4,6 +4,7 @@ import {
   type ComparisonCriterion,
   type Jurisdiction,
 } from "@/lib/domain/jurisdiction";
+import { factorsRequireProfessionalReview } from "@/lib/domain/trust-boundary";
 
 export function compareJurisdiction(
   jurisdictions: Jurisdiction[],
@@ -27,8 +28,7 @@ export function compareJurisdiction(
       indicator,
       confidence: calculateConfidence(jurisdiction.factors),
       reviewRequired:
-        indicator === null ||
-        jurisdiction.factors.some((factor) => factor.reviewRequired),
+        indicator === null || factorsRequireProfessionalReview(jurisdiction.factors),
     };
   });
 }

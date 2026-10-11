@@ -29,6 +29,20 @@ export const systemNavigation = [
   { href: "/settings", label: "Settings", icon: Settings2 },
 ] as const;
 
+// Unauthenticated marketing routes; rendered without the workspace shell or boot splash.
+export const publicRoutes = ["/", "/partners"] as const;
+
+export function isPublicRoute(pathname: string): boolean {
+  return (publicRoutes as readonly string[]).includes(pathname);
+}
+
+export const publicNavigation = [
+  { href: "/#journey", label: "Journey" },
+  { href: "/#capabilities", label: "Capabilities" },
+  { href: "/#professionals", label: "Professionals" },
+  { href: "/partners", label: "Partners" },
+] as const;
+
 export const portalNavigation = [
   { href: "/portal", label: "Client Portal", icon: BriefcaseBusiness },
 ] as const;

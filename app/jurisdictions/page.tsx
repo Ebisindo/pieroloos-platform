@@ -1,6 +1,7 @@
 import { JurisdictionCard } from "@/components/jurisdiction/JurisdictionCard";
 import { JurisdictionLensWorkflow } from "@/components/jurisdiction/JurisdictionLensWorkflow";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
+import { TrustBoundaryNotice } from "@/components/evidence/TrustBoundaryNotice";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { jurisdictionRepository } from "@/lib/db/jurisdiction-repository";
 import { prisma } from "@/lib/db/prisma";
@@ -58,14 +59,7 @@ export default async function JurisdictionsPage() {
         </p>
       </header>
 
-      <div className="rounded-2xl border border-amber-300/10 bg-amber-300/[0.035] p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">
-          Decision-support boundary
-        </p>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          Analytical indicators are internal comparison outputs. They are not legal, tax, regulatory, banking or other professional conclusions.
-        </p>
-      </div>
+      <TrustBoundaryNotice heading="Decision-support boundary" />
 
       {!workspaceId ? (
         <div className="rounded-2xl border border-dashed border-white/10 bg-slate-900/40 p-8 text-sm text-slate-400">
