@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 import { BRAND_TAGLINE, BrandLogo } from "@/components/brand/BrandLogo";
 import { isPublicRoute } from "@/lib/navigation";
 
 export function BootLayer({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t } = useLocale();
   const [ready, setReady] = useState(false);
   const [hidden, setHidden] = useState(false);
 
@@ -40,7 +42,7 @@ export function BootLayer({ children }: { children: React.ReactNode }) {
           <div className="boot-tagline">{BRAND_TAGLINE}</div>
           <div className="boot-status">
             <span className="status-dot" />
-            {ready ? "SYSTEM READY" : "INITIALIZING SYSTEM"}
+            {ready ? t("boot.ready") : t("boot.initializing")}
           </div>
         </div>
       </div>

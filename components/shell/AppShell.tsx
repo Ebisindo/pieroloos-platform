@@ -124,7 +124,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ShieldCheck size={16} />
               <span>{t(isClientPortal ? "navigation.protectedClient" : "navigation.protectedWorkspace")}</span>
             </div>
-            <div className="avatar" aria-label="Current user">JE</div>
+            <div className="avatar" aria-label={t("navigation.currentUser")}>JE</div>
           </div>
         </header>
         <div className="workspace">{children}</div>

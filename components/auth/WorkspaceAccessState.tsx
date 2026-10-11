@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { getRequestTranslator } from "@/lib/i18n/request";
 
-export function WorkspaceAccessState({
+export async function WorkspaceAccessState({
   title,
   description,
   href,
@@ -11,9 +12,10 @@ export function WorkspaceAccessState({
   href?: string;
   action?: string;
 }) {
+  const t = await getRequestTranslator();
   return (
     <section className="glass-panel max-w-2xl p-7">
-      <p className="eyebrow">WORKSPACE ACCESS</p>
+      <p className="eyebrow">{t("access.eyebrow")}</p>
       <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="mt-3 text-sm leading-6 text-slate-400">{description}</p>
       {href && action ? (

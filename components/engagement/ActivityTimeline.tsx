@@ -1,3 +1,8 @@
+"use client";
+
+import { useLocale } from "@/components/i18n/LocaleProvider";
+import { formatDate } from "@/lib/i18n/messages";
+
 type Activity = {
   id: string;
   type: string;
@@ -7,10 +12,11 @@ type Activity = {
 };
 
 export function ActivityTimeline({ activities }: { activities: Activity[] }) {
+  const { locale, t } = useLocale();
   if (!activities.length) {
     return (
       <div className="rounded-2xl border border-dashed border-white/10 p-6 text-sm text-slate-500">
-        No activity has been recorded yet.
+        {t("engagements.activity.empty")}
       </div>
     );
   }
@@ -28,7 +34,7 @@ export function ActivityTimeline({ activities }: { activities: Activity[] }) {
               )}
             </div>
             <span className="text-[11px] uppercase tracking-wider text-slate-600">
-              {new Date(activity.createdAt).toLocaleString()}
+              {formatDate(new Date(activity.createdAt), locale, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })}
             </span>
           </div>
         </li>

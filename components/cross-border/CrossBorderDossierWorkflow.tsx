@@ -3,6 +3,8 @@
 import { Check, Plus, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 type ClientOption = { id: string; name: string };
 type JurisdictionOption = { id: string; name: string; country: string };
@@ -53,6 +55,7 @@ export function CrossBorderDossierWorkflow({
   canReview: boolean;
 }) {
   const router = useRouter();
+  const { t } = useLocale();
   const [busyId, setBusyId] = useState("");
   const [message, setMessage] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -67,7 +70,7 @@ export function CrossBorderDossierWorkflow({
       body: JSON.stringify(body),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error ?? "Unable to update cross-border dossier.");
+    if (!response.ok) throw new Error(result.error ?? t("crossBorder.error.update"));
   }
 
   async function submitForm(event: React.FormEvent<HTMLFormElement>) {
@@ -90,10 +93,10 @@ export function CrossBorderDossierWorkflow({
       });
       form.reset();
       setSelectedClientId("");
-      setMessage("Preparation dossier created.");
+      setMessage(t("crossBorder.created"));
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to create dossier.");
+      setMessage(error instanceof Error ? error.message : t("crossBorder.error.create"));
     } finally {
       setBusyId("");
     }
@@ -117,7 +120,7 @@ export function CrossBorderDossierWorkflow({
       setControlDocuments((current) => ({ ...current, [dossier.id]: "" }));
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to add control.");
+      setMessage(error instanceof Error ? error.message : t("crossBorder.error.addControl"));
     } finally {
       setBusyId("");
     }
@@ -126,7 +129,7 @@ export function CrossBorderDossierWorkflow({
   async function attachEvidence(dossier: Dossier, control: Control) {
     const documentId = controlDocuments[control.id];
     if (!documentId) {
-      setMessage("Select a document before attaching evidence.");
+      setMessage(t("crossBorder.selectDocument"));
       return;
     }
     setBusyId(dossier.id);
@@ -139,7 +142,7 @@ export function CrossBorderDossierWorkflow({
       setControlDocuments((current) => ({ ...current, [control.id]: "" }));
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to attach evidence.");
+      setMessage(error instanceof Error ? error.message : t("crossBorder.error.attach"));
     } finally {
       setBusyId("");
     }
@@ -155,7 +158,7 @@ export function CrossBorderDossierWorkflow({
       });
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to update control.");
+      setMessage(error instanceof Error ? error.message : t("crossBorder.error.updateControl"));
     } finally {
       setBusyId("");
     }
@@ -164,7 +167,7 @@ export function CrossBorderDossierWorkflow({
   async function reviewDossier(dossier: Dossier, status: "REVIEWED" | "CHANGES_REQUESTED") {
     const note = reviewNotes[dossier.id]?.trim();
     if (!note) {
-      setMessage("Add a professional review note before recording an outcome.");
+      setMessage(t("crossBorder.reviewNoteRequired"));
       return;
     }
     setBusyId(dossier.id);
@@ -177,7 +180,7 @@ export function CrossBorderDossierWorkflow({
       });
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to record review.");
+      setMessage(error instanceof Error ? error.message : t("crossBorder.error.review"));
     } finally {
       setBusyId("");
     }
@@ -188,60 +191,60 @@ export function CrossBorderDossierWorkflow({
       {canManage ? (
         <details className="glass-panel p-5">
           <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-white">
-            <Plus size={16} aria-hidden="true" /> Create preparation dossier
+            <Plus size={16} aria-hidden="true" /> {t("crossBorder.create.summary")}
           </summary>
           <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={submitForm}>
             <label className="space-y-2 text-sm text-slate-300">
-              <span>Client</span>
+              <span>{t("crossBorder.create.client")}</span>
               <select className="form-input" name="clientId" required value={selectedClientId} onChange={(event) => setSelectedClientId(event.target.value)}>
-                <option value="">Select a client</option>
-                {clients.map((client) => <option key={client.id} value={client.id}>{client.name || "Unnamed client"}</option>)}
+                <option value="">{t("crossBorder.create.selectClient")}</option>
+                {clients.map((client) => <option key={client.id} value={client.id}>{client.name || t("crossBorder.create.unnamedClient")}</option>)}
               </select>
             </label>
             <label className="space-y-2 text-sm text-slate-300">
-              <span>Related market-entry pathway (optional)</span>
+              <span>{t("crossBorder.create.pathway")}</span>
               <select className="form-input" name="marketEntryPlanId" defaultValue="">
-                <option value="">No linked pathway</option>
+                <option value="">{t("crossBorder.create.noPathway")}</option>
                 {marketEntryPlans.filter((plan) => plan.clientId === selectedClientId).map((plan) => <option key={plan.id} value={plan.id}>{plan.label}</option>)}
               </select>
             </label>
             <label className="space-y-2 text-sm text-slate-300">
-              <span>Origin jurisdiction</span>
+              <span>{t("crossBorder.create.origin")}</span>
               <select className="form-input" name="originJurisdictionId" required defaultValue="">
-                <option value="">Select origin</option>
+                <option value="">{t("crossBorder.create.selectOrigin")}</option>
                 {jurisdictions.map((jurisdiction) => <option key={jurisdiction.id} value={jurisdiction.id}>{jurisdiction.name}, {jurisdiction.country}</option>)}
               </select>
             </label>
             <label className="space-y-2 text-sm text-slate-300">
-              <span>Destination jurisdiction</span>
+              <span>{t("crossBorder.create.destination")}</span>
               <select className="form-input" name="destinationJurisdictionId" required defaultValue="">
-                <option value="">Select destination</option>
+                <option value="">{t("crossBorder.create.selectDestination")}</option>
                 {jurisdictions.map((jurisdiction) => <option key={jurisdiction.id} value={jurisdiction.id}>{jurisdiction.name}, {jurisdiction.country}</option>)}
               </select>
             </label>
             <label className="space-y-2 text-sm text-slate-300">
-              <span>Counterparty name</span>
+              <span>{t("crossBorder.create.counterparty")}</span>
               <input className="form-input" name="counterpartyName" required minLength={2} maxLength={240} />
             </label>
             <label className="space-y-2 text-sm text-slate-300">
-              <span>Counterparty country (user-provided)</span>
+              <span>{t("crossBorder.create.counterpartyCountry")}</span>
               <input className="form-input" name="counterpartyCountry" maxLength={120} />
             </label>
             <label className="space-y-2 text-sm text-slate-300 sm:col-span-2">
-              <span>Goods, services, or activity being prepared</span>
+              <span>{t("crossBorder.create.activity")}</span>
               <textarea className="form-input min-h-20" name="activityDescription" required minLength={10} maxLength={4000} />
             </label>
             <label className="space-y-2 text-sm text-slate-300">
-              <span>Currency code (optional)</span>
+              <span>{t("crossBorder.create.currency")}</span>
               <input className="form-input" name="currencyCode" maxLength={3} pattern="[A-Za-z]{3}" />
             </label>
             <label className="space-y-2 text-sm text-slate-300">
-              <span>Estimated value (optional)</span>
+              <span>{t("crossBorder.create.value")}</span>
               <input className="form-input" name="estimatedValue" inputMode="decimal" pattern="[0-9]+(\.[0-9]{1,2})?" />
             </label>
             <div className="flex items-center justify-between gap-3 sm:col-span-2">
               <p role="status" className="text-sm text-slate-400">{message}</p>
-              <button className="button gap-2" disabled={busyId === "create"}><Check size={15} /> Create dossier</button>
+              <button className="button gap-2" disabled={busyId === "create"}><Check size={15} /> {t("crossBorder.create.submit")}</button>
             </div>
           </form>
         </details>
@@ -249,71 +252,71 @@ export function CrossBorderDossierWorkflow({
 
       {message && !canManage ? <p role="status" className="text-sm text-rose-300">{message}</p> : null}
       {!dossiers.length ? (
-        <div className="rounded-lg border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">No cross-border preparation dossiers have been created.</div>
+        <div className="rounded-lg border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">{t("crossBorder.list.empty")}</div>
       ) : (
         <div className="space-y-4">
           {dossiers.map((dossier) => (
             <article key={dossier.id} className="glass-panel space-y-4 p-5">
               <header className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-white">{dossier.clientName || "Client"} · {dossier.origin.country} → {dossier.destination.country}</h2>
+                  <h2 className="text-base font-semibold text-white">{dossier.clientName || t("crossBorder.dossier.clientFallback")} · {dossier.origin.country} → {dossier.destination.country}</h2>
                   <p className="mt-1 text-sm text-slate-400">{dossier.counterpartyName}{dossier.counterpartyCountry ? ` · ${dossier.counterpartyCountry}` : ""}</p>
                 </div>
-                <span className="status-badge status-info">{dossier.status.replaceAll("_", " ")}</span>
+                <span className="status-badge status-info">{t(`crossBorder.status.${dossier.status}` as MessageKey)}</span>
               </header>
               <p className="text-sm text-slate-300">{dossier.activityDescription}</p>
               <p className="text-xs text-slate-500">
-                {dossier.currencyCode ? `${dossier.currencyCode} ` : ""}{dossier.estimatedValue ?? "Value not recorded"} · Version {dossier.version}
+                {dossier.currencyCode ? `${dossier.currencyCode} ` : ""}{dossier.estimatedValue ?? t("crossBorder.dossier.valueNotRecorded")} · {t("crossBorder.dossier.version", { version: dossier.version })}
               </p>
-              {dossier.reviewNote ? <p className="text-sm text-amber-200">Review note: {dossier.reviewNote}</p> : null}
+              {dossier.reviewNote ? <p className="text-sm text-amber-200">{t("crossBorder.dossier.reviewNote", { note: dossier.reviewNote })}</p> : null}
 
               <div className="space-y-3 border-t border-white/10 pt-4">
-                <h3 className="text-sm font-medium text-white">Preparation controls ({dossier.controls.length})</h3>
+                <h3 className="text-sm font-medium text-white">{t("crossBorder.controls.title", { count: dossier.controls.length })}</h3>
                 {dossier.controls.map((control) => (
                   <div key={control.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 p-3">
                     <div className="min-w-48 flex-1">
                       <p className="text-sm text-white">{control.title}</p>
-                      <p className="text-xs text-slate-400">{control.category}{control.requiresEvidence ? " · Evidence required" : ""}</p>
+                      <p className="text-xs text-slate-400">{control.category}{control.requiresEvidence ? ` · ${t("crossBorder.controls.evidenceRequired")}` : ""}</p>
                     </div>
                     <span className="text-xs text-slate-400">
-                      {control.evidence.map((item) => item.document.name).join(", ") || (control.requiresEvidence ? "Evidence missing" : "No evidence linked")}
+                      {control.evidence.map((item) => item.document.name).join(", ") || (control.requiresEvidence ? t("crossBorder.controls.evidenceMissing") : t("crossBorder.controls.noEvidence"))}
                     </span>
                     {canManage && control.requiresEvidence && !["REVIEWED", "ARCHIVED"].includes(dossier.status) ? (
                       <>
-                        <select className="form-input min-h-10 sm:w-56" value={controlDocuments[control.id] ?? ""} onChange={(event) => setControlDocuments((current) => ({ ...current, [control.id]: event.target.value }))}>
-                          <option value="">Select client document</option>
+                        <select aria-label={t("crossBorder.controls.selectDocument")} className="form-input min-h-10 sm:w-56" value={controlDocuments[control.id] ?? ""} onChange={(event) => setControlDocuments((current) => ({ ...current, [control.id]: event.target.value }))}>
+                          <option value="">{t("crossBorder.controls.selectDocument")}</option>
                           {documents.filter((document) => document.clientId === dossier.clientId).map((document) => <option key={document.id} value={document.id}>{document.name}</option>)}
                         </select>
-                        <button className="icon-button" type="button" disabled={busyId === dossier.id || !controlDocuments[control.id]} onClick={() => attachEvidence(dossier, control)}>Attach evidence</button>
+                        <button className="icon-button" type="button" disabled={busyId === dossier.id || !controlDocuments[control.id]} onClick={() => attachEvidence(dossier, control)}>{t("crossBorder.controls.attach")}</button>
                       </>
                     ) : null}
                     {canManage && !["REVIEWED", "ARCHIVED"].includes(dossier.status) ? (
-                      <select className="form-input min-h-10 sm:w-48" value={control.status} disabled={busyId === dossier.id} onChange={(event) => updateControl(dossier, control, event.target.value)}>
-                        {["NOT_ASSESSED", "IN_PROGRESS", "COMPLETE", "NOT_APPLICABLE"].map((status) => <option key={status} value={status} disabled={status === "NOT_ASSESSED"}>{status.replaceAll("_", " ")}</option>)}
+                      <select aria-label={t("crossBorder.controls.statusLabel")} className="form-input min-h-10 sm:w-48" value={control.status} disabled={busyId === dossier.id} onChange={(event) => updateControl(dossier, control, event.target.value)}>
+                        {["NOT_ASSESSED", "IN_PROGRESS", "COMPLETE", "NOT_APPLICABLE"].map((status) => <option key={status} value={status} disabled={status === "NOT_ASSESSED"}>{t(`crossBorder.controlStatus.${status}` as MessageKey)}</option>)}
                       </select>
-                    ) : <span className="status-badge status-info">{control.status.replaceAll("_", " ")}</span>}
+                    ) : <span className="status-badge status-info">{t(`crossBorder.controlStatus.${control.status}` as MessageKey)}</span>}
                   </div>
                 ))}
                 {canManage && !["REVIEWED", "ARCHIVED"].includes(dossier.status) ? (
                   <form className="grid gap-2 sm:grid-cols-2" onSubmit={(event) => addControl(event, dossier)}>
-                    <input className="form-input" name="category" placeholder="Category (e.g. documentation)" required minLength={2} maxLength={100} />
-                    <input className="form-input" name="title" placeholder="User-defined control" required minLength={2} maxLength={240} />
-                    <input className="form-input sm:col-span-2" name="description" placeholder="Notes or professional source reference (optional)" maxLength={2000} />
+                    <input className="form-input" name="category" placeholder={t("crossBorder.controls.categoryPlaceholder")} required minLength={2} maxLength={100} />
+                    <input className="form-input" name="title" placeholder={t("crossBorder.controls.titlePlaceholder")} required minLength={2} maxLength={240} />
+                    <input className="form-input sm:col-span-2" name="description" placeholder={t("crossBorder.controls.descriptionPlaceholder")} maxLength={2000} />
                     <label className="flex items-center gap-2 text-sm text-slate-300">
                       <input name="requiresEvidence" type="checkbox" className="accent-[#d6b66a]" />
-                      Evidence required
+                      {t("crossBorder.controls.evidenceRequired")}
                     </label>
-                    <button className="button gap-2 sm:col-span-2" disabled={busyId === dossier.id}><Plus size={14} /> Add control</button>
+                    <button className="button gap-2 sm:col-span-2" disabled={busyId === dossier.id}><Plus size={14} /> {t("crossBorder.controls.add")}</button>
                   </form>
                 ) : null}
               </div>
 
               {canReview && !["REVIEWED", "ARCHIVED"].includes(dossier.status) ? (
                 <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
-                  <label className="sr-only" htmlFor={`review-${dossier.id}`}>Professional review note</label>
-                  <input id={`review-${dossier.id}`} className="form-input min-h-10 flex-1" value={reviewNotes[dossier.id] ?? ""} onChange={(event) => setReviewNotes((current) => ({ ...current, [dossier.id]: event.target.value }))} placeholder="Professional review note" maxLength={4000} />
-                  <button className="button gap-2" disabled={busyId === dossier.id} onClick={() => reviewDossier(dossier, "REVIEWED")}><ShieldCheck size={14} /> Record review</button>
-                  <button className="icon-button" disabled={busyId === dossier.id} onClick={() => reviewDossier(dossier, "CHANGES_REQUESTED")}>Request changes</button>
+                  <label className="sr-only" htmlFor={`review-${dossier.id}`}>{t("crossBorder.review.noteLabel")}</label>
+                  <input id={`review-${dossier.id}`} className="form-input min-h-10 flex-1" value={reviewNotes[dossier.id] ?? ""} onChange={(event) => setReviewNotes((current) => ({ ...current, [dossier.id]: event.target.value }))} placeholder={t("crossBorder.review.noteLabel")} maxLength={4000} />
+                  <button className="button gap-2" disabled={busyId === dossier.id} onClick={() => reviewDossier(dossier, "REVIEWED")}><ShieldCheck size={14} /> {t("crossBorder.review.record")}</button>
+                  <button className="icon-button" disabled={busyId === dossier.id} onClick={() => reviewDossier(dossier, "CHANGES_REQUESTED")}>{t("crossBorder.review.requestChanges")}</button>
                 </div>
               ) : null}
             </article>

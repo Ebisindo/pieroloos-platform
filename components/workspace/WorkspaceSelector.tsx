@@ -2,10 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 import type { AccessibleWorkspace } from "@/lib/auth/workspace-context";
 
 export function WorkspaceSelector({ workspaces }: { workspaces: AccessibleWorkspace[] }) {
   const router = useRouter();
+  const { t } = useLocale();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
@@ -18,10 +20,10 @@ export function WorkspaceSelector({ workspaces }: { workspaces: AccessibleWorksp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workspaceId }),
       });
-      if (!response.ok) throw new Error("Workspace selection could not be saved.");
+      if (!response.ok) throw new Error(t("workspace.saveError"));
       router.refresh();
     } catch (selectionError) {
-      setError(selectionError instanceof Error ? selectionError.message : "Selection failed.");
+      setError(selectionError instanceof Error ? selectionError.message : t("workspace.selectionFailed"));
     } finally {
       setPending(false);
     }
@@ -30,7 +32,7 @@ export function WorkspaceSelector({ workspaces }: { workspaces: AccessibleWorksp
   return (
     <div className="glass-panel max-w-2xl p-6">
       <label className="block text-sm font-medium" htmlFor="active-workspace">
-        Active workspace
+        {t("workspace.active")}
       </label>
       <select
         id="active-workspace"
@@ -39,7 +41,7 @@ export function WorkspaceSelector({ workspaces }: { workspaces: AccessibleWorksp
         disabled={pending}
         onChange={(event) => void selectWorkspace(event.target.value)}
       >
-        <option value="" disabled>Select a workspace</option>
+        <option value="" disabled>{t("workspace.select")}</option>
         {workspaces.map((workspace) => (
           <option key={workspace.id} value={workspace.id}>
             {workspace.name} · {workspace.role}

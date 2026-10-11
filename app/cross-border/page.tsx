@@ -1,3 +1,4 @@
+import { getRequestTranslator } from "@/lib/i18n/request";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { CrossBorderDossierWorkflow } from "@/components/cross-border/CrossBorderDossierWorkflow";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -5,22 +6,23 @@ import { prisma } from "@/lib/db/prisma";
 import { listDocuments } from "@/lib/services/document-storage-service";
 
 export default async function CrossBorderPage() {
+  const t = await getRequestTranslator();
   const context = await getWorkspaceContext();
   if (!context.userId) {
     return (
       <WorkspaceAccessState
-        title="Sign in to prepare cross-border activity"
-        description="Transaction preparation dossiers are available to authenticated workspace members."
+        title={t("crossBorder.signInTitle")}
+        description={t("crossBorder.signInDescription")}
         href="/signin?callbackUrl=/cross-border"
-        action="Sign in"
+        action={t("access.signIn")}
       />
     );
   }
   if (!context.principal || !context.activeWorkspace) {
-    return <WorkspaceAccessState title="Workspace selection required" description="Select a workspace to prepare cross-border activity." />;
+    return <WorkspaceAccessState title={t("access.workspaceRequired")} description={t("crossBorder.selectWorkspace")} />;
   }
   if (!context.principal.permissions.includes("compliance:read")) {
-    return <WorkspaceAccessState title="Cross-border preparation access required" description="Your role cannot view workspace transaction dossiers." />;
+    return <WorkspaceAccessState title={t("crossBorder.accessTitle")} description={t("crossBorder.accessDescription")} />;
   }
 
   const workspaceId = context.principal.workspaceId;
@@ -65,14 +67,14 @@ export default async function CrossBorderPage() {
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <p className="eyebrow">INTERNATIONAL OPERATIONS</p>
-          <h1>Cross-border preparation</h1>
-          <p>Organize a transaction context, user-defined controls, linked evidence, and internal professional review.</p>
+          <p className="eyebrow">{t("crossBorder.eyebrow")}</p>
+          <h1>{t("crossBorder.title")}</h1>
+          <p>{t("crossBorder.description")}</p>
         </div>
         <span className="status-badge status-info">{context.activeWorkspace.name}</span>
       </header>
       <aside className="rounded-lg border border-amber-300/10 bg-amber-300/[0.035] p-5 text-sm leading-6 text-slate-400">
-        These dossiers are internal preparation records. They do not execute payments, clear goods, assess sanctions or export controls, confirm counterparty standing, or replace advice from qualified professionals and authorities.
+        {t("crossBorder.boundary")}
       </aside>
       <CrossBorderDossierWorkflow
         dossiers={dossiers.map((dossier) => ({
@@ -94,7 +96,7 @@ export default async function CrossBorderPage() {
           id: plan.id,
           clientId: plan.businessProfile.clientId,
           targetJurisdictionId: plan.targetJurisdiction.id,
-          label: `${plan.businessProfile.businessName || "Business"} · ${plan.targetJurisdiction.name}, ${plan.targetJurisdiction.country}`,
+          label: `${plan.businessProfile.businessName || t("crossBorder.businessFallback")} · ${plan.targetJurisdiction.name}, ${plan.targetJurisdiction.country}`,
         }))}
         canManage={context.principal.permissions.includes("compliance:write")}
         canReview={context.principal.permissions.includes("documents:review")}

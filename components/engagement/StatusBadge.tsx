@@ -1,3 +1,6 @@
+"use client";
+
+import { useLocale } from "@/components/i18n/LocaleProvider";
 import type { EngagementStatus } from "@/lib/domain/engagement";
 
 const styles: Record<EngagementStatus, string> = {
@@ -17,9 +20,10 @@ const styles: Record<EngagementStatus, string> = {
 };
 
 export function StatusBadge({ status }: { status: EngagementStatus }) {
+  const { t } = useLocale();
   return (
     <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-wide ${styles[status]}`}>
-      {status}
+      {t(`engagements.status.${status}`)}
     </span>
   );
 }

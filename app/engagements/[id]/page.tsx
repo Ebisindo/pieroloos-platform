@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { getRequestTranslator } from "@/lib/i18n/request";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { engagementRepository } from "@/lib/db/engagement-repository";
 import { StatusBadge } from "@/components/engagement/StatusBadge";
@@ -11,6 +12,7 @@ type BusinessProfileData = {
 };
 
 export default async function EngagementPage({ params }: Props) {
+  const t = await getRequestTranslator();
   const workspaceContext = await getWorkspaceContext();
   if (!workspaceContext.userId) redirect("/signin");
   if (!workspaceContext.principal?.permissions.includes("engagement:read")) notFound();
@@ -30,7 +32,7 @@ export default async function EngagementPage({ params }: Props) {
     <div className="space-y-7">
       <header>
         <p className="text-xs uppercase tracking-[0.24em] text-cyan-300/70">
-          Engagement Operations
+          {t("engagements.detail.eyebrow")}
         </p>
         <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -48,10 +50,10 @@ export default async function EngagementPage({ params }: Props) {
       <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
         <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
           <p className="text-xs uppercase tracking-[0.2em] text-violet-300/70">
-            Operational History
+            {t("engagements.detail.historyEyebrow")}
           </p>
           <h2 className="mt-2 text-lg font-semibold text-white">
-            Activity Timeline
+            {t("engagements.detail.timelineTitle")}
           </h2>
           <div className="mt-6">
             <ActivityTimeline
@@ -69,19 +71,19 @@ export default async function EngagementPage({ params }: Props) {
         <aside className="space-y-6">
           <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
             <p className="text-xs uppercase tracking-[0.2em] text-amber-300/70">
-              Next Action
+              {t("engagements.detail.nextAction")}
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              {engagement.nextAction || "No next action has been defined."}
+              {engagement.nextAction || t("engagements.detail.noNextAction")}
             </p>
           </section>
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
             <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">
-              Business Context
+              {t("engagements.detail.context")}
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              {profileData.businessName || "Business profile not yet named."}
+              {profileData.businessName || t("engagements.detail.unnamedProfile")}
             </p>
           </section>
         </aside>

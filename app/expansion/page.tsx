@@ -1,3 +1,4 @@
+import { getRequestTranslator } from "@/lib/i18n/request";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { MarketEntryWorkflow } from "@/components/market-entry/MarketEntryWorkflow";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -14,22 +15,23 @@ function candidateIdsFromJson(value: string): string[] {
 }
 
 export default async function ExpansionPage() {
+  const t = await getRequestTranslator();
   const context = await getWorkspaceContext();
   if (!context.userId) {
     return (
       <WorkspaceAccessState
-        title="Sign in to plan market expansion"
-        description="Market-entry pathways are available to authenticated workspace members."
+        title={t("expansion.signInTitle")}
+        description={t("expansion.signInDescription")}
         href="/signin?callbackUrl=/expansion"
-        action="Sign in"
+        action={t("access.signIn")}
       />
     );
   }
   if (!context.principal || !context.activeWorkspace) {
-    return <WorkspaceAccessState title="Workspace selection required" description="Select a workspace to plan market expansion." />;
+    return <WorkspaceAccessState title={t("access.workspaceRequired")} description={t("expansion.selectWorkspace")} />;
   }
   if (!context.principal.permissions.includes("jurisdictions:read")) {
-    return <WorkspaceAccessState title="Market-entry access required" description="Your workspace role cannot view market-entry pathways." />;
+    return <WorkspaceAccessState title={t("expansion.accessTitle")} description={t("expansion.accessDescription")} />;
   }
 
   const workspaceId = context.principal.workspaceId;
@@ -97,7 +99,7 @@ export default async function ExpansionPage() {
       || client.organizationName
       || client.name
       || [client.firstName, client.lastName].filter(Boolean).join(" ")
-      || "Business profile";
+      || t("marketEntry.plan.businessFallback");
     const candidates = candidateIdsFromJson(comparison.jurisdictionIdsJson)
       .flatMap((id) => {
         const jurisdiction = jurisdictionById.get(id);
@@ -134,14 +136,14 @@ export default async function ExpansionPage() {
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <p className="eyebrow">INTERNATIONAL EXPANSION</p>
-          <h1>Market-entry pathways</h1>
-          <p>Connect saved jurisdiction comparisons to formalization, recorded obligations, evidence coverage, and professional review.</p>
+          <p className="eyebrow">{t("expansion.eyebrow")}</p>
+          <h1>{t("expansion.title")}</h1>
+          <p>{t("expansion.description")}</p>
         </div>
         <span className="status-badge status-info">{context.activeWorkspace.name}</span>
       </header>
       <aside className="rounded-lg border border-amber-300/10 bg-amber-300/[0.035] p-5 text-sm leading-6 text-slate-400">
-        This workspace tracks preparation and review. It does not determine market suitability or confirm legal, tax, regulatory, licensing, banking, or transaction readiness.
+        {t("expansion.boundary")}
       </aside>
       <MarketEntryWorkflow
         comparisons={comparisons}

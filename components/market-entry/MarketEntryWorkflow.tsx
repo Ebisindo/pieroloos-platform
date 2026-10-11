@@ -3,6 +3,8 @@
 import { ArrowRight, Globe2, RefreshCw, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale } from "@/components/i18n/LocaleProvider";
+import { formatDate, type MessageKey } from "@/lib/i18n/messages";
 import type { MarketEntryReviewStatus, MarketEntryStatus, MarketReadiness } from "@/lib/domain/market-entry";
 
 type CandidateJurisdiction = { id: string; name: string; country: string; countryCode: string | null };
@@ -33,20 +35,6 @@ type MarketEntryPlanView = {
   readinessAssessments: Array<{ id: string; status: MarketReadiness["status"]; planVersion: number; resultJson: MarketReadiness; assessedAt: string }>;
 };
 
-const statusLabel: Record<MarketEntryStatus, string> = {
-  ASSESSING: "Assessing",
-  IN_PROGRESS: "In progress",
-  PAUSED: "Paused",
-  COMPLETED: "Completed",
-};
-
-const readinessLabel: Record<MarketReadiness["status"], string> = {
-  PREPARATION_INCOMPLETE: "Preparation incomplete",
-  READY_FOR_REVIEW: "Ready for professional review",
-  REVIEW_RECORDED: "Review recorded",
-  CHANGES_REQUESTED: "Changes requested",
-};
-
 const checkTone: Record<string, string> = {
   COMPLETE: "status-success",
   IN_PROGRESS: "status-info",
@@ -72,6 +60,8 @@ export function MarketEntryWorkflow({
   canReview: boolean;
 }) {
   const router = useRouter();
+  const { locale, t } = useLocale();
+  const dateTime = (value: string) => formatDate(new Date(value), locale, { dateStyle: "medium", timeStyle: "short" });
   const [comparisonId, setComparisonId] = useState("");
   const [targetJurisdictionId, setTargetJurisdictionId] = useState("");
   const [formationPlanId, setFormationPlanId] = useState("");
@@ -99,11 +89,11 @@ export function MarketEntryWorkflow({
         body: JSON.stringify(body),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Unable to update market-entry pathway.");
+      if (!response.ok) throw new Error(result.error ?? t("marketEntry.updateError"));
       router.refresh();
       return result.data;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to update market-entry pathway.");
+      setError(cause instanceof Error ? cause.message : t("marketEntry.updateError"));
       return null;
     } finally {
       setBusyId("");
@@ -138,7 +128,7 @@ export function MarketEntryWorkflow({
   async function reviewPlan(plan: MarketEntryPlanView, reviewStatus: "APPROVED" | "CHANGES_REQUESTED") {
     const note = reviewNotes[plan.id]?.trim();
     if (!note) {
-      setError("Add a review note before recording the professional review.");
+      setError(t("marketEntry.reviewNoteRequired"));
       return;
     }
     await submit(`/api/market-entry/${plan.id}/review`, {
@@ -165,15 +155,15 @@ export function MarketEntryWorkflow({
         <section className="glass-panel space-y-4 p-5" aria-labelledby="create-market-entry">
           <header className="section-header">
             <div>
-              <h2 id="create-market-entry">Create a target-market pathway</h2>
-              <p>Start from a saved, workspace-scoped comparison so the decision context remains traceable.</p>
+              <h2 id="create-market-entry">{t("marketEntry.create.title")}</h2>
+              <p>{t("marketEntry.create.description")}</p>
             </div>
             <Globe2 size={19} aria-hidden="true" className="text-cyan-200" />
           </header>
           {comparisons.length ? (
             <form className="grid gap-4 sm:grid-cols-2" onSubmit={createPathway}>
               <label className="space-y-2 text-sm text-slate-300">
-                <span>Business profile and comparison</span>
+                <span>{t("marketEntry.create.comparison")}</span>
                 <select
                   className="form-input"
                   required
@@ -184,16 +174,16 @@ export function MarketEntryWorkflow({
                     setFormationPlanId("");
                   }}
                 >
-                  <option value="" disabled>Select a saved comparison</option>
+                  <option value="" disabled>{t("marketEntry.create.comparisonPlaceholder")}</option>
                   {comparisons.map((option) => (
                     <option key={option.id} value={option.id}>
-                      {option.businessName} · {new Date(option.createdAt).toLocaleDateString()}
+                      {option.businessName} · {formatDate(new Date(option.createdAt), locale, { dateStyle: "medium" })}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="space-y-2 text-sm text-slate-300">
-                <span>Target market jurisdiction</span>
+                <span>{t("marketEntry.create.target")}</span>
                 <select
                   className="form-input"
                   required
@@ -204,7 +194,7 @@ export function MarketEntryWorkflow({
                     setFormationPlanId("");
                   }}
                 >
-                  <option value="" disabled>Select a compared jurisdiction</option>
+                  <option value="" disabled>{t("marketEntry.create.targetPlaceholder")}</option>
                   {comparison?.jurisdictions.map((jurisdiction) => (
                     <option key={jurisdiction.id} value={jurisdiction.id}>
                       {jurisdiction.name} · {jurisdiction.country}
@@ -213,21 +203,21 @@ export function MarketEntryWorkflow({
                 </select>
               </label>
               <label className="space-y-2 text-sm text-slate-300 sm:col-span-2">
-                <span>Existing formation plan (optional)</span>
+                <span>{t("marketEntry.create.formationPlan")}</span>
                 <select
                   className="form-input"
                   value={formationPlanId}
                   disabled={!targetJurisdictionId || !formationChoices.length}
                   onChange={(event) => setFormationPlanId(event.target.value)}
                 >
-                  <option value="">Link a formation plan when available</option>
+                  <option value="">{t("marketEntry.create.formationPlanPlaceholder")}</option>
                   {formationChoices.map((plan) => (
                     <option key={plan.id} value={plan.id}>{plan.status} · {plan.id}</option>
                   ))}
                 </select>
               </label>
               <label className="space-y-2 text-sm text-slate-300 sm:col-span-2">
-                <span>Business rationale</span>
+                <span>{t("marketEntry.create.rationale")}</span>
                 <textarea
                   className="form-input"
                   required
@@ -236,15 +226,15 @@ export function MarketEntryWorkflow({
                   rows={3}
                   value={rationale}
                   onChange={(event) => setRationale(event.target.value)}
-                  placeholder="Record the commercial objective and assumptions to review."
+                  placeholder={t("marketEntry.create.rationalePlaceholder")}
                 />
               </label>
               <button className="button button-primary gap-2 sm:col-span-2 sm:justify-self-start" type="submit" disabled={busyId === "new" || !targetJurisdictionId}>
-                Create pathway <ArrowRight size={15} aria-hidden="true" />
+                {t("marketEntry.create.submit")} <ArrowRight size={15} aria-hidden="true" />
               </button>
             </form>
           ) : (
-            <p className="text-sm text-slate-400">Save a jurisdiction comparison linked to a business profile before creating a pathway.</p>
+            <p className="text-sm text-slate-400">{t("marketEntry.create.noComparisons")}</p>
           )}
         </section>
       ) : null}
@@ -252,19 +242,19 @@ export function MarketEntryWorkflow({
       <section className="space-y-4" aria-labelledby="market-entry-pathways">
         <header className="section-header">
           <div>
-            <h2 id="market-entry-pathways">Expansion pathways</h2>
-            <p>Traceable workstreams across candidate jurisdictions, formalization, obligations, evidence, and review.</p>
+            <h2 id="market-entry-pathways">{t("marketEntry.list.title")}</h2>
+            <p>{t("marketEntry.list.description")}</p>
           </div>
         </header>
         {!plans.length ? (
-          <div className="glass-panel p-6 text-sm text-slate-400">No target-market pathways have been created for this workspace.</div>
+          <div className="glass-panel p-6 text-sm text-slate-400">{t("marketEntry.list.empty")}</div>
         ) : plans.map((plan) => {
           const client = plan.businessProfile.client;
           const businessName = plan.businessProfile.businessName
             || client.organizationName
             || client.name
             || [client.firstName, client.lastName].filter(Boolean).join(" ")
-            || "Business profile";
+            || t("marketEntry.plan.businessFallback");
           const latest = plan.readinessAssessments[0];
           const latestAssessmentIsCurrent = Boolean(latest && (
             latest.planVersion === plan.version
@@ -284,19 +274,19 @@ export function MarketEntryWorkflow({
                   <p className="mt-2 max-w-3xl whitespace-pre-wrap text-sm leading-6 text-slate-400">{plan.rationale}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <span className="status-badge status-info">{statusLabel[plan.status]}</span>
+                  <span className="status-badge status-info">{t(`marketEntry.status.${plan.status}`)}</span>
                   <span className={plan.reviewStatus === "APPROVED" ? "status-badge status-success" : "status-badge status-warning"}>
-                    Review {plan.reviewStatus.replaceAll("_", " ").toLowerCase()}
+                    {t(`marketEntry.reviewStatus.${plan.reviewStatus}`)}
                   </span>
                 </div>
               </header>
 
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                <span>Formation {plan.formationPlan?.status ?? "not linked"}</span>
+                <span>{t("marketEntry.plan.formation", { status: plan.formationPlan?.status ?? t("marketEntry.plan.notLinked") })}</span>
                 <span aria-hidden="true">·</span>
-                <span>Updated {new Date(plan.updatedAt).toLocaleString()}</span>
+                <span>{t("marketEntry.plan.updated", { date: dateTime(plan.updatedAt) })}</span>
                 <span aria-hidden="true">·</span>
-                <span>Version {plan.version}</span>
+                <span>{t("marketEntry.plan.version", { version: plan.version })}</span>
               </div>
               {!plan.formationPlan && canLinkFormation && ["ASSESSING", "PAUSED"].includes(plan.status) ? (
                 <form
@@ -306,7 +296,7 @@ export function MarketEntryWorkflow({
                     void linkFormationPlan(plan);
                   }}
                 >
-                  <label htmlFor={`formation-${plan.id}`}>Link existing formation plan</label>
+                  <label htmlFor={`formation-${plan.id}`}>{t("marketEntry.plan.linkExisting")}</label>
                   <select
                     id={`formation-${plan.id}`}
                     className="form-input"
@@ -314,7 +304,7 @@ export function MarketEntryWorkflow({
                     disabled={busyId === plan.id}
                     onChange={(event) => setSelectedFormationPlans((current) => ({ ...current, [plan.id]: event.target.value }))}
                   >
-                    <option value="">Select matching plan</option>
+                    <option value="">{t("marketEntry.plan.selectMatching")}</option>
                     {formationPlans.filter((candidate) =>
                       candidate.businessProfileId === plan.businessProfileId
                       && candidate.jurisdictionId === plan.targetJurisdictionId,
@@ -322,19 +312,19 @@ export function MarketEntryWorkflow({
                       <option key={candidate.id} value={candidate.id}>{candidate.status} · {candidate.id}</option>
                     ))}
                   </select>
-                  <button className="button" type="submit" disabled={busyId === plan.id || !selectedFormationPlans[plan.id]}>Link plan</button>
+                  <button className="button" type="submit" disabled={busyId === plan.id || !selectedFormationPlans[plan.id]}>{t("marketEntry.plan.link")}</button>
                 </form>
               ) : null}
 
               {latest ? (
-                <section className="space-y-3 border-t border-white/10 pt-4" aria-label="Latest market preparation assessment">
+                <section className="space-y-3 border-t border-white/10 pt-4" aria-label={t("marketEntry.assessment.label")}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h4 className="text-sm font-semibold text-white">{readinessLabel[latest.resultJson.status]}</h4>
-                      <p className="mt-1 text-xs text-slate-500">Assessed {new Date(latest.assessedAt).toLocaleString()}</p>
+                      <h4 className="text-sm font-semibold text-white">{t(`marketEntry.readiness.${latest.resultJson.status}`)}</h4>
+                      <p className="mt-1 text-xs text-slate-500">{t("marketEntry.assessment.assessed", { date: dateTime(latest.assessedAt) })}</p>
                     </div>
                     <span className={`status-badge ${latestAssessmentIsCurrent ? "status-neutral" : "status-warning"}`}>
-                      {latestAssessmentIsCurrent ? "Current pathway version" : "Reassessment required"}
+                      {latestAssessmentIsCurrent ? t("marketEntry.assessment.current") : t("marketEntry.assessment.reassess")}
                     </span>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
@@ -342,17 +332,17 @@ export function MarketEntryWorkflow({
                       <div className="rounded-lg border border-white/5 bg-black/10 p-3" key={check.key}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <h5 className="text-xs font-semibold text-slate-200">{check.title}</h5>
-                          <span className={`status-badge ${checkTone[check.status]}`}>{check.status.replaceAll("_", " ").toLowerCase()}</span>
+                          <span className={`status-badge ${checkTone[check.status]}`}>{t(`marketEntry.check.${check.status}` as MessageKey)}</span>
                         </div>
                         <p className="mt-2 text-xs leading-5 text-slate-400">{check.summary}</p>
-                        {check.nextSteps.map((step) => <p className="mt-2 text-xs leading-5 text-amber-100/80" key={step}>Next: {step}</p>)}
+                        {check.nextSteps.map((step) => <p className="mt-2 text-xs leading-5 text-amber-100/80" key={step}>{t("marketEntry.assessment.next", { step })}</p>)}
                       </div>
                     ))}
                   </div>
                   <p className="rounded-lg border border-amber-300/10 bg-amber-300/[0.035] p-3 text-xs leading-5 text-amber-100/80">{latest.resultJson.boundary}</p>
                 </section>
               ) : (
-                <p className="border-t border-white/10 pt-4 text-xs text-slate-400">No preparation assessment has been recorded.</p>
+                <p className="border-t border-white/10 pt-4 text-xs text-slate-400">{t("marketEntry.assessment.none")}</p>
               )}
 
               {canManage || canReview ? (
@@ -360,27 +350,27 @@ export function MarketEntryWorkflow({
                   {canManage ? (
                     <>
                       <button className="button" type="button" disabled={busyId === plan.id} onClick={() => void assessReadiness(plan)}>
-                        <RefreshCw size={13} aria-hidden="true" /> Assess readiness
+                        <RefreshCw size={13} aria-hidden="true" /> {t("marketEntry.action.assess")}
                       </button>
                       {plan.status === "ASSESSING" || plan.status === "PAUSED" ? (
                         <button className="button" type="button" disabled={busyId === plan.id || plan.reviewStatus !== "APPROVED"} onClick={() => void updateStatus(plan, "IN_PROGRESS")}>
-                          Start pathway
+                          {t("marketEntry.action.start")}
                         </button>
                       ) : null}
                       {plan.status === "IN_PROGRESS" ? (
                         <>
-                          <button className="button" type="button" disabled={busyId === plan.id} onClick={() => void updateStatus(plan, "PAUSED")}>Pause</button>
-                          <button className="button" type="button" disabled={busyId === plan.id || plan.reviewStatus !== "APPROVED"} onClick={() => void updateStatus(plan, "COMPLETED")}>Mark workstream complete</button>
+                          <button className="button" type="button" disabled={busyId === plan.id} onClick={() => void updateStatus(plan, "PAUSED")}>{t("marketEntry.action.pause")}</button>
+                          <button className="button" type="button" disabled={busyId === plan.id || plan.reviewStatus !== "APPROVED"} onClick={() => void updateStatus(plan, "COMPLETED")}>{t("marketEntry.action.complete")}</button>
                         </>
                       ) : null}
                     </>
                   ) : null}
                   {canReview && plan.status !== "COMPLETED" ? (
                     <div className="action-control min-w-full">
-                      <label htmlFor={`market-review-${plan.id}`}><ShieldCheck size={13} aria-hidden="true" /> Professional review note</label>
-                      {!latest ? <p className="w-full text-xs text-amber-100/80">Record a preparation assessment before requesting professional review.</p> : null}
-                      {latest && !latestAssessmentIsCurrent ? <p className="w-full text-xs text-amber-100/80">This assessment predates the latest pathway change. Reassess before review.</p> : null}
-                      {latest?.status === "PREPARATION_INCOMPLETE" ? <p className="w-full text-xs text-amber-100/80">An incomplete preparation assessment may be reviewed for feedback, but cannot be approved.</p> : null}
+                      <label htmlFor={`market-review-${plan.id}`}><ShieldCheck size={13} aria-hidden="true" /> {t("marketEntry.review.noteLabel")}</label>
+                      {!latest ? <p className="w-full text-xs text-amber-100/80">{t("marketEntry.review.needAssessment")}</p> : null}
+                      {latest && !latestAssessmentIsCurrent ? <p className="w-full text-xs text-amber-100/80">{t("marketEntry.review.stale")}</p> : null}
+                      {latest?.status === "PREPARATION_INCOMPLETE" ? <p className="w-full text-xs text-amber-100/80">{t("marketEntry.review.incomplete")}</p> : null}
                       <textarea
                         id={`market-review-${plan.id}`}
                         className="form-input"
@@ -389,10 +379,10 @@ export function MarketEntryWorkflow({
                         maxLength={5000}
                         value={reviewNotes[plan.id] ?? ""}
                         onChange={(event) => setReviewNotes((current) => ({ ...current, [plan.id]: event.target.value }))}
-                        placeholder="Document scope, assumptions, and reviewer feedback."
+                        placeholder={t("marketEntry.review.placeholder")}
                       />
-                      <button className="button" type="button" disabled={busyId === plan.id || latest?.planVersion !== plan.version || !assessmentCanBeApproved} onClick={() => void reviewPlan(plan, "APPROVED")}>Record review</button>
-                      <button className="button" type="button" disabled={busyId === plan.id || latest?.planVersion !== plan.version} onClick={() => void reviewPlan(plan, "CHANGES_REQUESTED")}>Request changes</button>
+                      <button className="button" type="button" disabled={busyId === plan.id || latest?.planVersion !== plan.version || !assessmentCanBeApproved} onClick={() => void reviewPlan(plan, "APPROVED")}>{t("marketEntry.review.record")}</button>
+                      <button className="button" type="button" disabled={busyId === plan.id || latest?.planVersion !== plan.version} onClick={() => void reviewPlan(plan, "CHANGES_REQUESTED")}>{t("marketEntry.review.requestChanges")}</button>
                     </div>
                   ) : null}
                 </div>
