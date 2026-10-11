@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { useState } from "react";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 
@@ -32,7 +33,7 @@ export function NotificationPreferencesForm({
         body: JSON.stringify(preferences),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.notificationPreferences.saveError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.notificationPreferences.saveError")));
       setPreferences(result.data);
       setMessage(t("app.notificationPreferences.saved"));
     } catch (error) {

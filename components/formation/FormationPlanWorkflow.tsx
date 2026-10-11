@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { ArrowRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -85,7 +86,7 @@ export function FormationPlanWorkflow({
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.formation.error"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.formation.error")));
       setCandidateKey("");
       setMessage(t("app.formation.created"));
       router.refresh();

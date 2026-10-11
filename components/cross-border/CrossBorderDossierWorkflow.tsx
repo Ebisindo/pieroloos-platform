@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { Check, Plus, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -70,7 +71,7 @@ export function CrossBorderDossierWorkflow({
       body: JSON.stringify(body),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error ?? t("crossBorder.error.update"));
+    if (!response.ok) throw new Error(localizeApiError(t, result.error, t("crossBorder.error.update")));
   }
 
   async function submitForm(event: React.FormEvent<HTMLFormElement>) {

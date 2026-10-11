@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { Check, CirclePlay, FileCheck2, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -62,7 +63,7 @@ export function FormationTimeline({
         body: JSON.stringify({ action, ...extra }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.formation.error"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.formation.error")));
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t("app.formation.error"));

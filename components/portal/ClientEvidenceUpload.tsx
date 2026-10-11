@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { useState } from "react";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 
@@ -34,7 +35,7 @@ export function ClientEvidenceUpload({ clientId }: { clientId: string }) {
         body,
       });
       const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? t("app.portal.uploadFailed"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.portal.uploadFailed")));
       setMessage(t("app.portal.uploadReceived"));
       form.reset();
     } catch (error) {

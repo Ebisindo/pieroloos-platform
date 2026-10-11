@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { OperationalAction, ControlActionStatus } from "@/lib/domain/action-control";
@@ -63,7 +64,7 @@ export function ActionQueue({
         body: JSON.stringify({ ...body, expectedUpdatedAt: action.updatedAt.toISOString() }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.actions.updateError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.actions.updateError")));
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("app.actions.updateError"));

@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useLocale } from "@/components/i18n/LocaleProvider";
@@ -49,7 +50,7 @@ export function ClientPortalCollaboration({
         body: JSON.stringify(payload),
       });
       const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? t("app.portal.submitError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.portal.submitError")));
       setMessageContent("");
       setCompletionContent({});
       router.refresh();

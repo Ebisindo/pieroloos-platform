@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { FormEvent, useState } from "react";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import type { MessageKey } from "@/lib/i18n/messages";
@@ -75,7 +76,7 @@ export function ClientIntakeForm() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error ?? "Unable to save intake.");
+        throw new Error(localizeApiError(t, result.error, t("app.intake.error")));
       }
 
       setState("success");

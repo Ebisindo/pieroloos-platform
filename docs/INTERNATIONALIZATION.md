@@ -58,7 +58,7 @@ return <h1>{t("home.hero.title")}</h1>;
 
 ## Review requirements
 
-Maintain consistent terminology for jurisdiction, formation roadmap, evidence, obligation, professional review and cross-border preparation. Preserve meaning, provenance limitations, uncertainty, qualifications, warnings, privacy statements and disclaimers. Never translate machine-readable identifiers, API values, stored workflow/user data, protected product names or official legal entity names. API-originated error messages may remain in their source language.
+Maintain consistent terminology for jurisdiction, formation roadmap, evidence, obligation, professional review and cross-border preparation. Preserve meaning, provenance limitations, uncertainty, qualifications, warnings, privacy statements and disclaimers. Never translate machine-readable identifiers, API values, stored workflow/user data, protected product names or official legal entity names. API-originated error messages are localized only where mapped in `lib/i18n/api-errors.ts`; others remain in their source language.
 
 Legal-, tax-, accounting-, investment- and jurisdiction-sensitive localized content requires qualified native-language and subject-matter review before publication as authoritative. Translation must not convert observations into legal conclusions or alter business rules. Funding figures remain in Nigerian naira and are not currency-converted by locale formatting. No translation service or external API is part of this architecture.
 
@@ -78,6 +78,27 @@ Locale variants share the existing cookie-selected, unprefixed routes and canoni
 
 Newly translated (keys `access.*`, `boot.*`, `workspace.*`, `engagements.*`, `expansion.*`, `marketEntry.*`, `crossBorder.*`, `controlPlane.*`): `/expansion`, `/cross-border`, `/engagements`, `/engagements/[id]`, `WorkspaceAccessState`, `MarketEntryWorkflow`, `CrossBorderDossierWorkflow`, `ActivityTimeline`, `StatusBadge` (engagement), `BootLayer`, `WorkspaceSelector`, `EscalationBanner` and the AppShell user avatar label. Enum values sent to or stored by the API are unchanged; only displayed labels are mapped. Dates use the active locale.
 
-Remaining gaps: domain-generated readiness text and trust-boundary constants, API error messages, `DocumentEvidencePanel`, `EvidenceBadge`, `TrustBoundaryNotice`, `EvidenceSignalList`, `IntakeClassificationLegend`, `ActionStatusBadge`, `AuditTimeline` (date format only uses the browser locale), and `components/ui/primitives.tsx` has not been reviewed for copy. Several of these appear unused or lightly used and should be checked before translating.
+## Full-support readiness pass
+
+Additionally localized (keys `trust.*`, `signals.*`, `intake.classification.*`, `apiError.*`, `marketEntry.readinessText.*`):
+
+- `TrustBoundaryNotice` (now a server component using the request locale): heading, accessible label, the platform-guidance disclaimer and the evidence-gap labels. The English catalog entries are asserted equal to the constants in `lib/domain/trust-boundary.ts`, which remain the source.
+- Market-readiness check titles, summaries, next steps and the boundary statement. `lib/i18n/market-readiness.ts` selects text from the stable `check.key`, status codes and stored counts; stored English JSON and the API contract are unchanged, and unknown keys or custom text fall back to the stored string. Tests assert the English locale reproduces the stored text exactly.
+- API error messages: `lib/i18n/api-errors.ts` maps about 30 frequently returned English messages to catalog keys on the client (`localizeApiError`). Response bodies and status codes are unchanged. Unmapped messages (the long tail of roughly 180 route-specific strings) are shown as returned in English; extend the map when adding or changing messages.
+- `AuditTimeline` (locale-aware dates), `IntakeClassificationLegend`, `ActionStatusBadge` and `EvidenceSignalList`. These are not currently imported by any route but are translated so they are safe to adopt.
+
+Remaining gaps: `components/evidence/DocumentEvidencePanel.tsx` and `components/evidence/EvidenceBadge.tsx` are unused and untranslated (they render domain strings from `assessEvidence`); `components/ui/primitives.tsx` contains layout primitives and no reviewed copy; server-side Zod `issues` and the long tail of API errors remain English; user-entered and stored data are intentionally not translated.
+
+## Promotion checklist (proposed to supported)
+
+A locale may be promoted in `lib/i18n/config.ts` only after every item is recorded in the pull request, with reviewer names and dates:
+
+1. Catalog complete (`npm test -- tests/i18n.test.ts tests/i18n-screens.test.ts tests/i18n-domain-text.test.ts`).
+2. Qualified native-language review of the whole catalog against the glossary (jurisdiction, formation roadmap, evidence, obligation, professional review, cross-border preparation).
+3. Subject-matter (legal/tax/compliance) review of the legally sensitive keys: `trust.*`, `marketEntry.readinessText.boundary`, `crossBorder.*` boundary text, `expansion.*` disclaimers, privacy and terms content, and `apiError.*` permission messages.
+4. Browser verification at mobile, tablet and desktop widths with long strings, keyboard navigation, focus visibility and screen reader labels.
+5. Decision on locale-prefixed URLs and `hreflang` if search indexing of the locale is wanted.
+
+Until then fr, pt and es remain `proposed` and are labelled preview in the language selector.
 
 Verification (Node, vitest, lint, `tsc`, production build with a disposable `NEXTAUTH_SECRET`): `npm test` 244 passed / 7 skipped, lint and typecheck clean, build succeeded. Browser, mobile, keyboard and screen-reader checks were not run (no Playwright browser installed). fr, pt and es remain preview languages pending qualified human review, especially the market-entry and cross-border boundary disclaimers.

@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { ArrowRight, Scale } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -77,7 +78,7 @@ export function JurisdictionLensWorkflow({
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.jurisdiction.compareError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.jurisdiction.compareError")));
       setComparison({ id: result.data.snapshot.id, results: result.data.results });
       setFormationJurisdictionId(selectedIds[0]);
       setMessage(t("app.jurisdiction.savedComparison"));
@@ -103,7 +104,7 @@ export function JurisdictionLensWorkflow({
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.jurisdiction.createPlanError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.jurisdiction.createPlanError")));
       router.push("/formation");
       router.refresh();
     } catch (error) {

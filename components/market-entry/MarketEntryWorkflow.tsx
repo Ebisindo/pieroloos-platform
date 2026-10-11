@@ -1,10 +1,12 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { ArrowRight, Globe2, RefreshCw, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import { formatDate, type MessageKey } from "@/lib/i18n/messages";
+import { localizeReadinessBoundary, localizeReadinessCheck } from "@/lib/i18n/market-readiness";
 import type { MarketEntryReviewStatus, MarketEntryStatus, MarketReadiness } from "@/lib/domain/market-entry";
 
 type CandidateJurisdiction = { id: string; name: string; country: string; countryCode: string | null };
@@ -89,7 +91,7 @@ export function MarketEntryWorkflow({
         body: JSON.stringify(body),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("marketEntry.updateError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("marketEntry.updateError")));
       router.refresh();
       return result.data;
     } catch (cause) {
@@ -328,18 +330,21 @@ export function MarketEntryWorkflow({
                     </span>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    {latest.resultJson.checks.map((check) => (
+                    {latest.resultJson.checks.map((check) => {
+                      const text = localizeReadinessCheck(t, check);
+                      return (
                       <div className="rounded-lg border border-white/5 bg-black/10 p-3" key={check.key}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h5 className="text-xs font-semibold text-slate-200">{check.title}</h5>
+                          <h5 className="text-xs font-semibold text-slate-200">{text.title}</h5>
                           <span className={`status-badge ${checkTone[check.status]}`}>{t(`marketEntry.check.${check.status}` as MessageKey)}</span>
                         </div>
-                        <p className="mt-2 text-xs leading-5 text-slate-400">{check.summary}</p>
-                        {check.nextSteps.map((step) => <p className="mt-2 text-xs leading-5 text-amber-100/80" key={step}>{t("marketEntry.assessment.next", { step })}</p>)}
+                        <p className="mt-2 text-xs leading-5 text-slate-400">{text.summary}</p>
+                        {text.nextSteps.map((step) => <p className="mt-2 text-xs leading-5 text-amber-100/80" key={step}>{t("marketEntry.assessment.next", { step })}</p>)}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                  <p className="rounded-lg border border-amber-300/10 bg-amber-300/[0.035] p-3 text-xs leading-5 text-amber-100/80">{latest.resultJson.boundary}</p>
+                  <p className="rounded-lg border border-amber-300/10 bg-amber-300/[0.035] p-3 text-xs leading-5 text-amber-100/80">{localizeReadinessBoundary(t, latest.resultJson.boundary)}</p>
                 </section>
               ) : (
                 <p className="border-t border-white/10 pt-4 text-xs text-slate-400">{t("marketEntry.assessment.none")}</p>

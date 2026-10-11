@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { Check, FileCheck2, Plus, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -129,7 +130,7 @@ export function ComplianceWorkflow({
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.compliance.createError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.compliance.createError")));
       form.reset();
       setMessage(t("app.compliance.saved"));
       router.refresh();
@@ -150,7 +151,7 @@ export function ComplianceWorkflow({
         body: JSON.stringify({ status }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.compliance.statusError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.compliance.statusError")));
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t("app.compliance.statusError"));
@@ -169,7 +170,7 @@ export function ComplianceWorkflow({
         body: JSON.stringify({ ownerUserId }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.compliance.assignmentError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.compliance.assignmentError")));
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t("app.compliance.assignmentError"));
@@ -188,7 +189,7 @@ export function ComplianceWorkflow({
         body: JSON.stringify({}),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.compliance.reviewError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.compliance.reviewError")));
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t("app.compliance.reviewError"));
@@ -214,7 +215,7 @@ export function ComplianceWorkflow({
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.compliance.attachError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.compliance.attachError")));
       setSelectedEvidence((current) => ({ ...current, [obligation.id]: "" }));
       router.refresh();
     } catch (error) {
@@ -239,7 +240,7 @@ export function ComplianceWorkflow({
         body: JSON.stringify({ reviewStatus, note }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? t("app.compliance.evidenceReviewError"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.compliance.evidenceReviewError")));
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t("app.compliance.evidenceReviewError"));

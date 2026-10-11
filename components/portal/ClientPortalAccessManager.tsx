@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiError } from "@/lib/i18n/api-errors";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/components/i18n/LocaleProvider";
@@ -60,7 +61,7 @@ export function ClientPortalAccessManager({ clients, canWrite }: { clients: Port
         body: body ? JSON.stringify(body) : undefined,
       });
       const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? t("app.portal.updateFailed"));
+      if (!response.ok) throw new Error(localizeApiError(t, result.error, t("app.portal.updateFailed")));
       router.refresh();
       setMessage(t("app.portal.updated"));
     } catch (error) {
