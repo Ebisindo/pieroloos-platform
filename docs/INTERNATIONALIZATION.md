@@ -87,7 +87,7 @@ Additionally localized (keys `trust.*`, `signals.*`, `intake.classification.*`, 
 - API error messages: `lib/i18n/api-errors.ts` maps about 30 frequently returned English messages to catalog keys on the client (`localizeApiError`). Response bodies and status codes are unchanged. Unmapped messages (the long tail of roughly 180 route-specific strings) are shown as returned in English; extend the map when adding or changing messages.
 - `AuditTimeline` (locale-aware dates), `IntakeClassificationLegend`, `ActionStatusBadge` and `EvidenceSignalList`. These are not currently imported by any route but are translated so they are safe to adopt.
 
-Remaining gaps: `components/evidence/DocumentEvidencePanel.tsx` and `components/evidence/EvidenceBadge.tsx` are unused and untranslated (they render domain strings from `assessEvidence`); `components/ui/primitives.tsx` contains layout primitives and no reviewed copy; server-side Zod `issues` and the long tail of API errors remain English; user-entered and stored data are intentionally not translated.
+Remaining gaps (superseded by the remaining-audit section below): `components/ui/primitives.tsx` contains layout primitives and no reviewed copy; server-side Zod `issues` and the long tail of API errors remain English; user-entered and stored data are intentionally not translated.
 
 ## Promotion checklist (proposed to supported)
 
@@ -101,4 +101,25 @@ A locale may be promoted in `lib/i18n/config.ts` only after every item is record
 
 Until then fr, pt and es remain `proposed` and are labelled preview in the language selector.
 
-Verification (Node, vitest, lint, `tsc`, production build with a disposable `NEXTAUTH_SECRET`): `npm test` 244 passed / 7 skipped, lint and typecheck clean, build succeeded. Browser, mobile, keyboard and screen-reader checks were not run (no Playwright browser installed). fr, pt and es remain preview languages pending qualified human review, especially the market-entry and cross-border boundary disclaimers.
+## Remaining audit pass (feature/i18n-remaining-audit)
+
+### Route matrix
+
+All 17 `page.tsx` routes use the typed translator (`getRequestTranslator` or `useLocale`): `/`, `/partners`, `/signin`, `/clients`, `/clients/new`, `/command-center`, `/compliance`, `/cross-border`, `/engagements`, `/engagements/[id]`, `/expansion`, `/formation`, `/jurisdictions`, `/jurisdictions/[id]`, `/portal`, `/reports`, `/settings`. Missing catalog keys fall back to English with a development warning. Automated coverage: catalog key/placeholder parity and preview-copy checks (`tests/i18n*.test.ts`); browser coverage exists only for `/` and `/partners` (below). Authenticated routes need a database and sign-in and have no browser tests.
+
+### Changes
+
+- `DocumentEvidencePanel` and `EvidenceBadge` are now client components using `evidencePanel.*` keys (status, class labels, missing/warning items, confidence as a locale-formatted percentage). Evidence data, `assessEvidence` output and domain labels are unchanged; unknown items fall back to the raw English string.
+- `apiError.*` grew from about 30 to about 150 mapped messages (permissions, not-found, concurrency, invalid input, workflow gates, portal, generic failures). Operational and internal messages (workers, scanner callbacks, storage/configuration, OIDC provisioning, dead letters) are intentionally not mapped so internals are not surfaced; they stay English. Response bodies and status codes are unchanged; unmapped messages pass through in English.
+- `validation.summary` and `validation.field` added for field-level validation text. Zod `issues` details are not displayed by clients (except the partnership form's translated generic message) and remain English in API responses.
+- New tests in `tests/i18n-evidence-api.test.ts`: key and placeholder parity in all locales, evidence translations, domain-label alignment, every mapped API error translated, English fallback, and validation interpolation.
+
+### Browser testing
+
+`playwright.config.ts` and `e2e/i18n.spec.ts` run against a production build (`NEXTAUTH_SECRET=build-validation-only npm run build`, then `npm run test:e2e`). Prerequisites in a fresh environment: `npx playwright install chromium` and `sudo npx playwright install-deps chromium` (system libraries such as libatk were missing initially). Tests cover language selection and `lang` persistence, `/partners` form-state preservation across a switch, no horizontal overflow at 375/768/1440 px for all four locales on `/` and `/partners`, and keyboard focus of the selector. These are automated checks, not an accessibility certification; screen-reader and visual review are outstanding.
+
+### Remaining limitations
+
+Internal/operational API errors, Zod `issues`, and user-entered or stored text are not translated. Authenticated screens lack browser tests. No locale-prefixed URLs or `hreflang`. fr, pt and es remain preview languages pending native-language and legal/tax/compliance review.
+
+Verification (Node, vitest, lint, `tsc`, production build with a disposable `NEXTAUTH_SECRET`): `npm test` 244 passed / 7 skipped, lint and typecheck clean, build succeeded. (Earlier pass; see the remaining-audit section for later results.) fr, pt and es remain preview languages pending qualified human review, especially the market-entry and cross-border boundary disclaimers.
