@@ -68,7 +68,7 @@ const pt = {
   "home.journey.intent.body": "Registre objetivos, atividades, propriedade e contexto por meio de um processo estruturado de entrada de clientes.",
   "home.journey.intent.via": "Entrada de clientes",
   "home.journey.entity.title": "Explore a arquitetura das entidades",
-  "home.journey.entity.body": "Apresente opções de entidades e estruturas como pontos para análise profissional.",
+  "home.journey.entity.body": "Apresente opções de entidades e estruturas como pontos para revisão profissional.",
   "home.journey.entity.via": "Perfil empresarial, expansão de mercado",
   "home.journey.jurisdiction.title": "Avalie jurisdições",
   "home.journey.jurisdiction.body": "Compare jurisdições com transparência sobre qualidade, origem e limitações das evidências.",

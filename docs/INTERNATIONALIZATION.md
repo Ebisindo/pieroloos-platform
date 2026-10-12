@@ -122,4 +122,27 @@ All 17 `page.tsx` routes use the typed translator (`getRequestTranslator` or `us
 
 Internal/operational API errors, Zod `issues`, and user-entered or stored text are not translated. Authenticated screens lack browser tests. No locale-prefixed URLs or `hreflang`. fr, pt and es remain preview languages pending native-language and legal/tax/compliance review.
 
+## Controlled terminology (glossary)
+
+`lib/i18n/glossary.ts` is the single source for standardised translations of legally and operationally sensitive terms, enforced by `tests/i18n-glossary.test.ts` (disallowed variants fail the build; approved terms must appear in the sensitive `apiError.*` messages). Status: **unreviewed**. The table is a consistency baseline derived from the existing catalogs, not a legal or native-language opinion.
+
+| Concept | fr | pt | es |
+| --- | --- | --- | --- |
+| professional review | revue professionnelle | revisão profissional | revisión profesional |
+| jurisdiction | juridiction | jurisdição | jurisdicción |
+| obligation | obligation | obrigação | obligación |
+| evidence | preuve | evidência | evidencia |
+| supporting document | document justificatif | documento comprovativo | documento justificativo |
+| compliance | conformité | conformidade | cumplimiento |
+| formation roadmap | feuille de route | roteiro | hoja de ruta |
+| cross-border | transfrontalier | transfronteiriço | transfronterizo |
+
+Standardised in this pass: French "examen professionnel"/"examen par un professionnel" became "revue professionnelle" (with gender agreement corrected), and French evidence labels "justificatif(s)" and "éléments probants" became "preuve(s)"; Portuguese "análise profissional" became "revisão profissional".
+
+Questions the qualified reviewers must settle (not decided here): pt-PT versus pt-BR conventions (the catalog currently follows pt-PT forms such as "registo"); es-ES versus Latin American usage and whether "evidencia" or "prueba" is preferred in legal contexts; whether "revue professionnelle" is the right register in each target jurisdiction; any jurisdiction-specific statutory terms, which must come from authoritative sources and not from this glossary.
+
+### Recording a review
+
+Each locale needs a dated entry (reviewer name and qualification, scope: whole catalog or keys, glossary approved or amended, date) in the pull request that changes `lib/i18n/config.ts`. Legal/tax/compliance reviewers sign off separately on `trust.*`, `crossBorder.*`, `expansion.*`, `marketEntry.readinessText.boundary` and `apiError.*` permission messages. Only after both records exist may `GLOSSARY_REVIEW_STATUS` and the locale status change.
+
 Verification (Node, vitest, lint, `tsc`, production build with a disposable `NEXTAUTH_SECRET`): `npm test` 244 passed / 7 skipped, lint and typecheck clean, build succeeded. (Earlier pass; see the remaining-audit section for later results.) fr, pt and es remain preview languages pending qualified human review, especially the market-entry and cross-border boundary disclaimers.
