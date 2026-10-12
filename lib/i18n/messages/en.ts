@@ -613,6 +613,8 @@ const en = {
   "app.portal.publish": "Publish",
   "app.portal.unpublish": "Unpublish",
   "app.portal.updateFailed": "Portal update failed.",
+  "app.portal.requestAcknowledgment": "Request authenticated acknowledgment",
+  "app.jurisdiction.name": "Jurisdiction",
   "app.portal.updated": "Client portal settings updated.",
   "app.portal.inboxTitle": "Client conversation and submissions ({count})",
   "app.portal.request": "Request:",

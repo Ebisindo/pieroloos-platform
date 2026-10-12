@@ -615,6 +615,8 @@ const es = {
   "app.portal.publish": "Publicar",
   "app.portal.unpublish": "Anular publicación",
   "app.portal.updateFailed": "No se pudo actualizar el portal.",
+  "app.portal.requestAcknowledgment": "Solicitar acuse de recibo autenticado",
+  "app.jurisdiction.name": "Jurisdicción",
   "app.portal.updated": "Se actualizó la configuración del portal del cliente.",
   "app.portal.inboxTitle": "Conversación y envíos del cliente ({count})",
   "app.portal.request": "Solicitud:",

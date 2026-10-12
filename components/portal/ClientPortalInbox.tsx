@@ -192,7 +192,7 @@ export function ClientPortalInbox({
                     },
                   )}
                 >
-                  Request authenticated acknowledgment
+                  {t("app.portal.requestAcknowledgment")}
                 </button>
               ) : null}
             </div>
