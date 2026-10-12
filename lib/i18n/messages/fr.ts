@@ -615,6 +615,8 @@ const fr = {
   "app.portal.publish": "Publier",
   "app.portal.unpublish": "Dépublier",
   "app.portal.updateFailed": "Échec de la mise à jour du portail.",
+  "app.portal.requestAcknowledgment": "Demander un accusé de réception authentifié",
+  "app.jurisdiction.name": "Juridiction",
   "app.portal.updated": "Paramètres du portail client mis à jour.",
   "app.portal.inboxTitle": "Conversation et soumissions du client ({count})",
   "app.portal.request": "Demande :",

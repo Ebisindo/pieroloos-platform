@@ -51,6 +51,9 @@ jobs:
       - name: Test PostgreSQL data integrity
         run: npm run test:db
 
+      - name: Lint
+        run: npm run lint
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -59,3 +62,42 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  e2e:
+    # Browser tests for the public, signed-out surface in every locale. Authenticated routes need an OIDC test
+    # identity provider, which is not provisioned; see docs/INTERNATIONALIZATION.md.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXTAUTH_SECRET: ci-only-not-a-deployment-secret
+      # Placeholder so Prisma can load its config; the signed-out public routes under test do not query the database.
+      DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Playwright browser and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Production build
+        run: npm run build
+
+      - name: Browser tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results
+          if-no-files-found: ignore

@@ -615,6 +615,8 @@ const pt = {
   "app.portal.publish": "Publicar",
   "app.portal.unpublish": "Despublicar",
   "app.portal.updateFailed": "Falha ao atualizar o portal.",
+  "app.portal.requestAcknowledgment": "Solicitar confirmação de receção autenticada",
+  "app.jurisdiction.name": "Jurisdição",
   "app.portal.updated": "Configurações do portal do cliente atualizadas.",
   "app.portal.inboxTitle": "Conversa e envios do cliente ({count})",
   "app.portal.request": "Solicitação:",

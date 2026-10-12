@@ -145,4 +145,82 @@ Questions the qualified reviewers must settle (not decided here): pt-PT versus p
 
 Each locale needs a dated entry (reviewer name and qualification, scope: whole catalog or keys, glossary approved or amended, date) in the pull request that changes `lib/i18n/config.ts`. Legal/tax/compliance reviewers sign off separately on `trust.*`, `crossBorder.*`, `expansion.*`, `marketEntry.readinessText.boundary` and `apiError.*` permission messages. Only after both records exist may `GLOSSARY_REVIEW_STATUS` and the locale status change.
 
+## Release readiness (feature/i18n-release-readiness)
+
+**Status: NO-GO for promoting fr, pt or es to fully supported.** English is the default. A controlled preview release (language selector labelled "preview", pages not locale-indexed) is technically supportable once the PR order below is merged and CI is green. Promotion is blocked by human reviews that engineering cannot supply.
+
+### Integration order
+
+1. PR #2 (`feature/i18n-remaining-audit` → `main`).
+2. PR #3 (`feature/i18n-glossary`), currently based on #2; retarget to `main` after #2 merges.
+3. This branch (`feature/i18n-release-readiness`), currently based on #3; retarget after #3 merges.
+No file conflicts were found between them (each builds linearly on the previous). None is merged without human approval.
+
+### Route coverage
+
+All 17 `page.tsx` routes use the typed translator. Stray hardcoded text found and fixed in this pass: the client-portal "Request authenticated acknowledgment" button (`app.portal.requestAcknowledgment`) and `ComparisonMatrix` (currently unused; now localized). Remaining non-translated strings are deliberate: brand name "PIEROLOOS" in the boot layer, an IANA time-zone placeholder, a URL placeholder. `components/shell/Boot layer.tsx` is a tracked stray file with a space in its name that is not imported anywhere and differs from `BootLayer.tsx`; it was left untouched and should be removed in a separate reviewed change. Emails and generated documents: outgoing email exists (`lib/services/notification-email.ts`, `notification-worker.ts`, `compliance-notification.ts`, `partnership-inquiry-service.ts`) and is **English only and not localized**. Localizing it needs a stored per-recipient locale preference (a schema change), because the locale cookie is not available to background workers; this is an open blocker for a full multilingual release, deliberately not changed here. Generated report/document text was not audited for this item.
+
+| Area | Catalog coverage | Browser coverage | Human review |
+| --- | --- | --- | --- |
+| `/`, `/partners` | Yes | Yes (selector, lang, query/route, form state, overflow, zoom, axe) | Outstanding |
+| `/signin`, 404, signed-out protected routes | Yes | Lang and overflow only | Outstanding |
+| `/clients`, `/clients/new`, `/jurisdictions*`, `/formation`, `/compliance`, `/cross-border`, `/expansion`, `/engagements*`, `/portal`, `/reports`, `/settings`, `/command-center` | Yes | None (needs OIDC test identity provider and seeded data) | Outstanding |
+| Outgoing emails | English only | None | Blocker: needs recipient locale storage |
+| API errors | About 150 mapped; internal/operational deliberately English | n/a | Outstanding for permission messages |
+
+### Governance
+
+Catalog key and placeholder parity, glossary consistency, preview-copy checks, and a promotion gate run in `npm test`. `lib/i18n/review-records.ts` is the append-only record of native-language, legal, tax/accounting and compliance reviews per locale (reviewer, qualification, date, glossary version, outcome, regional variant, unresolved questions). It is empty. `tests/i18n-release-gate.test.ts` fails if any locale is marked supported without a complete, non-rejected record for every scope. Regional choices (pt-PT vs pt-BR, Spanish variant, French register) are not decided by engineering and are listed for reviewers above.
+
+### SEO decision
+
+Locales share unprefixed URLs and are selected by the `pieroloos-locale` cookie. Crawlers send no cookie, so only English is ever indexed; only `/` and `/partners` are indexable and all other routes are `noindex`. There are no duplicate locale URLs and no `hreflang`, which is correct while fr/pt/es are previews. Consequence: no localized search presence. Before any localized indexing, adopt locale-prefixed URLs (for example `/fr/partners`) with self-referencing canonicals, reciprocal `hreflang` including `x-default`, and sitemap entries, and only for locales that have passed review. A browser test asserts no `hreflang` or locale paths are exposed today.
+
+### Security and privacy review
+
+No changes to `lib/auth` or `app/api` versus `main`. The locale cookie holds only a validated locale code (`SameSite=Lax`, `Secure` over HTTPS, one year, not HttpOnly because the client sets it); unknown values fall back to English and a browser test confirms an injected value is rejected. Catalog values contain no markup and interpolated values render as escaped React text; the only `dangerouslySetInnerHTML` is JSON-LD with `<` escaped. No external translation service is used or added. Browser tests confirm locale state does not leak between browser contexts. Not verified here: CSRF, rate limiting, upload validation and workspace isolation were not exercised by browser tests; they are unchanged by this work and covered only by the existing unit and database tests.
+
+### Accessibility
+
+Automated: axe-core (WCAG 2.0/2.1/2.2 A and AA rule tags) on `/` and `/partners` in all four locales reports no violations; the selector is keyboard reachable with a visible focus style; 200% text zoom does not overflow `/partners`; no horizontal overflow at 375, 768 and 1440 px. This is **not** a WCAG conformance or certification claim. Outstanding human review: screen-reader announcement of language changes and form errors, focus management after navigation, colour contrast beyond axe's automated checks, and authenticated screens.
+
+### Performance
+
+All four catalogs ship to the client in one shared chunk (about 322 KB raw, about 80 KB gzipped in the measured production build, including other shared code), because `LocaleProvider` imports every catalog. Acceptable for a preview but a candidate optimization (per-locale dynamic loading) before wide release. Not measured: locale-switch latency, hydration errors on authenticated routes, CDN caching behaviour, and any deployed environment. Because locale is read from a request cookie, responses that vary by locale must not be cached as shared public pages; confirm `Vary: Cookie`/no-store behaviour on the deployed CDN.
+
+### Test commands and actual results (this branch, Codespaces)
+
+- `npm test`: 307 passed, 7 skipped.
+- `npm run lint`: clean. `npm run typecheck`: clean. `git diff --check`: clean.
+- `NEXTAUTH_SECRET=build-validation-only npm run build`: succeeded.
+- `npm run test:e2e` (after `npx playwright install --with-deps chromium` and a production build): 32 passed (24 behaviour/layout tests plus 8 axe scans).
+- `npm run test:db`: **not run** here (no PostgreSQL server in this environment); it runs in CI.
+- CI (`.github/workflows/ci.yml`) now runs lint and a separate `e2e` job that installs Chromium with system dependencies, builds, and runs `npm run test:e2e`. These CI changes are unproven until the workflow runs on GitHub.
+
+### Deployment and rollback
+
+Deploy only after PRs merge and CI is green. No database migration or environment variable is added by the i18n work. Rollback: revert the merge commit; the cookie is harmless to older builds (ignored). Production acceptance, to be done by the release owner on the deployed environment: confirm `lang` and metadata per locale, selector behaviour, no hydration errors in browser console, response caching by locale, sign-in via the real identity provider with each locale, and error monitoring.
+
+### Release evidence matrix
+
+| Requirement | Status | Evidence | Reviewer | Blocker |
+| --- | --- | --- | --- | --- |
+| Catalog and placeholder parity | Met | `tests/i18n*.test.ts` | Engineering | None |
+| Glossary consistency | Met (unreviewed content) | `tests/i18n-glossary.test.ts` | Pending | Native/legal review |
+| Native-language review fr / pt / es | Not met | `REVIEW_RECORDS` empty | Pending | Qualified reviewers |
+| Legal, tax, compliance terminology | Not met | None | Pending | Qualified reviewers |
+| Public route browser tests | Met locally | 32 Playwright tests | Engineering | CI run pending |
+| Authenticated route browser tests | Not met | None | n/a | OIDC test IdP, seed data |
+| Automated accessibility | Met for 2 public routes | axe scans | Engineering | Not certification |
+| Manual keyboard and screen-reader review | Not met | None | Pending | Human tester |
+| SEO strategy | Decided | Section above | Engineering | Needs approval |
+| Security review | Partial | Code review plus tests | Engineering | Dynamic testing outstanding |
+| Performance | Partial | Bundle measurement | Engineering | Deployed measurements |
+| DB integrity check | Not run locally | CI job | Engineering | CI result |
+| Production verification | Not met | None | Release owner | Deployed environment |
+
+### Release approval criteria
+
+Fully supported status for a locale requires all of: complete review records for every scope in `REVIEW_RECORDS`; recorded regional-variant decisions; authenticated-route browser tests passing in CI; manual accessibility sign-off; green CI including the e2e job; deployed-environment acceptance; and explicit release-owner approval. Until then fr, pt and es remain preview.
+
 Verification (Node, vitest, lint, `tsc`, production build with a disposable `NEXTAUTH_SECRET`): `npm test` 244 passed / 7 skipped, lint and typecheck clean, build succeeded. (Earlier pass; see the remaining-audit section for later results.) fr, pt and es remain preview languages pending qualified human review, especially the market-entry and cross-border boundary disclaimers.
