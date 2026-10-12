@@ -70,6 +70,8 @@ jobs:
     timeout-minutes: 20
     env:
       NEXTAUTH_SECRET: ci-only-not-a-deployment-secret
+      # Placeholder so Prisma can load its config; the signed-out public routes under test do not query the database.
+      DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public
     steps:
       - name: Checkout
         uses: actions/checkout@v5
