@@ -11,6 +11,7 @@ const defaultPreference = {
   quietHoursStart: null,
   quietHoursEnd: null,
   timezone: "UTC",
+  locale: "en",
 };
 
 export async function GET() {

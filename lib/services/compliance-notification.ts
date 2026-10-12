@@ -15,6 +15,7 @@ export type ComplianceNotification = {
   dedupeKey: string;
   templateKey?: string;
   templateVersion?: number;
+  templateParams?: Record<string, string | number>;
   createdAt?: Date;
   sentAt?: Date;
   failedAt?: Date;
@@ -46,6 +47,7 @@ export function buildEscalationNotification(
     dedupeKey: `escalation:${action.id}:${level}`,
     templateKey: "operational-action-escalation",
     templateVersion: 1,
+    templateParams: { title: action.title, level },
   };
 }
 

@@ -72,6 +72,7 @@ export const operationalEscalationRepository: EscalationRepository = {
           dedupeKey: notification.dedupeKey,
           templateKey: notification.templateKey ?? "legacy-notification",
           templateVersion: notification.templateVersion ?? 1,
+          templateParams: notification.templateParams,
         },
         update: {},
       });
@@ -97,6 +98,7 @@ export const operationalEscalationRepository: EscalationRepository = {
           dedupeKey: `${notification.dedupeKey}:email`,
           templateKey: notification.templateKey ?? "legacy-notification",
           templateVersion: notification.templateVersion ?? 1,
+          templateParams: notification.templateParams,
         },
         update: {},
       });

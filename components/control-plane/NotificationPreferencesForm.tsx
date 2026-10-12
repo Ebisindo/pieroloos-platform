@@ -2,6 +2,7 @@
 
 import { localizeApiError } from "@/lib/i18n/api-errors";
 import { useState } from "react";
+import { locales, type Locale } from "@/lib/i18n/config";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 
 export type NotificationPreferences = {
@@ -10,6 +11,7 @@ export type NotificationPreferences = {
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
   timezone: string;
+  locale?: string;
 };
 
 export function NotificationPreferencesForm({
@@ -69,6 +71,17 @@ export function NotificationPreferencesForm({
           onChange={(event) => setPreferences({ ...preferences, timezone: event.target.value })}
           placeholder="America/New_York"
         />
+      </label>
+      <label>
+        {t("app.notificationPreferences.language")}
+        <select
+          value={preferences.locale ?? "en"}
+          onChange={(event) => setPreferences({ ...preferences, locale: event.target.value })}
+        >
+          {(Object.keys(locales) as Locale[]).map((code) => (
+            <option key={code} value={code} lang={locales[code].htmlLang}>{locales[code].name}</option>
+          ))}
+        </select>
       </label>
       <div className="notification-quiet-hours">
         <label>

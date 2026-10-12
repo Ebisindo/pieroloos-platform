@@ -158,14 +158,14 @@ No file conflicts were found between them (each builds linearly on the previous)
 
 ### Route coverage
 
-All 17 `page.tsx` routes use the typed translator. Stray hardcoded text found and fixed in this pass: the client-portal "Request authenticated acknowledgment" button (`app.portal.requestAcknowledgment`) and `ComparisonMatrix` (currently unused; now localized). Remaining non-translated strings are deliberate: brand name "PIEROLOOS" in the boot layer, an IANA time-zone placeholder, a URL placeholder. `components/shell/Boot layer.tsx` is a tracked stray file with a space in its name that is not imported anywhere and differs from `BootLayer.tsx`; it was left untouched and should be removed in a separate reviewed change. Emails and generated documents: outgoing email exists (`lib/services/notification-email.ts`, `notification-worker.ts`, `compliance-notification.ts`, `partnership-inquiry-service.ts`) and is **English only and not localized**. Localizing it needs a stored per-recipient locale preference (a schema change), because the locale cookie is not available to background workers; this is an open blocker for a full multilingual release, deliberately not changed here. Generated report/document text was not audited for this item.
+All 17 `page.tsx` routes use the typed translator. Stray hardcoded text found and fixed in this pass: the client-portal "Request authenticated acknowledgment" button (`app.portal.requestAcknowledgment`) and `ComparisonMatrix` (currently unused; now localized). Remaining non-translated strings are deliberate: brand name "PIEROLOOS" in the boot layer, an IANA time-zone placeholder, a URL placeholder. `components/shell/Boot layer.tsx` is a tracked stray file with a space in its name that is not imported anywhere and differs from `BootLayer.tsx`; it was left untouched and should be removed in a separate reviewed change. Emails and generated documents: outgoing email exists (`lib/services/notification-email.ts`, `notification-worker.ts`, `compliance-notification.ts`, `partnership-inquiry-service.ts`). Recipient-language delivery is implemented for the operational-escalation email (see "Email localization" below); the partnership-inquiry alert to the platform reviewer remains English-only by design (internal recipient, no stored locale). Generated report/document text was not audited for this item.
 
 | Area | Catalog coverage | Browser coverage | Human review |
 | --- | --- | --- | --- |
 | `/`, `/partners` | Yes | Yes (selector, lang, query/route, form state, overflow, zoom, axe) | Outstanding |
 | `/signin`, 404, signed-out protected routes | Yes | Lang and overflow only | Outstanding |
 | `/clients`, `/clients/new`, `/jurisdictions*`, `/formation`, `/compliance`, `/cross-border`, `/expansion`, `/engagements*`, `/portal`, `/reports`, `/settings`, `/command-center` | Yes | None (needs OIDC test identity provider and seeded data) | Outstanding |
-| Outgoing emails | English only | None | Blocker: needs recipient locale storage |
+| Outgoing emails | Escalation email localized from stored recipient locale; partnership alert English | `tests/notification-email-locale.test.ts` | Migration unverified against a real database locally (runs in CI); fr/pt/es wording unreviewed |
 | API errors | About 150 mapped; internal/operational deliberately English | n/a | Outstanding for permission messages |
 
 ### Governance
@@ -224,3 +224,15 @@ Deploy only after PRs merge and CI is green. No database migration or environmen
 Fully supported status for a locale requires all of: complete review records for every scope in `REVIEW_RECORDS`; recorded regional-variant decisions; authenticated-route browser tests passing in CI; manual accessibility sign-off; green CI including the e2e job; deployed-environment acceptance; and explicit release-owner approval. Until then fr, pt and es remain preview.
 
 Verification (Node, vitest, lint, `tsc`, production build with a disposable `NEXTAUTH_SECRET`): `npm test` 244 passed / 7 skipped, lint and typecheck clean, build succeeded. (Earlier pass; see the remaining-audit section for later results.) fr, pt and es remain preview languages pending qualified human review, especially the market-entry and cross-border boundary disclaimers.
+
+
+## Email localization
+
+Approved schema change (additive migration `20261012000000_notification_recipient_locale`):
+
+- `NotificationPreference.locale` (`TEXT NOT NULL DEFAULT 'en'`): the recipient's notification language, set in the notification preferences form and the existing preferences API (`locale` is optional and validated against the language registry).
+- `ComplianceNotification.templateParams` (`JSONB`, nullable): the values (`title`, `level`) used to render the email.
+
+Behaviour: the stored `subject` and `body` remain English and are the fallback. At send time the worker reads the recipient's locale and re-renders the template from the catalog (`lib/i18n/email-templates.ts`). Legacy rows without params, unknown templates, invalid params and unknown locales all send the stored English text. Stored params are re-validated at render time, content is HTML-escaped, and the HTML carries a matching `lang` attribute. Notifications queued before the migration are delivered in English. In-app notifications are unchanged. Rollback: the columns are unused by older code and can be left in place; reverting the application code restores English-only email.
+
+The French, Portuguese and Spanish email strings are preview text and fall under the same pending native-language and legal/compliance reviews as the rest of the catalogs.

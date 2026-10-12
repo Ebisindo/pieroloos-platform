@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import nodemailer from "nodemailer";
+import { locales, type Locale } from "@/lib/i18n/config";
+import { renderLocalizedEmailText, type EmailTemplateParams } from "@/lib/i18n/email-templates";
 
 export type EmailNotification = {
   id: string;
@@ -8,6 +10,9 @@ export type EmailNotification = {
   subject: string;
   body: string;
   recipientEmail: string;
+  // Rendering inputs only; the stored subject and body remain the English fallback.
+  locale?: Locale;
+  templateParams?: EmailTemplateParams | null;
 };
 
 export type EmailDeliveryReceipt = {
@@ -27,7 +32,14 @@ function renderTemplate(notification: EmailNotification) {
     throw new Error("NOTIFICATION_TEMPLATE_UNAVAILABLE");
   }
 
-  const escapedBody = notification.body
+  const localized = notification.locale
+    ? renderLocalizedEmailText(notification.templateKey, notification.locale, notification.templateParams ?? null)
+    : null;
+  const subject = localized?.subject ?? notification.subject;
+  const body = localized?.body ?? notification.body;
+  const lang = localized && notification.locale ? locales[notification.locale].htmlLang : "en";
+
+  const escapedBody = body
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -35,9 +47,9 @@ function renderTemplate(notification: EmailNotification) {
     .replace(/'/g, "&#39;");
 
   return {
-    subject: notification.subject,
-    text: notification.body,
-    html: `<main><h1>${notification.subject.replace(/[&<>"]/g, "")}</h1><p>${escapedBody.replace(/\n/g, "<br>")}</p></main>`,
+    subject,
+    text: body,
+    html: `<main lang="${lang}"><h1>${subject.replace(/[&<>"]/g, "")}</h1><p>${escapedBody.replace(/\n/g, "<br>")}</p></main>`,
   };
 }
 
