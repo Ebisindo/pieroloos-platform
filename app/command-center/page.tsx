@@ -63,6 +63,7 @@ export default async function CommandCenterPage() {
           quietHoursStart: true,
           quietHoursEnd: true,
           timezone: true,
+          locale: true,
         },
       }).then((preference) => preference ?? {
         inAppEnabled: true,
@@ -70,6 +71,7 @@ export default async function CommandCenterPage() {
         quietHoursStart: null,
         quietHoursEnd: null,
         timezone: "UTC",
+        locale: "en",
       })
       : null,
   ]);

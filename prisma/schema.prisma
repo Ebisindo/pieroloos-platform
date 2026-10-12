@@ -1190,6 +1190,7 @@ model ComplianceNotification {
   deliveryReceipt   String?
   templateKey       String              @default("legacy-notification")
   templateVersion   Int                 @default(1)
+  templateParams    Json?
   deadLetteredAt    DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -1212,6 +1213,7 @@ model NotificationPreference {
   quietHoursStart String?
   quietHoursEnd   String?
   timezone        String   @default("UTC")
+  locale          String   @default("en")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

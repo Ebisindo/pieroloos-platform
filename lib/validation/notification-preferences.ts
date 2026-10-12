@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { locales, type Locale } from "@/lib/i18n/config";
 
 export const notificationPreferenceSchema = z.object({
   inAppEnabled: z.boolean(),
@@ -6,6 +7,7 @@ export const notificationPreferenceSchema = z.object({
   quietHoursStart: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable(),
   quietHoursEnd: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable(),
   timezone: z.string().trim().min(1).max(100),
+  locale: z.enum(Object.keys(locales) as [Locale, ...Locale[]]).optional(),
 }).strict().superRefine((value, context) => {
   if ((value.quietHoursStart === null) !== (value.quietHoursEnd === null)) {
     context.addIssue({

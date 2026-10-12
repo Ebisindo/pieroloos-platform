@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
+import { parseEmailTemplateParams, resolveEmailLocale } from "@/lib/i18n/email-templates";
 import { sendNotificationEmail } from "@/lib/services/notification-email";
 
 const MAX_BATCH_SIZE = 100;
@@ -17,6 +18,7 @@ type ClaimedNotification = {
   body: string;
   templateKey: string;
   templateVersion: number;
+  templateParams?: unknown;
   status: string;
   attemptCount: number;
   maxAttempts: number;
@@ -198,6 +200,7 @@ async function loadRecipientContext(notification: ClaimedNotification) {
       quietHoursStart: null,
       quietHoursEnd: null,
       timezone: "UTC",
+      locale: "en",
     },
     notificationsEnabled: workspaceSettings?.notificationsEnabled ?? true,
   };
@@ -378,6 +381,8 @@ export async function runNotificationWorker(
           subject: notification.subject,
           body: notification.body,
           recipientEmail: recipient.email,
+          locale: resolveEmailLocale(recipient.preference.locale),
+          templateParams: parseEmailTemplateParams(notification.templateKey, notification.templateParams),
         });
         summary.delivered += await finishAttempt({
           notification,
