@@ -10,6 +10,7 @@ import {
   ArrowLeftRight,
   Map,
   Scale,
+  ShieldCheck,
   Settings2,
 } from "lucide-react";
 
@@ -27,6 +28,10 @@ export const workspaceNavigation = [
 
 export const systemNavigation = [
   { href: "/settings", label: "Settings", icon: Settings2 },
+] as const;
+
+export const adminNavigation = [
+  { href: "/admin/dashboard", label: "navigation.adminControlCentre", icon: ShieldCheck },
 ] as const;
 
 // Unauthenticated marketing routes; rendered without the workspace shell or boot splash.

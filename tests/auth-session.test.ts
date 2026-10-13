@@ -156,13 +156,14 @@ describe("authentication configuration", () => {
     expect(mod.authOptions.pages?.signIn).toBe("/signin");
   });
 
-  it("maps JWT claims into the session and never grants superadmin by default", async () => {
+  it("maps the persisted user identifier into the session without carrying an authorization claim", async () => {
     const mod = await load({ NEXTAUTH_SECRET: "x".repeat(32), GITHUB_ID: "id", GITHUB_SECRET: "s" });
     const session = await mod.authOptions.callbacks!.session!({
       session: { user: { name: "a" }, expires: "" },
       token: { sub: "u1" },
     } as never);
-    expect(session.user).toMatchObject({ id: "u1", isSuperAdmin: false });
+    expect(session.user).toMatchObject({ id: "u1" });
+    expect(session.user).not.toHaveProperty("isSuperAdmin");
   });
 
   it("route returns a generic 503 when unconfigured", async () => {

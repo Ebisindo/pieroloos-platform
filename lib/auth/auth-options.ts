@@ -8,13 +8,6 @@ const clientSecret = process.env.OIDC_CLIENT_SECRET;
 const githubId = process.env.GITHUB_ID;
 const githubSecret = process.env.GITHUB_SECRET;
 
-const platformSuperadminEmails = new Set(
-  (process.env.PLATFORM_SUPERADMIN_EMAILS ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean),
-);
-
 export const oidcConfigured = Boolean(issuer && clientId && clientSecret);
 export const githubConfigured = Boolean(githubId && githubSecret);
 export const authSecretConfigured = Boolean(process.env.NEXTAUTH_SECRET?.trim());
@@ -32,10 +25,6 @@ export function getAuthConfigProblems(): string[] {
     problems.push("NEXTAUTH_URL is not set.");
   }
   return problems;
-}
-
-export function isPlatformSuperadmin(email: string | null | undefined): boolean {
-  return Boolean(email && platformSuperadminEmails.has(email.trim().toLowerCase()));
 }
 
 async function hasVerifiedPortalEmail(
@@ -153,14 +142,12 @@ export const authOptions: AuthOptions = {
           select: { id: true },
         });
         if (existingUser) token.sub = existingUser.id;
-        token.isSuperAdmin = isPlatformSuperadmin(user.email);
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         if (token.sub) session.user.id = token.sub;
-        session.user.isSuperAdmin = token.isSuperAdmin === true;
       }
       return session;
     },

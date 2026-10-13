@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth-options";
+import { PlatformPermission } from "@prisma/client";
+import { getCurrentPlatformActor, hasPlatformPermission } from "@/lib/auth/platform-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import {
   enforceRateLimit,
@@ -9,6 +9,7 @@ import {
   PARTNERSHIP_INQUIRY_LIMIT,
 } from "@/lib/http/rate-limit";
 import { listPartnershipInquiries, submitPartnershipInquiry } from "@/lib/services/partnership-inquiry-service";
+import { recordPlatformAuditEvent } from "@/lib/services/platform-admin-service";
 import { partnershipInquirySchema } from "@/lib/validation/partnership-inquiry";
 
 const MAX_BODY_BYTES = 16 * 1024;
@@ -61,13 +62,26 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (!session.user.isSuperAdmin) {
+  const actor = await getCurrentPlatformActor();
+  if (!actor) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (!hasPlatformPermission(actor, PlatformPermission.PARTNERSHIP_INQUIRIES_READ)) {
+    await recordPlatformAuditEvent({
+      actorUserId: actor.userId,
+      actorRole: "ADMIN",
+      action: "PARTNERSHIP_INQUIRIES_READ_DENIED",
+      outcome: "DENIED",
+    });
     return NextResponse.json({ error: "Platform administrator access required." }, { status: 403 });
   }
   try {
-    return NextResponse.json({ data: await listPartnershipInquiries() });
+    const data = await listPartnershipInquiries();
+    await recordPlatformAuditEvent({
+      actorUserId: actor.userId,
+      actorRole: actor.isSuperAdmin ? "SUPER_ADMIN" : "ADMIN",
+      action: "PARTNERSHIP_INQUIRIES_READ",
+      outcome: "SUCCESS",
+    });
+    return NextResponse.json({ data });
   } catch {
     console.error("Unable to load partnership inquiries.");
     return NextResponse.json({ error: "Unable to load partnership inquiries." }, { status: 500 });

@@ -38,9 +38,9 @@ http://localhost:3000/api/auth/callback/oidc
 
 ## Authorization
 
-Sign-in is allowed only for users already present in the database with an organization membership. `PLATFORM_SUPERADMIN_EMAILS` is a comma-separated list of platform superadmin email addresses; it does not bypass the membership requirement. Protected workflows should resolve organization, workspace, and role permissions from the database.
+Sign-in is allowed only for users already present in the database with an organization membership (or an active, verified client portal grant). Platform-wide administrator status is stored in the database and does not bypass the staff membership requirement. It is resolved from the current database assignment for each server-side authorization check, not from the session JWT. See [ADMINISTRATION.md](ADMINISTRATION.md) for initial provisioning, permission delegation, and recovery.
 
-`GET /api/partnerships/inquiries` requires a signed-in platform superadmin (401 or 403 otherwise). `POST` on the same path is public and protected by origin checks, rate limits and validation. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full boundary list.
+`GET /api/partnerships/inquiries` requires a signed-in administrator with `partnership-inquiries.read` (401 or 403 otherwise). `POST` on the same path is public and protected by origin checks, rate limits and validation. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full boundary list.
 
 ## Variables
 

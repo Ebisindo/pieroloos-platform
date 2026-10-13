@@ -1,17 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createMock, listMock, sessionMock, sendEmailMock } = vi.hoisted(() => ({
+const { createMock, listMock, actorMock, auditMock, sendEmailMock } = vi.hoisted(() => ({
   createMock: vi.fn(),
   listMock: vi.fn(),
-  sessionMock: vi.fn(),
+  actorMock: vi.fn(),
+  auditMock: vi.fn(),
   sendEmailMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: { partnershipInquiry: { create: createMock, findMany: listMock } },
 }));
-vi.mock("next-auth", () => ({ getServerSession: sessionMock }));
-vi.mock("@/lib/auth/auth-options", () => ({ authOptions: {} }));
+vi.mock("@/lib/auth/platform-access", () => ({
+  getCurrentPlatformActor: actorMock,
+  hasPlatformPermission: (actor: { isSuperAdmin: boolean; permissions: string[] }, permission: string) =>
+    actor.isSuperAdmin || actor.permissions.includes(permission),
+}));
+vi.mock("@/lib/services/platform-admin-service", () => ({ recordPlatformAuditEvent: auditMock }));
 vi.mock("@/lib/services/notification-email", () => ({ sendNotificationEmail: sendEmailMock }));
 
 import { GET, POST } from "@/app/api/partnerships/inquiries/route";
@@ -142,22 +147,44 @@ describe("partnership inquiry submission", () => {
 
 describe("private inquiry access", () => {
   it("requires authentication", async () => {
-    sessionMock.mockResolvedValue(null);
+    actorMock.mockResolvedValue(null);
     expect((await GET()).status).toBe(401);
     expect(listMock).not.toHaveBeenCalled();
   });
 
   it("rejects authenticated users who are not platform administrators", async () => {
-    sessionMock.mockResolvedValue({ user: { id: "u1", isSuperAdmin: false } });
+    actorMock.mockResolvedValue({ userId: "u1", isSuperAdmin: false, permissions: [], organizationIds: [], email: "u1@example.test" });
     expect((await GET()).status).toBe(403);
     expect(listMock).not.toHaveBeenCalled();
+    expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: "u1",
+      action: "PARTNERSHIP_INQUIRIES_READ_DENIED",
+      outcome: "DENIED",
+    }));
   });
 
   it("lists inquiries for platform administrators", async () => {
-    sessionMock.mockResolvedValue({ user: { id: "u1", isSuperAdmin: true } });
+    actorMock.mockResolvedValue({ userId: "u1", isSuperAdmin: true, permissions: [], organizationIds: [], email: "u1@example.test" });
     listMock.mockResolvedValue([{ id: "inq-1" }]);
     const response = await GET();
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ data: [{ id: "inq-1" }] });
+    expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: "u1",
+      action: "PARTNERSHIP_INQUIRIES_READ",
+      outcome: "SUCCESS",
+    }));
+  });
+
+  it("allows an ordinary administrator only when explicitly assigned the read permission", async () => {
+    actorMock.mockResolvedValue({
+      userId: "u2",
+      isSuperAdmin: false,
+      permissions: ["PARTNERSHIP_INQUIRIES_READ"],
+      organizationIds: [],
+      email: "u2@example.test",
+    });
+    listMock.mockResolvedValue([]);
+    expect((await GET()).status).toBe(200);
   });
 });

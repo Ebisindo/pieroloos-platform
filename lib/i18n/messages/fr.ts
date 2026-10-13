@@ -41,6 +41,7 @@ const fr = {
   "navigation.reports": "Rapports",
   "navigation.engagements": "Missions",
   "navigation.settings": "Paramètres",
+  "navigation.adminControlCentre": "Centre de contrôle administratif",
   "module.clientIntake": "Accueil des clients",
   "module.businessProfile": "Profil d’entreprise",
   "module.jurisdictionLens": "Analyse des juridictions",

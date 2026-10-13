@@ -39,6 +39,7 @@ const en = {
   "navigation.reports": "Reports",
   "navigation.engagements": "Engagements",
   "navigation.settings": "Settings",
+  "navigation.adminControlCentre": "Administrative Control Centre",
   "module.clientIntake": "Client Intake",
   "module.businessProfile": "Business Profile",
   "module.jurisdictionLens": "Jurisdiction Lens",

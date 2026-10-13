@@ -14,6 +14,7 @@ PieroloOS is a professional decision-support and workflow-organization platform.
 | Internationalization foundation and translation workflow | [docs/INTERNATIONALIZATION.md](docs/INTERNATIONALIZATION.md) |
 | Partnership strategy and inquiry workflow | [docs/PARTNERSHIP.md](docs/PARTNERSHIP.md) |
 | Sign-in providers and authorization | [docs/AUTH-SETUP.md](docs/AUTH-SETUP.md) |
+| Platform Super Admin, permissions, provisioning and limits | [docs/ADMINISTRATION.md](docs/ADMINISTRATION.md) |
 | Launch readiness checklist and pilot gate | [docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md](docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md) |
 | Library layering | [docs/ARCHITECTURE-LIB.md](docs/ARCHITECTURE-LIB.md) |
 | Lint/typecheck troubleshooting | [docs/LINT-PROJECT-DIRECTORY.md](docs/LINT-PROJECT-DIRECTORY.md) |
