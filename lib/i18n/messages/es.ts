@@ -41,6 +41,7 @@ const es = {
   "navigation.reports": "Informes",
   "navigation.engagements": "Servicios",
   "navigation.settings": "Configuración",
+  "navigation.adminControlCentre": "Centro de control administrativo",
   "module.clientIntake": "Admisión de clientes",
   "module.businessProfile": "Perfil empresarial",
   "module.jurisdictionLens": "Análisis de jurisdicciones",

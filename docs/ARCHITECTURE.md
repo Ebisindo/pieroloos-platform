@@ -34,7 +34,7 @@ Client Intake → Business Profile → Engagement → Jurisdiction Lens → Form
 
 - **Staff:** NextAuth v4 (GitHub or OIDC), JWT sessions. Sign-in requires an existing organization membership (or a client portal grant with a verified email). Roles: owner, admin, advisor, member, viewer; permissions in `lib/auth/roles.ts`; the active workspace comes from the `active-workspace` cookie validated against memberships.
 - **Clients:** `ClientPortalGrant` scopes a user to one client with view/upload flags, expiry and revocation (`lib/auth/client-portal-context.ts`).
-- **Platform administrators:** `PLATFORM_SUPERADMIN_EMAILS`; does not bypass the membership requirement. Used only for `GET /api/partnerships/inquiries`.
+- **Platform administrators:** the database-backed `PlatformSuperAdmin` singleton and explicit `PlatformAdministratorPermission` assignments, independent of workspace roles and still requiring existing staff membership. See [ADMINISTRATION.md](ADMINISTRATION.md).
 - **Public endpoints:** `POST /api/partnerships/inquiries` (origin check, rate limits, size cap, strict validation) and `/api/health` (no data). Worker routes require `OPERATIONAL_WORKER_SECRET` or the scanner webhook secret.
 - There is no `proxy.ts`; every page and route enforces its own checks. A new route needs its own guard and an authorization test.
 
@@ -52,7 +52,7 @@ Never commit values. Examples live in `.env.example` and `.env.auth.example`.
 
 | Group | Variables | Notes |
 | --- | --- | --- |
-| Auth | `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GITHUB_ID`, `GITHUB_SECRET`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME`, `PLATFORM_SUPERADMIN_EMAILS` | `NEXTAUTH_SECRET` is required in production; the build fails without it |
+| Auth | `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GITHUB_ID`, `GITHUB_SECRET`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME` | `NEXTAUTH_SECRET` is required in production; the build fails without it |
 | Database | `DATABASE_URL`, `DATABASE_ENV`, `DATABASE_URL_LOCAL`, `SHADOW_DATABASE_URL_LOCAL` | Shadow database must be disposable |
 | Workers | `OPERATIONAL_WORKER_SECRET`, `DOCUMENT_SCANNER_WEBHOOK_SECRET` | Scheduler also needs repository secrets `PIEROLOOS_APP_URL` and `OPERATIONAL_WORKER_SECRET` |
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_MESSAGE_ID_DOMAIN` | Optional unless notifications are enabled |

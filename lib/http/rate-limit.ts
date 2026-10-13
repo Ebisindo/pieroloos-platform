@@ -38,6 +38,7 @@ export const PORTAL_UPLOAD_LIMIT: RateLimitPolicy = { name: "portal-upload", lim
 export const PORTAL_INTERACTION_LIMIT: RateLimitPolicy = { name: "portal-interaction", limit: 30, windowMs: 60_000 };
 export const PARTNERSHIP_INQUIRY_LIMIT: RateLimitPolicy = { name: "partnership-inquiry", limit: 5, windowMs: 3_600_000 };
 export const PARTNERSHIP_INQUIRY_GLOBAL_LIMIT: RateLimitPolicy = { name: "partnership-inquiry-global", limit: 200, windowMs: 3_600_000 };
+export const PLATFORM_ADMIN_MUTATION_LIMIT: RateLimitPolicy = { name: "platform-admin-mutation", limit: 10, windowMs: 60_000 };
 
 // Returns a 429 response when the subject has exhausted the policy, otherwise null.
 export async function enforceRateLimit(

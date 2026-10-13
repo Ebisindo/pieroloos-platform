@@ -15,6 +15,14 @@ enum UserRole {
   VIEWER
 }
 
+enum PlatformPermission {
+  DASHBOARD_READ
+  CLIENTS_READ
+  PARTNERSHIP_INQUIRIES_READ
+  ADMINS_READ
+  AUDIT_READ
+}
+
 enum NotificationChannel {
   IN_APP
   EMAIL
@@ -319,6 +327,62 @@ model User {
   clientPortalEvents     ClientPortalAuditEvent[] @relation("PortalAuditActor")
   portalInteractionsAuthored ClientPortalInteraction[] @relation("PortalInteractionActor")
   portalInteractionsReviewed ClientPortalInteraction[] @relation("PortalInteractionReviewer")
+  platformAdministrator     PlatformAdministrator?
+  platformSuperAdmin        PlatformSuperAdmin?
+  platformPermissionsGranted PlatformAdministratorPermission[] @relation("PlatformPermissionGrantor")
+  platformAuditEvents       PlatformAuditEvent[] @relation("PlatformAuditActor")
+}
+
+model PlatformAdministrator {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  user        User                             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  permissions PlatformAdministratorPermission[]
+
+  @@index([createdAt])
+}
+
+model PlatformSuperAdmin {
+  id         String   @id @default("singleton")
+  userId     String   @unique
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model PlatformAdministratorPermission {
+  id                    String             @id @default(cuid())
+  administratorId      String
+  permission            PlatformPermission
+  grantedByUserId       String
+  createdAt             DateTime           @default(now())
+
+  administrator PlatformAdministrator @relation(fields: [administratorId], references: [id], onDelete: Cascade)
+  grantedBy     User                  @relation("PlatformPermissionGrantor", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([administratorId, permission])
+  @@index([grantedByUserId, createdAt])
+}
+
+model PlatformAuditEvent {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  actorRole   String
+  action      String
+  subjectType String?
+  subjectId   String?
+  outcome     String
+  reason      String?
+  details     Json?
+  occurredAt  DateTime @default(now())
+
+  actor User? @relation("PlatformAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([occurredAt])
+  @@index([actorUserId, occurredAt])
+  @@index([subjectType, subjectId, occurredAt])
 }
 
 model Membership {

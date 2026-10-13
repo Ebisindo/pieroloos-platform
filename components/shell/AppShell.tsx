@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Search, ShieldCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { isPublicRoute, portalNavigation, systemNavigation, workspaceNavigation } from "@/lib/navigation";
+import { adminNavigation, isPublicRoute, portalNavigation, systemNavigation, workspaceNavigation } from "@/lib/navigation";
 import { cx } from "@/components/ui/primitives";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { useLocale } from "@/components/i18n/LocaleProvider";
@@ -24,9 +24,16 @@ const navigationKeys = {
   "/engagements": "navigation.engagements",
   "/settings": "navigation.settings",
   "/portal": "navigation.clientPortal",
+  "/admin/dashboard": "navigation.adminControlCentre",
 } as const satisfies Record<string, MessageKey>;
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  canReadAdminDashboard = false,
+}: {
+  children: React.ReactNode;
+  canReadAdminDashboard?: boolean;
+}) {
   const { locale, t } = useLocale();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -43,9 +50,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (isPublicRoute(pathname)) return <>{children}</>;
 
   const isClientPortal = pathname === "/portal" || pathname.startsWith("/portal/");
-  const navigation = isClientPortal
+  const baseNavigation = isClientPortal
     ? portalNavigation
     : [...workspaceNavigation, ...systemNavigation];
+  const navigation = canReadAdminDashboard
+    ? [...baseNavigation, ...adminNavigation]
+    : baseNavigation;
 
   return (
     <div className="app-shell">

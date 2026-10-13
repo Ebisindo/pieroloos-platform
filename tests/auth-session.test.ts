@@ -121,3 +121,58 @@ describe("authentication session policy", () => {
     expect(allowed).toBe(false);
   });
 });
+
+describe("authentication configuration", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  async function load(env: Record<string, string>) {
+    vi.resetModules();
+    for (const key of ["NEXTAUTH_SECRET", "NEXTAUTH_URL", "GITHUB_ID", "GITHUB_SECRET", "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"]) {
+      vi.stubEnv(key, env[key] ?? "");
+    }
+    return import("@/lib/auth/auth-options");
+  }
+
+  it("reports missing configuration by name without throwing", async () => {
+    const mod = await load({});
+    expect(mod.authConfigured).toBe(false);
+    expect(mod.authOptions.providers).toHaveLength(0);
+    expect(mod.getAuthConfigProblems().join(" ")).toContain("NEXTAUTH_SECRET");
+  });
+
+  it("is not configured when providers exist but the secret is missing", async () => {
+    const mod = await load({ GITHUB_ID: "id", GITHUB_SECRET: "s" });
+    expect(mod.authConfigured).toBe(false);
+    expect(mod.authOptions.secret).toBeUndefined();
+  });
+
+  it("registers GitHub when secret and credentials are present", async () => {
+    const mod = await load({ NEXTAUTH_SECRET: "x".repeat(32), GITHUB_ID: "id", GITHUB_SECRET: "s" });
+    expect(mod.authConfigured).toBe(true);
+    expect(mod.authOptions.providers.map((p) => p.id)).toEqual(["github"]);
+    expect(mod.authOptions.pages?.signIn).toBe("/signin");
+  });
+
+  it("maps the persisted user identifier into the session without carrying an authorization claim", async () => {
+    const mod = await load({ NEXTAUTH_SECRET: "x".repeat(32), GITHUB_ID: "id", GITHUB_SECRET: "s" });
+    const session = await mod.authOptions.callbacks!.session!({
+      session: { user: { name: "a" }, expires: "" },
+      token: { sub: "u1" },
+    } as never);
+    expect(session.user).toMatchObject({ id: "u1" });
+    expect(session.user).not.toHaveProperty("isSuperAdmin");
+  });
+
+  it("route returns a generic 503 when unconfigured", async () => {
+    await load({});
+    vi.doMock("next-auth", () => ({ default: () => () => new Response("ok") }));
+    const route = await import("@/app/api/auth/[...nextauth]/route");
+    const res = await route.GET(new Request("http://x/api/auth/signin/github"), { params: Promise.resolve({ nextauth: ["signin", "github"] }) });
+    expect(res.status).toBe(503);
+    expect(JSON.stringify(await res.json())).not.toMatch(/NEXTAUTH|GITHUB/);
+    vi.doUnmock("next-auth");
+  });
+});

@@ -8,24 +8,23 @@ const clientSecret = process.env.OIDC_CLIENT_SECRET;
 const githubId = process.env.GITHUB_ID;
 const githubSecret = process.env.GITHUB_SECRET;
 
-const platformSuperadminEmails = new Set(
-  (process.env.PLATFORM_SUPERADMIN_EMAILS ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean),
-);
-
 export const oidcConfigured = Boolean(issuer && clientId && clientSecret);
 export const githubConfigured = Boolean(githubId && githubSecret);
-export const authConfigured = oidcConfigured || githubConfigured;
+export const authSecretConfigured = Boolean(process.env.NEXTAUTH_SECRET?.trim());
+export const authConfigured = authSecretConfigured && (oidcConfigured || githubConfigured);
 export const AUTH_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
-if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_SECRET) {
-  throw new Error("NEXTAUTH_SECRET must be configured in production.");
-}
-
-export function isPlatformSuperadmin(email: string | null | undefined): boolean {
-  return Boolean(email && platformSuperadminEmails.has(email.trim().toLowerCase()));
+// Names only; never includes values.
+export function getAuthConfigProblems(): string[] {
+  const problems: string[] = [];
+  if (!authSecretConfigured) problems.push("NEXTAUTH_SECRET is not set.");
+  if (!oidcConfigured && !githubConfigured) {
+    problems.push("No identity provider: set GITHUB_ID and GITHUB_SECRET, or OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET.");
+  }
+  if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
+    problems.push("NEXTAUTH_URL is not set.");
+  }
+  return problems;
 }
 
 async function hasVerifiedPortalEmail(
@@ -74,17 +73,8 @@ async function hasVerifiedPortalEmail(
   }
 }
 
-function resolveAuthSecret(): string {
-  const secret = process.env.NEXTAUTH_SECRET;
-  if (secret) return secret;
-  if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build") {
-    throw new Error("NEXTAUTH_SECRET must be set in production.");
-  }
-  return "dev-secret-change-me";
-}
-
 export const authOptions: AuthOptions = {
-  secret: resolveAuthSecret(),
+  secret: process.env.NEXTAUTH_SECRET?.trim() || undefined,
   session: { strategy: "jwt", maxAge: AUTH_SESSION_MAX_AGE_SECONDS },
   providers: [
     ...(githubConfigured
@@ -152,14 +142,12 @@ export const authOptions: AuthOptions = {
           select: { id: true },
         });
         if (existingUser) token.sub = existingUser.id;
-        token.isSuperAdmin = isPlatformSuperadmin(user.email);
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         if (token.sub) session.user.id = token.sub;
-        session.user.isSuperAdmin = token.isSuperAdmin === true;
       }
       return session;
     },
