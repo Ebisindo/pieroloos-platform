@@ -60,6 +60,7 @@ describe("public FAQ and legal content", () => {
     const content = readFileSync(join(process.cwd(), "app/policies/[slug]/page.tsx"), "utf8");
     expect(content).toContain('robots: { index: false, follow: true }');
     expect(content).toContain("DRAFT — NOT APPROVED FOR BINDING OR FINAL PUBLICATION.");
-    expect(content).toContain("Approval and implementation requirements");
+    expect(content).toContain('"blockers"');
+    expect(content).toContain('"DRAFT"');
   });
 });
