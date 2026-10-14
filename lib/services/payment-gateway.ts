@@ -295,7 +295,10 @@ export async function createCryptoPaymentOrder(input: {
   if (!invoice) throw new PaymentGatewayError("Open USD invoice not found in the active organization.", "NOT_FOUND");
   const paymentReference = newPaymentReference("CRYPTO");
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-  const expectedTokenAmountBaseUnits = (invoice.amountRemainingMinor * BigInt(10000)).toString();
+  // Invoice money uses USD cents. Convert cents to base units using the explicitly verified decimals for this exact rail.
+  const expectedTokenAmountBaseUnits = (
+    invoice.amountRemainingMinor * (BigInt(10) ** BigInt(rail.tokenDecimals - 2))
+  ).toString();
   const provider = `crypto:${rail.network.toLowerCase()}:${rail.asset.toLowerCase()}`;
 
   const result = await prisma.$transaction(async (tx) => {
