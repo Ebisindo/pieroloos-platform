@@ -23,7 +23,7 @@ function safeInvoiceAmount(invoice: { amountDueMinor: bigint; amountPaidMinor: b
 }
 
 export async function listOpenInvoices(organizationId: string) {
-  return prisma.billingInvoice.findMany({
+  const invoices = await prisma.billingInvoice.findMany({
     where: { organizationId, status: BillingInvoiceStatus.OPEN, amountRemainingMinor: { gt: 0n } },
     orderBy: { createdAt: "desc" },
     take: 50,
@@ -32,10 +32,16 @@ export async function listOpenInvoices(organizationId: string) {
       amountPaidMinor: true, amountRemainingMinor: true, dueAt: true, createdAt: true,
     },
   });
+  return invoices.map((invoice) => ({
+    ...invoice,
+    amountDueMinor: invoice.amountDueMinor.toString(),
+    amountPaidMinor: invoice.amountPaidMinor.toString(),
+    amountRemainingMinor: invoice.amountRemainingMinor.toString(),
+  }));
 }
 
 export async function listPayments(organizationId: string) {
-  return prisma.billingPayment.findMany({
+  const payments = await prisma.billingPayment.findMany({
     where: { organizationId },
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -45,6 +51,10 @@ export async function listPayments(organizationId: string) {
       createdAt: true, paidAt: true,
     },
   });
+  return payments.map((payment) => ({
+    ...payment,
+    amountMinor: payment.amountMinor.toString(),
+  }));
 }
 
 export async function createBankTransferOrder(input: {
