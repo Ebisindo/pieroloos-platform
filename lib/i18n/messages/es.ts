@@ -41,6 +41,7 @@ const es = {
   "navigation.reports": "Informes",
   "navigation.engagements": "Servicios",
   "navigation.settings": "Configuración",
+  "navigation.billing": "Facturación y pagos",
   "navigation.adminControlCentre": "Centro de control administrativo",
   "module.clientIntake": "Admisión de clientes",
   "module.businessProfile": "Perfil empresarial",
