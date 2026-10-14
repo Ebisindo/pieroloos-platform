@@ -24,7 +24,8 @@ function stringValue(value: unknown): string | null {
 }
 
 export async function POST(request: Request) {
-  if (process.env.PAYMENTS_ENABLED !== "true" || process.env.STRIPE_PAYMENTS_ENABLED !== "true") {
+  const controls = paymentControlConfiguration();
+  if (!controls.paymentsEnabled || !controls.stripeEnabled) {
     return errorResponse("Stripe webhook processing is disabled.", 503);
   }
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
