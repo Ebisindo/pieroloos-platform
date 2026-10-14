@@ -214,3 +214,22 @@ Do not launch or represent the feature as production-ready until:
 Report exact files changed, schemas/migrations, implemented workflows, permissions, evidence and audit mechanisms, tests actually executed and their outcomes, unresolved risks, deployment steps, and approvals still required.
 
 This framework remains a proposal until code is implemented and reviewed; any institution remains a prospective partner until the appropriate relationship is documented and authorized.
+
+## 13. First implementation slice (in progress)
+
+The current feature branch adds an initial application slice:
+
+- Prisma domain records for `ExportInstitution` and `ExportInstitutionEvidence`.
+- An additive PostgreSQL migration under `prisma/migrations/20261014190000_global_export_institution_directory`.
+- A private Super Admin directory at `/admin/institutions`, linked from the administrative control centre.
+- `GET/POST /api/admin/institutions` for listing and creating records.
+- `PATCH /api/admin/institutions/[id]` for controlled relationship-status transitions.
+- Evidence intake and review endpoints under `/api/admin/institutions/[id]/evidence`.
+- Lifecycle validation and initial unit tests.
+- Audit events for directory reads, institution creation, evidence changes and relationship-status changes.
+
+New records default to `PROSPECTIVE_NOT_CONFIRMED`, `UNVERIFIED`, `publicProfileApproved=false`, and `logoUseAuthorized=false`. Status transitions to written authorization or active agreement require a reviewed official-primary evidence record. Only the current Super Administrator can use these initial endpoints.
+
+### Explicit limitations
+
+This is not the complete global exporter workflow. Exporter onboarding, market-entry assessments, programme management, a dedicated public institution profile approval workflow, institutional outreach automation, data-sharing agreements, and full evidence search/review UX remain unimplemented. Do not describe them as available. Before merging, review CI, Prisma schema validation, migration inventory, and security/test results in the repository's development environment.
