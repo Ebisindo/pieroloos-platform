@@ -10,10 +10,10 @@ export type PaymentWorkflowStatus = (typeof PAYMENT_STATUSES)[number];
 
 export const CRYPTO_RAILS = [
   { asset: "USDT", network: "TRON", envKey: "CRYPTO_USDT_TRON_ADDRESS" },
-  { asset: "USDT", network: "BNB_SMART_CHAIN", envKey: "CRYPTO_USDT_BSC_ADDRESS" },
+  { asset: "USDT", network: "BNB_SMART_CHAIN", envKey: "CRYPTO_USDT_BNB_SMART_CHAIN_ADDRESS" },
   { asset: "USDC", network: "ETHEREUM", envKey: "CRYPTO_USDC_ETHEREUM_ADDRESS" },
   { asset: "USDC", network: "SOLANA", envKey: "CRYPTO_USDC_SOLANA_ADDRESS" },
-  { asset: "USDC", network: "BNB_SMART_CHAIN", envKey: "CRYPTO_USDC_BSC_ADDRESS" },
+  { asset: "USDC", network: "BNB_SMART_CHAIN", envKey: "CRYPTO_USDC_BNB_SMART_CHAIN_ADDRESS" },
 ] as const;
 
 export function paymentFeatureEnabled(method: PaymentMethod, env: Record<string, string | undefined> = process.env) {
