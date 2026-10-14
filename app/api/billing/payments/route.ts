@@ -6,6 +6,7 @@ import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PORTAL_INTERACTION_LIMIT } from "@/lib/http/rate-limit";
 import { listOpenInvoices, listPayments, submitCryptoPaymentClaim, PaymentGatewayError } from "@/lib/services/payment-gateway";
 import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
+import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 
 const claimSchema = z.object({
   paymentId: z.string().min(1).max(128),
@@ -77,7 +78,8 @@ export async function POST(request: Request) {
   const parsed = claimSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Validation failed.", issues: parsed.error.flatten().fieldErrors }, { status: 422 });
 
-  if (!paymentFeatureEnabled("CRYPTO")) {
+  const paymentControls = paymentControlConfiguration();
+  if (!paymentControls.paymentsEnabled || !paymentControls.cryptoEnabled || !paymentFeatureEnabled("CRYPTO")) {
     return NextResponse.json({ error: "Cryptocurrency payments are currently unavailable." }, { status: 503 });
   }
 
