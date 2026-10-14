@@ -270,11 +270,6 @@ export default async function PolicyDocumentPage({ params }: { params: Promise<{
           </dl>
           <p className="legal-prose">{doc.purpose}</p>
           {doc.body.map((paragraph) => <p className="legal-prose" key={paragraph}>{paragraph}</p>)}
-          <section className="policy-blockers">
-            <h2>Approval and implementation requirements</h2>
-            <p>This readiness section is shown to make the draft status clear; it is not a binding contractual clause.</p>
-            <ul>{doc.blockers.map((item) => <li key={item}>{item}</li>)}</ul>
-          </section>
           <p className="legal-related-links"><Link href="/policies">All Policies &amp; Legal</Link> · <Link href="/terms">Terms and Conditions (draft)</Link> · <Link href="/faq">FAQ</Link></p>
         </article>
       </section>
