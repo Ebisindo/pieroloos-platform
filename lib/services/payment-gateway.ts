@@ -227,7 +227,7 @@ export async function submitBankTransferClaim(input: {
   return prisma.$transaction(async (tx) => {
     const payment = await tx.billingPayment.findFirst({
       where: { id: input.paymentId, organizationId: input.organizationId, provider: "bank_transfer", status: BillingPaymentStatus.PENDING },
-      select: { id: true, invoiceId: true, currency: true, amountMinor: true, providerPaymentId: true },
+      select: { id: true, invoiceId: true, currency: true, amountMinor: true, providerPaymentId: true, provider: true, status: true },
     });
     if (!payment || !payment.invoiceId || !payment.providerPaymentId) {
       throw new PaymentGatewayError("Pending bank-transfer order not found.", "NOT_FOUND");
