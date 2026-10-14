@@ -102,7 +102,7 @@ export async function POST(request: Request) {
       transactionReference: parsed.data.transactionReference,
     });
     return NextResponse.json({
-      data: payment,
+      data: { ...payment, amountMinor: payment.amountMinor.toString() },
       message: "Your payment claim has been recorded as pending. This submission does not confirm receipt of funds or activate paid access.",
     }, { status: 201 });
   } catch (error) {
