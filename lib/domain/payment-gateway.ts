@@ -34,23 +34,29 @@ export function cryptoRailConfiguration(env: NodeJS.ProcessEnv = process.env) {
       ? "CRYPTO_USDC_SOLANA_MINT"
       : `CRYPTO_${rail.asset}_${rail.network}_TOKEN_ID`;
     const tokenIdentifier = env[tokenIdentifierEnv]?.trim() ?? "";
-    const verificationConfigured = Boolean(
-      env[`CRYPTO_${rail.network}_RPC_URL`] ||
-      env.CRYPTO_VERIFICATION_PROVIDER_URL,
-    );
+    const configuredDecimals = env[`CRYPTO_${rail.asset}_${rail.network}_TOKEN_DECIMALS`];
+    const tokenDecimals = configuredDecimals && /^\\d+$/.test(configuredDecimals) ? Number(configuredDecimals) : null;
     const destinationVerified = env[`${rail.envKey}_VERIFIED`] === "true";
     const tokenVerified = env[`${tokenIdentifierEnv}_VERIFIED`] === "true";
     const networkEnabled = env[`CRYPTO_${rail.network}_ENABLED`] === "true";
+    // This implementation supports only an explicitly approved USD-parity quote and
+    // human finance review against independent chain evidence. It does not claim automatic
+    // on-chain verification. Stablecoin decimals must be explicitly configured as verified.
+    const reviewPolicyReady = env.CRYPTO_MANUAL_RECONCILIATION_ENABLED === "true" &&
+      env.CRYPTO_USD_PARITY_QUOTE_APPROVED === "true" &&
+      env.CRYPTO_TOKEN_DECIMALS_VERIFIED === "true" &&
+      tokenDecimals === 6;
     return {
       asset: rail.asset,
       network: rail.network,
       address,
       tokenIdentifier,
+      tokenDecimals,
       enabled: env.PAYMENTS_ENABLED === "true" &&
         env.CRYPTO_PAYMENTS_ENABLED === "true" &&
         networkEnabled &&
-        Boolean(address && tokenIdentifier && verificationConfigured) &&
-        destinationVerified && tokenVerified,
+        Boolean(address && tokenIdentifier) &&
+        destinationVerified && tokenVerified && reviewPolicyReady,
     };
   });
 }
