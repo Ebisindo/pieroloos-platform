@@ -36,7 +36,7 @@ export function paymentFeatureEnabled(method: PaymentMethod, env: Record<string,
   return env.CRYPTO_PAYMENTS_ENABLED === "true";
 }
 
-export function cryptoRailConfiguration(env: NodeJS.ProcessEnv = process.env) {
+export function cryptoRailConfiguration(env: Record<string, string | undefined> = process.env) {
   return CRYPTO_RAILS.map((rail) => {
     const address = env[rail.envKey]?.trim() ?? "";
     // Destination addresses alone are not enough: token identity, verification provider,
