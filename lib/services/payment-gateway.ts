@@ -286,6 +286,7 @@ export async function reconcileCryptoPayment(input: {
   receivedAmountBaseUnits: bigint;
   evidenceReference: string;
   reason: string;
+  decision: "APPROVE" | "REJECT";
 }) {
   if (process.env.PAYMENTS_ENABLED !== "true" ||
       process.env.CRYPTO_PAYMENTS_ENABLED !== "true" ||
@@ -293,7 +294,7 @@ export async function reconcileCryptoPayment(input: {
     throw new PaymentGatewayError("Crypto reconciliation is disabled.", "DISABLED");
   }
   if (input.reason.trim().length < 8 || input.evidenceReference.trim().length < 8 ||
-      input.receivedAmountBaseUnits <= 0n) {
+      (input.decision === "APPROVE" && input.receivedAmountBaseUnits <= 0n)) {
     throw new PaymentGatewayError("Independent chain evidence, exact received base units, and a reason are required.", "INVALID");
   }
   return prisma.$transaction(async (tx) => {
@@ -323,10 +324,28 @@ export async function reconcileCryptoPayment(input: {
     });
     if (!payment || !payment.invoiceId) throw new PaymentGatewayError("Crypto payment claim not found.", "NOT_FOUND");
     if (payment.status !== BillingPaymentStatus.PENDING) throw new PaymentGatewayError("Crypto claim is no longer pending.", "CONFLICT");
+    if (payment.providerPaymentId !== claimMetadata?.transactionReference) {
+      throw new PaymentGatewayError("Transaction reference does not match the immutable claim.", "INVALID");
+    }
+    if (input.decision === "REJECT") {
+      const changed = await tx.billingPayment.updateMany({
+        where: { id: payment.id, organizationId: input.organizationId, status: BillingPaymentStatus.PENDING },
+        data: { status: BillingPaymentStatus.FAILED, failureCode: "CRYPTO_CLAIM_REJECTED", failureMessage: input.reason.trim() },
+      });
+      if (changed.count !== 1) throw new PaymentGatewayError("Crypto claim has already been reviewed.", "CONFLICT");
+      await tx.platformAuditEvent.create({
+        data: {
+          actorUserId: input.actorUserId, actorRole: "SUPER_ADMIN",
+          action: "CRYPTO_PAYMENT_REJECTED", subjectType: "BILLING_PAYMENT", subjectId: payment.id,
+          outcome: "SUCCESS", reason: input.reason.trim(),
+          details: { organizationId: input.organizationId, evidenceReference: input.evidenceReference.trim(), transactionReference: payment.providerPaymentId, automaticVerification: false },
+        },
+      });
+      return { id: payment.id, status: BillingPaymentStatus.FAILED };
+    }
     if (payment.currency !== "USD" || typeof claimMetadata?.expectedTokenAmountBaseUnits !== "string" ||
-        BigInt(claimMetadata.expectedTokenAmountBaseUnits) !== input.receivedAmountBaseUnits ||
-        payment.providerPaymentId !== claimMetadata.transactionReference) {
-      throw new PaymentGatewayError("Received token amount or transaction reference does not match the immutable claim.", "INVALID");
+        BigInt(claimMetadata.expectedTokenAmountBaseUnits) !== input.receivedAmountBaseUnits) {
+      throw new PaymentGatewayError("Received token amount does not match the immutable claim.", "INVALID");
     }
     const invoice = await tx.billingInvoice.findFirst({
       where: { id: payment.invoiceId, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN },
