@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 type Rail = { asset: "USDT" | "USDC"; network: "TRON" | "BNB_SMART_CHAIN" | "ETHEREUM" | "SOLANA"; address: string; tokenIdentifier: string; tokenDecimals: number };
-type Invoice = { id: string; invoiceNumber: string | null; currency: "USD"; amountRemainingMinor: string; expectedTokenAmountBaseUnits: string; expectedTokenAmount: string };
+type Invoice = { id: string; invoiceNumber: string | null; currency: "USD"; amountRemainingMinor: string; expectedTokenAmount: string };
 type PaymentOrder = {
   payment: { id: string; providerPaymentId: string; status: string; amountMinor: string };
   invoice: { id: string; invoiceNumber: string | null; currency: "USD"; amountRemainingMinor: string };
