@@ -42,70 +42,41 @@ export async function activateSubscriptionAfterVerifiedPayment(
     actorRole?: string;
   },
 ) {
-  if (!input.subscriptionId) return { activated: false, reason: "NO_SUBSCRIPTION_LINKED" as const };
+  if (process.env.PAYMENT_SUBSCRIPTION_ACTIVATION_ENABLED !== "true" || !input.subscriptionId) {
+    return { activated: false, reason: "ACTIVATION_DISABLED_OR_NO_SUBSCRIPTION" as const };
+  }
   const now = new Date();
   const subscription = await tx.billingSubscription.findFirst({
     where: { id: input.subscriptionId, organizationId: input.organizationId },
     select: { id: true, status: true, currentPeriodStart: true, currentPeriodEnd: true },
   });
-  if (!subscription) {
-    await tx.platformAuditEvent.create({
-      data: {
-        actorUserId: input.actorUserId ?? null,
-        actorRole: input.actorRole ?? "SYSTEM",
-        action: "BILLING_SUBSCRIPTION_REQUIRES_REVIEW",
-        subjectType: "BILLING_SUBSCRIPTION",
-        subjectId: input.subscriptionId,
-        outcome: "SUCCESS",
-        reason: "Paid invoice references a subscription that was not found in its organization.",
-        details: { organizationId: input.organizationId, paymentId: input.paymentId },
-      },
-    });
-    return { activated: false, reason: "SUBSCRIPTION_NOT_FOUND" as const };
-  }
+  if (!subscription) return { activated: false, reason: "SUBSCRIPTION_NOT_FOUND" as const };
   const eligibleStatus = subscription.status === "ACTIVE" || subscription.status === "TRIALING" || subscription.status === "PAST_DUE";
   const withinPeriod = subscription.currentPeriodStart <= now && subscription.currentPeriodEnd > now;
   if (!eligibleStatus || !withinPeriod) {
     await tx.platformAuditEvent.create({
       data: {
-        actorUserId: input.actorUserId ?? null,
-        actorRole: input.actorRole ?? "SYSTEM",
-        action: "BILLING_SUBSCRIPTION_REQUIRES_REVIEW",
-        subjectType: "BILLING_SUBSCRIPTION",
-        subjectId: subscription.id,
-        outcome: "SUCCESS",
-        reason: "Payment was verified, but subscription status or billing period did not permit automatic activation.",
-        details: {
-          organizationId: input.organizationId, paymentId: input.paymentId,
-          priorStatus: subscription.status,
-          currentPeriodStart: subscription.currentPeriodStart.toISOString(),
-          currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
-        },
+        actorUserId: input.actorUserId ?? null, actorRole: input.actorRole ?? "SYSTEM",
+        action: "BILLING_SUBSCRIPTION_REQUIRES_REVIEW", subjectType: "BILLING_SUBSCRIPTION",
+        subjectId: subscription.id, outcome: "SUCCESS",
+        reason: "Payment was verified, but subscription status or current period did not permit automatic activation.",
+        details: { organizationId: input.organizationId, paymentId: input.paymentId, priorStatus: subscription.status },
       },
     });
     return { activated: false, reason: "SUBSCRIPTION_STATE_REQUIRES_REVIEW" as const };
   }
   if (subscription.status !== "ACTIVE") {
     const updated = await tx.billingSubscription.updateMany({
-      where: {
-        id: subscription.id,
-        organizationId: input.organizationId,
-        status: subscription.status,
-        currentPeriodStart: { lte: now },
-        currentPeriodEnd: { gt: now },
-      },
+      where: { id: subscription.id, organizationId: input.organizationId, status: subscription.status, currentPeriodStart: { lte: now }, currentPeriodEnd: { gt: now } },
       data: { status: "ACTIVE" },
     });
     if (updated.count !== 1) throw new PaymentGatewayError("Subscription changed during payment reconciliation.", "CONFLICT");
   }
   await tx.platformAuditEvent.create({
     data: {
-      actorUserId: input.actorUserId ?? null,
-      actorRole: input.actorRole ?? "SYSTEM",
-      action: subscription.status === "ACTIVE" ? "BILLING_SUBSCRIPTION_PAYMENT_CONFIRMED" : "BILLING_SUBSCRIPTION_ACTIVATED_AFTER_PAYMENT",
-      subjectType: "BILLING_SUBSCRIPTION",
-      subjectId: subscription.id,
-      outcome: "SUCCESS",
+      actorUserId: input.actorUserId ?? null, actorRole: input.actorRole ?? "SYSTEM",
+      action: "BILLING_SUBSCRIPTION_PAYMENT_CONFIRMED", subjectType: "BILLING_SUBSCRIPTION",
+      subjectId: subscription.id, outcome: "SUCCESS",
       details: { organizationId: input.organizationId, paymentId: input.paymentId },
     },
   });
