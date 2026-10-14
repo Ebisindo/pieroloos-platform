@@ -38,23 +38,22 @@ export async function PATCH(
     if (!parsed.data.agreementEvidenceRef?.trim()) {
       return NextResponse.json({ error: "A reviewed written-authorization evidence reference is required for this status." }, { status: 422 });
     }
-    const evidence = await prisma.exportInstitutionEvidence.findFirst({
+    const authorizationEvidence = await prisma.exportInstitutionEvidence.findFirst({
       where: {
         id: parsed.data.agreementEvidenceRef,
         institutionId: id,
-        evidenceClass: "OFFICIAL_PRIMARY",
+        evidenceClass: "WRITTEN_AUTHORIZATION",
         verifiedAt: { not: null },
       },
       select: { id: true },
     });
-    if (!evidence) {
-      return NextResponse.json({ error: "The evidence reference must identify reviewed official primary evidence for this institution." }, { status: 422 });
+    if (!authorizationEvidence) {
+      return NextResponse.json({ error: "The reference must identify reviewed written-authorization evidence for this institution." }, { status: 422 });
     }
   }
   if (parsed.data.status === "ACTIVE_UNDER_SIGNED_AGREEMENT") {
-    const nextVerification = parsed.data.verificationStatus ?? current.verificationStatus;
-    if (nextVerification !== "SOURCE_REVIEWED" && nextVerification !== "CROSS_VERIFIED") {
-      return NextResponse.json({ error: "Reviewed source evidence is required before activating a partnership." }, { status: 422 });
+    if (current.verificationStatus !== "SOURCE_REVIEWED" && current.verificationStatus !== "CROSS_VERIFIED") {
+      return NextResponse.json({ error: "Reviewed official-source evidence is required before activating a partnership." }, { status: 422 });
     }
     const verifiedOfficialSources = await prisma.exportInstitutionEvidence.count({
       where: { institutionId: id, evidenceClass: "OFFICIAL_PRIMARY", verifiedAt: { not: null } },
@@ -71,8 +70,6 @@ export async function PATCH(
         data: {
           relationshipStatus: parsed.data.status,
           agreementEvidenceRef: parsed.data.agreementEvidenceRef ?? current.agreementEvidenceRef,
-          verificationStatus: parsed.data.verificationStatus ?? current.verificationStatus,
-          lastVerifiedAt: parsed.data.verificationStatus ? new Date() : current.lastVerifiedAt,
           // Status transitions never publish profiles or authorize logo use.
           publicProfileApproved: current.publicProfileApproved,
           logoUseAuthorized: current.logoUseAuthorized,
@@ -91,8 +88,6 @@ export async function PATCH(
           details: {
             fromStatus: current.relationshipStatus,
             toStatus: parsed.data.status,
-            fromVerificationStatus: current.verificationStatus,
-            toVerificationStatus: parsed.data.verificationStatus ?? current.verificationStatus,
             evidenceReferenceProvided: Boolean(parsed.data.agreementEvidenceRef),
           },
         },
