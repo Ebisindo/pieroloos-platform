@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid invoice reference." }, { status: 422 });
 
   const invoice = await prisma.billingInvoice.findFirst({
-    where: { id: parsed.data.invoiceId, organizationId: context.activeWorkspace.organizationId, status: BillingInvoiceStatus.OPEN, amountRemainingMinor: { gt: 0n } },
+    where: { id: parsed.data.invoiceId, organizationId: context.activeWorkspace.organizationId, status: BillingInvoiceStatus.OPEN, amountRemainingMinor: { gt: BigInt(0) } },
     select: { id: true, currency: true, amountRemainingMinor: true, invoiceNumber: true },
   });
   if (!invoice) return NextResponse.json({ error: "Open invoice not found." }, { status: 404 });
