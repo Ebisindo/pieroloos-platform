@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db/prisma";
 import { reconcileBankTransfer, reconcileCryptoPayment, PaymentGatewayError } from "@/lib/services/payment-gateway";
 
 const actionSchema = z.object({
-  action: z.enum(["APPROVE_BANK_TRANSFER", "REJECT_BANK_TRANSFER", "APPROVE_CRYPTO_PAYMENT"]),
+  action: z.enum(["APPROVE_BANK_TRANSFER", "REJECT_BANK_TRANSFER", "APPROVE_CRYPTO_PAYMENT", "REJECT_CRYPTO_PAYMENT"]),
   paymentId: z.string().min(1).max(128),
   organizationId: z.string().min(1).max(128),
   receivedAmountMinor: z.string().regex(/^[1-9][0-9]{0,17}$/).optional(),
@@ -83,16 +83,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (parsed.data.action === "APPROVE_CRYPTO_PAYMENT") {
+    if (parsed.data.action === "APPROVE_CRYPTO_PAYMENT" || parsed.data.action === "REJECT_CRYPTO_PAYMENT") {
       const result = await reconcileCryptoPayment({
         actorUserId: actor.userId,
         organizationId: parsed.data.organizationId,
         paymentId: parsed.data.paymentId,
-        receivedAmountBaseUnits: BigInt(parsed.data.receivedAmountBaseUnits!),
+        receivedAmountBaseUnits: BigInt(parsed.data.receivedAmountBaseUnits ?? "1"),
+        decision: parsed.data.action === "APPROVE_CRYPTO_PAYMENT" ? "APPROVE" : "REJECT",
         evidenceReference: parsed.data.evidenceReference,
         reason: parsed.data.reason,
       });
-      return NextResponse.json({ data: result, notice: "Recorded as manually reconciled from evidence supplied by the reviewer; this API does not itself query a blockchain." });
+      return NextResponse.json({ data: result, notice: "Recorded as a manually reconciled decision from evidence supplied by the reviewer; this API does not itself query a blockchain." });
     }
     const result = await reconcileBankTransfer({
       actorUserId: actor.userId,
