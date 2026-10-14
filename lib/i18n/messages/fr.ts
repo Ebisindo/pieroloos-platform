@@ -1,6 +1,18 @@
 import type { MessageCatalog } from "../messages";
 
 const fr = {
+  "faq.eyebrow": "CENTRE D’AIDE",
+  "faq.heading": "Foire aux questions",
+  "faq.intro": "Réponses sur PieroloOS, les preuves, les comptes, la disponibilité et les limites importantes.",
+  "faq.lastUpdated": "Dernière mise à jour",
+  "faq.section.about": "À propos de PieroloOS",
+  "faq.section.evidence": "Création, preuves et conformité",
+  "faq.section.accounts": "Comptes, confidentialité et documents",
+  "faq.section.support": "Tarifs, partenariats et assistance",
+  "terms.draftLabel": "CONDITIONS GÉNÉRALES · PROJET",
+  "terms.heading": "Conditions générales",
+  "terms.draftNoticeTitle": "PROJET — VALIDATION JURIDIQUE REQUISE AVANT TOUTE PUBLICATION CONTRACTUELLE.",
+  "terms.draftNoticeBody": "L’identité juridique de l’opérateur, son adresse enregistrée, la date d’entrée en vigueur, le droit applicable, les coordonnées, les informations de confidentialité, les protections des consommateurs, la responsabilité et les exigences propres aux marchés doivent être confirmés et examinés par un conseil qualifié.",
   "language.legalReviewNotice": "Les textes des politiques en français, portugais et espagnol sont présentés à titre d’aperçu uniquement et n’ont pas fait l’objet d’une révision juridique professionnelle de la traduction.",
   "navigation.helpLegal": "Aide et juridique",
   "navigation.faq": "Foire aux questions",
