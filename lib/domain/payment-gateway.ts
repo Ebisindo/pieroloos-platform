@@ -134,5 +134,8 @@ export function parseTransactionReference(value: unknown, network: string): stri
     ETHEREUM: /^0x[0-9a-fA-F]{64}$/,
     SOLANA: /^[1-9A-HJ-NP-Za-km-z]{64,90}$/,
   };
-  return patterns[network] && patterns[network].test(candidate) ? candidate : null;
+  if (!patterns[network] || !patterns[network].test(candidate)) return null;
+  return network === "TRON" || network === "ETHEREUM" || network === "BNB_SMART_CHAIN"
+    ? candidate.toLowerCase()
+    : candidate;
 }
