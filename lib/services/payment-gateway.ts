@@ -233,6 +233,7 @@ export async function reconcileBankTransfer(input: {
       where: { id: payment.id, organizationId: input.organizationId, status: BillingPaymentStatus.PENDING },
       data: {
         status: resultStatus,
+        ...(input.decision === "APPROVE" ? { providerPaymentId: `bank-transfer:${input.bankTransactionReference.trim()}` } : {}),
         paidAt: input.decision === "APPROVE" ? new Date() : null,
         failureCode: input.decision === "REJECT" ? "BANK_TRANSFER_REJECTED" : null,
         failureMessage: input.decision === "REJECT" ? input.reason.trim() : null,
