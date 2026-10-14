@@ -311,6 +311,16 @@ export async function createCryptoPaymentOrder(input: {
   const provider = `crypto:${rail.network.toLowerCase()}:${rail.asset.toLowerCase()}`;
 
   const result = await prisma.$transaction(async (tx) => {
+    const pendingPayment = await tx.billingPayment.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        invoiceId: invoice.id,
+        status: BillingPaymentStatus.PENDING,
+        OR: [{ provider: "bank_transfer" }, { provider: "stripe" }, { provider: { startsWith: "crypto:" } }],
+      },
+      select: { id: true },
+    });
+    if (pendingPayment) throw new PaymentGatewayError("Another payment attempt is still pending for this invoice. Complete or reconcile it before creating a new crypto order.", "CONFLICT");
     const fresh = await tx.billingInvoice.findFirst({
       where: { id: invoice.id, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD" },
       select: { amountRemainingMinor: true },
