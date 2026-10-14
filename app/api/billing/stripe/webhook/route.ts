@@ -4,6 +4,7 @@ import { BillingInvoiceStatus, BillingPaymentStatus, BillingWebhookStatus, Prism
 import { prisma } from "@/lib/db/prisma";
 import { activateSubscriptionAfterVerifiedPayment } from "@/lib/services/payment-gateway";
 import { verifyStripeWebhookSignature } from "@/lib/domain/stripe-webhook-signature";
+import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,9 +33,7 @@ export async function POST(request: Request) {
   if (!signature) return errorResponse("Missing Stripe signature.", 400);
   const rawBody = await request.text().catch(() => "");
   if (!rawBody || Buffer.byteLength(rawBody, "utf8") > 1024 * 1024) return errorResponse("Invalid webhook body.", 400);
-  const configuredTolerance = Number(process.env.PAYMENT_WEBHOOK_MAX_AGE_SECONDS ?? "300");
-  const signatureTolerance = Number.isSafeInteger(configuredTolerance) && configuredTolerance >= 30 && configuredTolerance <= 900
-    ? configuredTolerance : 300;
+  const signatureTolerance = paymentControlConfiguration().webhookMaxAgeSeconds;
   if (!verifyStripeWebhookSignature(rawBody, signature, secret, Math.floor(Date.now() / 1000), signatureTolerance)) {
     return errorResponse("Invalid or expired Stripe signature.", 400);
   }
