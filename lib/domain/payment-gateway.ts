@@ -39,8 +39,8 @@ export function paymentFeatureEnabled(method: PaymentMethod, env: Record<string,
 export function cryptoRailConfiguration(env: Record<string, string | undefined> = process.env) {
   return CRYPTO_RAILS.map((rail) => {
     const address = env[rail.envKey]?.trim() ?? "";
-    // Destination addresses alone are not enough: token identity, verification provider,
-    // and independent address-control verification are required before a rail is offered.
+    // Destination addresses alone are not enough: token identity, mainnet RPC and
+    // independent address-control verification are required before a rail is offered.
     const tokenIdentifierEnv = rail.network === "SOLANA"
       ? "CRYPTO_USDC_SOLANA_MINT"
       : `CRYPTO_${rail.asset}_${rail.network}_TOKEN_ID`;
@@ -51,14 +51,22 @@ export function cryptoRailConfiguration(env: Record<string, string | undefined> 
     const decimalsVerified = env[`${decimalsEnv}_VERIFIED`] === "true";
     const destinationVerified = env[`${rail.envKey}_VERIFIED`] === "true";
     const tokenVerified = env[`${tokenIdentifierEnv}_VERIFIED`] === "true";
-    const networkEnabled = env[`CRYPTO_${rail.network}_ENABLED`] === "true";
-    // Token decimals differ across networks and wrapped/native assets. Every rail requires
-    // an explicitly verified decimal count and an explicitly approved USD-parity quote.
-    // Transfers are reviewed manually; this is not automated on-chain verification.
+    const networkPrefix = `CRYPTO_${rail.network}`;
+    const networkEnabled = env[`${networkPrefix}_ENABLED`] === "true";
+    const rpcConfigured = Boolean(env[`${networkPrefix}_RPC_URL`]?.trim());
+    const mainnetVerified = env[`${networkPrefix}_MAINNET_VERIFIED`] === "true";
+    const confirmationValue = env[`${networkPrefix}_MIN_CONFIRMATIONS`];
+    const confirmationThreshold = confirmationValue && /^\\d+$/.test(confirmationValue)
+      ? Number(confirmationValue) : 0;
+    // The expected mainnet, RPC, confirmation threshold, token identity, destination
+    // and token decimals must all be independently verified before displaying a rail.
+    // A separate human-review fallback remains available for provider outages.
     const reviewPolicyReady = env.CRYPTO_MANUAL_RECONCILIATION_ENABLED === "true" &&
       env.CRYPTO_USD_PARITY_QUOTE_APPROVED === "true" &&
       decimalsVerified &&
-      tokenDecimals !== null && tokenDecimals >= 2 && tokenDecimals <= 18;
+      tokenDecimals !== null && tokenDecimals >= 2 && tokenDecimals <= 18 &&
+      rpcConfigured && mainnetVerified &&
+      Number.isSafeInteger(confirmationThreshold) && confirmationThreshold > 0;
     return {
       asset: rail.asset,
       network: rail.network,
