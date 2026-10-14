@@ -168,7 +168,7 @@ export function PaymentReviewPanel() {
             <label>Currency<input className="input-field" value={field(payment, "currency")} onChange={(e) => change(payment, "currency", e.target.value.toUpperCase())} maxLength={3} /></label>
             <label>Matched bank transaction reference<input className="input-field" value={field(payment, "bankRef")} onChange={(e) => change(payment, "bankRef", e.target.value)} maxLength={160} /></label>
           </> : <>
-            <p className="payment-warning">This app does not query a blockchain automatically. Do not approve unless an authorized reviewer has independently verified the transaction, chain, token, destination, successful status, actual token transfer, confirmations, exact amount, and no previous credit.</p>
+            <p className="payment-warning">The server will query the configured read-only RPC and validate the transaction, token, recipient, amount and finality. If the provider is unavailable, a Super Administrator may use the explicitly audited manual-review fallback only after independently inspecting the chain explorer. A pending, failed or mismatched RPC result blocks approval and remains pending for investigation.</p>
             <label>Observed token amount in base units<input className="input-field" inputMode="numeric" value={field(payment, "tokenAmount")} onChange={(e) => change(payment, "tokenAmount", e.target.value)} /></label>
           </>}
           <label>Independent evidence reference{crypto ? " (HTTPS explorer URL)" : " (bank record/reference)"}<input className="input-field" value={field(payment, "evidence")} onChange={(e) => change(payment, "evidence", e.target.value)} maxLength={500} /></label>
