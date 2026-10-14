@@ -6,6 +6,7 @@ import {
   paymentFeatureEnabled,
   parseTransactionReference,
 } from "@/lib/domain/payment-gateway";
+import { verifyCryptoTransfer } from "@/lib/services/crypto-chain-verifier";
 
 export class PaymentGatewayError extends Error {
   constructor(
@@ -603,6 +604,108 @@ export async function reconcileCryptoPayment(input: {
   } catch {
     throw new PaymentGatewayError("Crypto evidence must be a valid HTTPS blockchain-explorer or evidence URL.", "INVALID");
   }
+
+  let verificationAudit: {
+    automaticVerification: boolean;
+    verificationProvider: string;
+    confirmations: number | null;
+    blockReference: string | null;
+    manualOverrideReason: string | null;
+  } = {
+    automaticVerification: false,
+    verificationProvider: "manual-finance-review",
+    confirmations: null,
+    blockReference: null,
+    manualOverrideReason: null,
+  };
+
+  // Query the network before opening the DB transaction so an RPC latency cannot hold
+  // database locks. All order/payment state is revalidated inside the transaction below.
+  if (input.decision === "APPROVE") {
+    const claim = await prisma.platformAuditEvent.findFirst({
+      where: { action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT", subjectId: input.paymentId, outcome: "SUCCESS" },
+      orderBy: { occurredAt: "asc" },
+      select: { actorUserId: true, details: true },
+    });
+    if (!claim || claim.actorUserId === input.actorUserId) {
+      throw new PaymentGatewayError("The submitter cannot reconcile their own crypto claim.", "FORBIDDEN");
+    }
+    const claimDetails = claim.details as { organizationId?: unknown; claimMetadata?: unknown } | null;
+    if (claimDetails?.organizationId !== input.organizationId) {
+      throw new PaymentGatewayError("Claim organization does not match the review scope.", "FORBIDDEN");
+    }
+    const meta = claimDetails.claimMetadata as {
+      transactionReference?: unknown; tokenIdentifier?: unknown; network?: unknown; asset?: unknown;
+      destinationAddress?: unknown; tokenDecimals?: unknown; expectedTokenAmountBaseUnits?: unknown;
+    } | undefined;
+    const payment = await prisma.billingPayment.findFirst({
+      where: { id: input.paymentId, organizationId: input.organizationId, provider: { startsWith: "crypto:" }, status: BillingPaymentStatus.PENDING },
+      select: { id: true, providerPaymentId: true, currency: true },
+    });
+    if (!payment || payment.providerPaymentId !== meta?.transactionReference || payment.currency !== "USD") {
+      throw new PaymentGatewayError("Pending crypto payment does not match the submitted claim.", "CONFLICT");
+    }
+    if (typeof meta?.network !== "string" || typeof meta.asset !== "string" ||
+        typeof meta.destinationAddress !== "string" || typeof meta.tokenIdentifier !== "string" ||
+        typeof meta.tokenDecimals !== "number" || typeof meta.expectedTokenAmountBaseUnits !== "string") {
+      throw new PaymentGatewayError("Immutable crypto order snapshot is incomplete.", "CONFLICT");
+    }
+    const expectedAmount = safeBigInt(meta.expectedTokenAmountBaseUnits);
+    if (expectedAmount === null || input.receivedAmountBaseUnits !== expectedAmount) {
+      throw new PaymentGatewayError("Entered token amount does not match the immutable payment order.", "INVALID");
+    }
+    const rail = cryptoRailConfiguration().find((item) =>
+      item.enabled && item.asset === meta.asset && item.network === meta.network,
+    );
+    if (!rail || rail.address !== meta.destinationAddress ||
+        rail.tokenIdentifier !== meta.tokenIdentifier || rail.tokenDecimals !== meta.tokenDecimals) {
+      throw new PaymentGatewayError("The crypto rail configuration has changed or is disabled. Approval is blocked pending controlled review.", "NOT_CONFIGURED");
+    }
+
+    const verification = await verifyCryptoTransfer({
+      network: meta.network as "TRON" | "BNB_SMART_CHAIN" | "ETHEREUM" | "SOLANA",
+      transactionReference: String(meta.transactionReference),
+      destinationAddress: meta.destinationAddress,
+      tokenIdentifier: meta.tokenIdentifier,
+      tokenDecimals: meta.tokenDecimals,
+      expectedTokenAmountBaseUnits: meta.expectedTokenAmountBaseUnits,
+    });
+    if (verification.status === "CONFIRMED") {
+      if (verification.receivedAmountBaseUnits !== expectedAmount.toString() ||
+          safeBigInt(verification.receivedAmountBaseUnits) !== input.receivedAmountBaseUnits) {
+        throw new PaymentGatewayError("Independently verified chain amount does not match the payment order.", "INVALID");
+      }
+      verificationAudit = {
+        automaticVerification: true,
+        verificationProvider: verification.provider,
+        confirmations: verification.confirmations,
+        blockReference: verification.blockReference,
+        manualOverrideReason: null,
+      };
+    } else if (verification.status === "UNAVAILABLE") {
+      if (process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true") {
+        throw new PaymentGatewayError("RPC verification is unavailable; the claim remains pending.", "NOT_CONFIGURED");
+      }
+      // An explicitly authorized Super Administrator can fall back to evidence-led
+      // manual reconciliation only on provider outage; failed, pending or mismatched
+      // on-chain results never qualify for this fallback.
+      verificationAudit = {
+        automaticVerification: false,
+        verificationProvider: "manual-finance-review-after-rpc-outage",
+        confirmations: null,
+        blockReference: null,
+        manualOverrideReason: verification.reason,
+      };
+    } else {
+      throw new PaymentGatewayError(
+        verification.status === "PENDING"
+          ? `Blockchain verification is still pending: ${verification.reason}`
+          : `Blockchain verification did not confirm the payment: ${verification.reason}`,
+        verification.status === "PENDING" ? "CONFLICT" : "INVALID",
+      );
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     const originalClaim = await tx.platformAuditEvent.findFirst({
       where: { action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT", subjectId: input.paymentId, outcome: "SUCCESS" },
@@ -712,11 +815,15 @@ export async function reconcileCryptoPayment(input: {
           receivedAmountBaseUnits: input.receivedAmountBaseUnits.toString(),
           evidenceReference: input.evidenceReference.trim(),
           submittedByUserId: typeof claimMetadata.submittedByUserId === "string" ? claimMetadata.submittedByUserId : null,
-          automaticVerification: false,
+          automaticVerification: verificationAudit.automaticVerification,
+          verificationProvider: verificationAudit.verificationProvider,
+          confirmations: verificationAudit.confirmations,
+          blockReference: verificationAudit.blockReference,
+          manualOverrideReason: verificationAudit.manualOverrideReason,
         } as Prisma.InputJsonObject,
       },
     });
-    return { id: payment.id, status: BillingPaymentStatus.SUCCEEDED };
+    return { id: payment.id, status: BillingPaymentStatus.SUCCEEDED, automaticVerification: verificationAudit.automaticVerification, verificationProvider: verificationAudit.verificationProvider };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
