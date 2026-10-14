@@ -1,3 +1,5 @@
+"use client";
+
 import type { ComplianceNotification } from "@/lib/services/compliance-notification";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import type { MessageKey } from "@/lib/i18n/messages";

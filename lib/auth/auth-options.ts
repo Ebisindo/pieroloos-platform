@@ -1,4 +1,5 @@
 import type { AuthOptions, Profile } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import { prisma } from "@/lib/db/prisma";
 
@@ -7,19 +8,34 @@ const clientId = process.env.OIDC_CLIENT_ID;
 const clientSecret = process.env.OIDC_CLIENT_SECRET;
 const githubId = process.env.GITHUB_ID;
 const githubSecret = process.env.GITHUB_SECRET;
+const localAuthEmail = process.env.LOCAL_AUTH_EMAIL?.trim();
+const localAuthPassword = process.env.LOCAL_AUTH_PASSWORD;
 
 export const oidcConfigured = Boolean(issuer && clientId && clientSecret);
 export const githubConfigured = Boolean(githubId && githubSecret);
+export const localDevelopmentConfigured = Boolean(
+  process.env.NODE_ENV === "development" &&
+  process.env.LOCAL_AUTH_ENABLED === "true" &&
+  localAuthEmail &&
+  localAuthPassword,
+);
 export const authSecretConfigured = Boolean(process.env.NEXTAUTH_SECRET?.trim());
-export const authConfigured = authSecretConfigured && (oidcConfigured || githubConfigured);
+export const authConfigured = authSecretConfigured && (
+  oidcConfigured ||
+  githubConfigured ||
+  localDevelopmentConfigured
+);
 export const AUTH_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
 // Names only; never includes values.
 export function getAuthConfigProblems(): string[] {
   const problems: string[] = [];
   if (!authSecretConfigured) problems.push("NEXTAUTH_SECRET is not set.");
-  if (!oidcConfigured && !githubConfigured) {
-    problems.push("No identity provider: set GITHUB_ID and GITHUB_SECRET, or OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET.");
+  if (!oidcConfigured && !githubConfigured && !localDevelopmentConfigured) {
+    const localOption = process.env.NODE_ENV === "development"
+      ? ", or set LOCAL_AUTH_ENABLED=true, LOCAL_AUTH_EMAIL and LOCAL_AUTH_PASSWORD for local development"
+      : "";
+    problems.push(`No identity provider: set GITHUB_ID and GITHUB_SECRET, or OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET${localOption}.`);
   }
   if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
     problems.push("NEXTAUTH_URL is not set.");
@@ -77,6 +93,31 @@ export const authOptions: AuthOptions = {
   secret: process.env.NEXTAUTH_SECRET?.trim() || undefined,
   session: { strategy: "jwt", maxAge: AUTH_SESSION_MAX_AGE_SECONDS },
   providers: [
+    ...(localDevelopmentConfigured
+      ? [
+          CredentialsProvider({
+            name: "Local development",
+            credentials: {
+              email: { label: "Email", type: "email" },
+              password: { label: "Password", type: "password" },
+            },
+            async authorize(credentials) {
+              if (
+                !credentials?.email ||
+                credentials.email.trim().toLowerCase() !== localAuthEmail?.toLowerCase() ||
+                credentials.password !== localAuthPassword
+              ) {
+                return null;
+              }
+              return {
+                id: `local:${localAuthEmail!.toLowerCase()}`,
+                email: localAuthEmail!,
+                name: localAuthEmail!,
+              };
+            },
+          }),
+        ]
+      : []),
     ...(githubConfigured
       ? [GitHubProvider({ clientId: githubId!, clientSecret: githubSecret! })]
       : []),

@@ -130,7 +130,19 @@ describe("authentication configuration", () => {
 
   async function load(env: Record<string, string>) {
     vi.resetModules();
-    for (const key of ["NEXTAUTH_SECRET", "NEXTAUTH_URL", "GITHUB_ID", "GITHUB_SECRET", "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"]) {
+    for (const key of [
+      "NODE_ENV",
+      "NEXTAUTH_SECRET",
+      "NEXTAUTH_URL",
+      "GITHUB_ID",
+      "GITHUB_SECRET",
+      "OIDC_ISSUER",
+      "OIDC_CLIENT_ID",
+      "OIDC_CLIENT_SECRET",
+      "LOCAL_AUTH_ENABLED",
+      "LOCAL_AUTH_EMAIL",
+      "LOCAL_AUTH_PASSWORD",
+    ]) {
       vi.stubEnv(key, env[key] ?? "");
     }
     return import("@/lib/auth/auth-options");
@@ -154,6 +166,60 @@ describe("authentication configuration", () => {
     expect(mod.authConfigured).toBe(true);
     expect(mod.authOptions.providers.map((p) => p.id)).toEqual(["github"]);
     expect(mod.authOptions.pages?.signIn).toBe("/signin");
+  });
+
+  it("enables local credentials only in explicitly enabled development with a secret", async () => {
+    const mod = await load({
+      NODE_ENV: "development",
+      NEXTAUTH_SECRET: "x".repeat(32),
+      LOCAL_AUTH_ENABLED: "true",
+      LOCAL_AUTH_EMAIL: "staff@example.test",
+      LOCAL_AUTH_PASSWORD: "local-password",
+    });
+    expect(mod.authConfigured).toBe(true);
+    expect(mod.localDevelopmentConfigured).toBe(true);
+    expect(mod.authOptions.providers.map((provider) => provider.id)).toEqual(["credentials"]);
+
+    const provider = mod.authOptions.providers.find((candidate) => candidate.id === "credentials");
+    if (!provider || provider.type !== "credentials") throw new Error("Local credentials provider is not configured.");
+    const authorize = provider.options?.authorize as typeof provider.authorize;
+    const request = { body: {}, query: {}, headers: {}, method: "POST" };
+    await expect(authorize({ email: "staff@example.test", password: "wrong" }, request)).resolves.toBeNull();
+    await expect(authorize({ email: " STAFF@example.test ", password: "local-password" }, request))
+      .resolves.toMatchObject({ email: "staff@example.test" });
+
+    const signIn = mod.authOptions.callbacks?.signIn;
+    if (!signIn) throw new Error("Sign-in callback is not configured.");
+    userFindFirst.mockResolvedValueOnce({ memberships: [{ id: "membership-1" }], clientPortalGrants: [] });
+    await expect(signIn({
+      user: { id: "local-user", email: "staff@example.test", name: "Staff" },
+      account: { provider: "credentials", type: "credentials", providerAccountId: "local-user" },
+      profile: undefined,
+      email: undefined,
+      credentials: undefined,
+    })).resolves.toBe(true);
+
+    userFindFirst.mockResolvedValueOnce({ memberships: [], clientPortalGrants: [{ id: "grant-1" }] });
+    await expect(signIn({
+      user: { id: "local-client", email: "client@example.test", name: "Client" },
+      account: { provider: "credentials", type: "credentials", providerAccountId: "local-client" },
+      profile: undefined,
+      email: undefined,
+      credentials: undefined,
+    })).resolves.toBe(false);
+  });
+
+  it("never enables local credentials outside development", async () => {
+    const mod = await load({
+      NODE_ENV: "production",
+      NEXTAUTH_SECRET: "x".repeat(32),
+      LOCAL_AUTH_ENABLED: "true",
+      LOCAL_AUTH_EMAIL: "staff@example.test",
+      LOCAL_AUTH_PASSWORD: "local-password",
+    });
+    expect(mod.localDevelopmentConfigured).toBe(false);
+    expect(mod.authConfigured).toBe(false);
+    expect(mod.authOptions.providers).toHaveLength(0);
   });
 
   it("maps the persisted user identifier into the session without carrying an authorization claim", async () => {

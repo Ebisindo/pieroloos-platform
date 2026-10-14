@@ -1,10 +1,10 @@
 # PieroloOS Authentication Setup
 
-PieroloOS uses NextAuth v4 with GitHub OAuth and an optional generic OIDC provider. The provider configuration and callbacks are defined in `lib/auth/auth-options.ts`.
+PieroloOS uses NextAuth v4 with GitHub OAuth, an optional generic OIDC provider, and an opt-in local-development credentials provider. The provider configuration and callbacks are defined in `lib/auth/auth-options.ts`.
 
 ## Diagnosing "Identity provider not configured"
 
-The `/signin` page shows this when `authConfigured` (see `lib/auth/auth-options.ts`) is false, i.e. `NEXTAUTH_SECRET` is unset **or** neither `GITHUB_ID`+`GITHUB_SECRET` nor the three `OIDC_*` variables are set in the *runtime* environment of the running server. The missing variable names are logged server-side (never values, never shown to visitors). `/api/auth/*` returns a generic 503 until configured; public pages are unaffected. There is no fallback secret.
+The `/signin` page shows this when `authConfigured` (see `lib/auth/auth-options.ts`) is false: either `NEXTAUTH_SECRET` is unset or no supported identity provider is configured in the running server's environment. The missing variable names are logged server-side (never values, never shown to visitors). `/api/auth/*` returns a generic 503 until configured; public pages are unaffected. There is no fallback secret.
 
 ## Configure environment
 
@@ -15,6 +15,18 @@ openssl rand -base64 32
 ```
 
 Never commit secret values.
+
+## Local development sign-in
+
+When running `npm run dev`, local sign-in can use one already-provisioned staff account without an external OAuth provider. Set `LOCAL_AUTH_ENABLED=true`, `LOCAL_AUTH_EMAIL` to the account's email, and `LOCAL_AUTH_PASSWORD` to a development-only password in the ignored `.env` or `.env.local` file. `NEXTAUTH_SECRET` is still required; generate it with the command above. Restart the server after changing these values.
+
+```dotenv
+LOCAL_AUTH_ENABLED="true"
+LOCAL_AUTH_EMAIL="staff@example.com"
+LOCAL_AUTH_PASSWORD="use-a-unique-local-development-password"
+```
+
+Local credentials are registered only when `NODE_ENV=development` and the opt-in flag and both credential values are present. The normal sign-in authorization callback still checks that the email belongs to an existing user with an organization membership. This provider is unavailable in production regardless of its environment values, and does not authorize client-portal-only accounts. Do not reuse a real account password.
 
 ## GitHub OAuth
 
@@ -50,6 +62,7 @@ Sign-in is allowed only for users already present in the database with an organi
 | `NEXTAUTH_SECRET` | Signs/encrypts session JWTs. Required; generate with `openssl rand -base64 32`. |
 | `GITHUB_ID` / `GITHUB_SECRET` | GitHub OAuth App client ID and secret. |
 | `OIDC_*` | Optional organization SSO. |
+| `LOCAL_AUTH_ENABLED`, `LOCAL_AUTH_EMAIL`, `LOCAL_AUTH_PASSWORD` | Optional development-only sign-in for an existing staff account; ignored outside `NODE_ENV=development`. |
 
 ## GitHub OAuth App steps
 

@@ -1,6 +1,12 @@
 import Link from "next/link";
-import { authConfigured, githubConfigured, oidcConfigured } from "@/lib/auth/auth-options";
+import {
+  authConfigured,
+  githubConfigured,
+  localDevelopmentConfigured,
+  oidcConfigured,
+} from "@/lib/auth/auth-options";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
+import { LocalDevelopmentSignIn } from "@/components/auth/LocalDevelopmentSignIn";
 import { getRequestTranslator } from "@/lib/i18n/request";
 
 export default async function SignInPage({
@@ -34,6 +40,15 @@ export default async function SignInPage({
         <Link className="button button-secondary mt-5" href={`/api/auth/signin/github?callbackUrl=${encodedCallbackUrl}`}>
           {t("signin.github")}
         </Link>
+      )}
+      {localDevelopmentConfigured && (
+        <LocalDevelopmentSignIn
+          callbackUrl={callbackUrl}
+          emailLabel={t("signin.local.email")}
+          passwordLabel={t("signin.local.password")}
+          submitLabel={t("signin.local.submit")}
+          errorMessage={t("signin.local.error")}
+        />
       )}
     </section>
   ) : (

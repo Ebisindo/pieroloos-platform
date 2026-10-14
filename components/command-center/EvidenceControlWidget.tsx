@@ -1,3 +1,5 @@
+"use client";
+
 import type { EvidenceAwareControlSummary } from "@/lib/domain/operational-intelligence";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 
