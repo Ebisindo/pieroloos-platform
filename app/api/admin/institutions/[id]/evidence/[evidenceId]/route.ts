@@ -50,9 +50,12 @@ export async function PATCH(
       const independentSourceKeys = new Set(
         verifiedOfficialSources.map((source) => source.sourceUrl?.trim().toLowerCase() || source.sourceTitle.trim().toLowerCase()),
       );
-      const nextVerificationStatus = independentSourceKeys.size >= 2
+      const verifiedAuthorizations = await tx.exportInstitutionEvidence.count({
+        where: { institutionId: id, verifiedAt: { not: null }, evidenceClass: "WRITTEN_AUTHORIZATION" },
+      });
+      const nextVerificationStatus = independentSourceKeys.size >= 2 && verifiedAuthorizations > 0
         ? "CROSS_VERIFIED"
-        : independentSourceKeys.size === 1
+        : independentSourceKeys.size >= 1
           ? "SOURCE_REVIEWED"
           : "UNVERIFIED";
       await tx.exportInstitution.update({
