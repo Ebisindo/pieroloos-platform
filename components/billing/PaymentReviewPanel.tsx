@@ -74,8 +74,7 @@ export function PaymentReviewPanel() {
     if (key === "currency") return payment.currency;
     if (key === "bankRef") return "";
     if (key === "tokenAmount") return payment.claim?.expectedTokenAmountBaseUnits ?? "";
-    if (key === "evidence") return payment.claim?.network && payment.claim?.transactionReference
-      ? `https://` : "";
+    if (key === "evidence") return "";
     return "";
   }
   function change(payment: Payment, key: "amount" | "currency" | "bankRef" | "tokenAmount" | "evidence" | "reason", value: string) {
