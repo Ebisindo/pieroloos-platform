@@ -12,9 +12,9 @@ export function getSiteUrl(): URL | null {
 }
 
 // The only routes intended for search indexing; everything else is private or transactional.
-export const INDEXABLE_PATHS = ["/", "/partners"] as const;
+export const INDEXABLE_PATHS = ["/", "/partners", "/faq", "/terms", "/policies"] as const;
 
-export function publicPageMetadata(path: (typeof INDEXABLE_PATHS)[number]) {
+export function publicPageMetadata(path: string) {
   const site = getSiteUrl();
   return {
     robots: { index: true, follow: true },
