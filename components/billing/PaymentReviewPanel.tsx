@@ -120,7 +120,7 @@ export function PaymentReviewPanel() {
         setError("Crypto review requires an HTTPS explorer/evidence URL and the recorded transaction reference."); setBusyId(""); return;
       }
       const confirm = window.confirm(
-        `Confirm you independently inspected the correct chain, token, destination, successful transfer, confirmations, exact amount, and no prior credit for ${claim.asset ?? "the token"} on ${claim.network ?? "the network"}? This approval is a manual finance decision, not automated blockchain verification.`,
+        `Approve ${claim.asset ?? "crypto"} on ${claim.network ?? "the selected network"} only after the server has verified the transaction using the configured read-only RPC. Confirm the evidence URL points to the submitted transaction, no prior credit was recorded, and the review reason is accurate. If RPC verification is unavailable, manual approval is allowed only under the explicitly enabled RPC-outage override policy.`,
       );
       if (!confirm) { setBusyId(""); return; }
     }
