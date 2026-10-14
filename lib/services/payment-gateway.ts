@@ -604,15 +604,6 @@ export async function reconcileCryptoPayment(input: {
     if (payment.providerPaymentId !== claimMetadata?.transactionReference) {
       throw new PaymentGatewayError("Transaction reference does not match the immutable claim.", "INVALID");
     }
-    const activeRail = cryptoRailConfiguration().find((rail) =>
-      rail.enabled && rail.asset === claimMetadata?.asset && rail.network === claimMetadata?.network,
-    );
-    if (!activeRail ||
-        activeRail.address !== claimMetadata?.destinationAddress ||
-        activeRail.tokenIdentifier !== claimMetadata?.tokenIdentifier ||
-        activeRail.tokenDecimals !== claimMetadata?.tokenDecimals) {
-      throw new PaymentGatewayError("The payment rail configuration has changed or is disabled; escalate the claim for controlled review.", "NOT_CONFIGURED");
-    }
     if (input.decision === "REJECT") {
       const changed = await tx.billingPayment.updateMany({
         where: { id: payment.id, organizationId: input.organizationId, status: BillingPaymentStatus.PENDING },
@@ -628,6 +619,15 @@ export async function reconcileCryptoPayment(input: {
         },
       });
       return { id: payment.id, status: BillingPaymentStatus.FAILED };
+    }
+    const activeRail = cryptoRailConfiguration().find((rail) =>
+      rail.enabled && rail.asset === claimMetadata?.asset && rail.network === claimMetadata?.network,
+    );
+    if (!activeRail ||
+        activeRail.address !== claimMetadata?.destinationAddress ||
+        activeRail.tokenIdentifier !== claimMetadata?.tokenIdentifier ||
+        activeRail.tokenDecimals !== claimMetadata?.tokenDecimals) {
+      throw new PaymentGatewayError("The payment rail configuration has changed or is disabled; escalate the claim for controlled review.", "NOT_CONFIGURED");
     }
     if (payment.currency !== "USD" || typeof claimMetadata?.expectedTokenAmountBaseUnits !== "string" ||
         BigInt(claimMetadata.expectedTokenAmountBaseUnits) !== input.receivedAmountBaseUnits) {
