@@ -28,7 +28,13 @@ export default async function CryptoPaymentPage({ searchParams }: { searchParams
   if (!invoice) {
     return <div className="page-stack"><PageHeader eyebrow="CRYPTO PAYMENT" title="Cryptocurrency payment" description="No payable USD invoice was found in the active organization." /><Link className="button button-secondary" href="/billing">Return to billing</Link></div>;
   }
-  const rails = paymentFeatureEnabled("CRYPTO") ? cryptoRailConfiguration().filter((rail) => rail.enabled && rail.tokenDecimals === 6 && rail.address && rail.tokenIdentifier).map(({ asset, network, address, tokenIdentifier, tokenDecimals }) => ({ asset, network, address, tokenIdentifier, tokenDecimals })) : [];
+  const rails = paymentFeatureEnabled("CRYPTO")
+    ? cryptoRailConfiguration()
+        .filter((rail) => rail.enabled && rail.tokenDecimals === 6 && rail.address && rail.tokenIdentifier)
+        .map(({ asset, network, address, tokenIdentifier, tokenDecimals }) => ({
+          asset, network, address, tokenIdentifier, tokenDecimals: tokenDecimals ?? 0,
+        }))
+    : [];
   return (
     <div className="page-stack">
       <PageHeader eyebrow="BILLING / CRYPTO" title="Cryptocurrency payment" description="Instructions are available only for explicitly verified rails. Claims remain pending until independent finance reconciliation is complete." actions={<Link className="button button-secondary" href="/billing">Back to billing</Link>} />
