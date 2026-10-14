@@ -19,7 +19,7 @@ export class PaymentGatewayError extends Error {
 }
 
 function safeInvoiceAmount(invoice: { amountDueMinor: bigint; amountPaidMinor: bigint; amountRemainingMinor: bigint }) {
-  if (invoice.amountRemainingMinor <= 0n) throw new PaymentGatewayError("Invoice has no outstanding balance.", "NOT_PAYABLE");
+  if (invoice.amountRemainingMinor <= BigInt(0)) throw new PaymentGatewayError("Invoice has no outstanding balance.", "NOT_PAYABLE");
   return invoice.amountRemainingMinor;
 }
 
@@ -105,7 +105,7 @@ export async function activateSubscriptionAfterVerifiedPayment(
 
 export async function listOpenInvoices(organizationId: string) {
   const invoices = await prisma.billingInvoice.findMany({
-    where: { organizationId, status: BillingInvoiceStatus.OPEN, amountRemainingMinor: { gt: 0n } },
+    where: { organizationId, status: BillingInvoiceStatus.OPEN, amountRemainingMinor: { gt: BigInt(0) } },
     orderBy: { createdAt: "desc" },
     take: 50,
     select: {
@@ -162,7 +162,7 @@ export async function createBankTransferOrder(input: {
     swiftSupported: false,
   };
   const invoice = await prisma.billingInvoice.findFirst({
-    where: { id: input.invoiceId, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: 0n } },
+    where: { id: input.invoiceId, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: BigInt(0) } },
     select: { id: true, invoiceNumber: true, currency: true, amountRemainingMinor: true },
   });
   if (!invoice) throw new PaymentGatewayError("Open USD invoice not found in the active organization.", "NOT_FOUND");
@@ -173,7 +173,7 @@ export async function createBankTransferOrder(input: {
         where: { id: invoice.id, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN },
         select: { amountRemainingMinor: true, currency: true },
       });
-      if (!fresh || fresh.currency !== "USD" || fresh.amountRemainingMinor !== invoice.amountRemainingMinor || fresh.amountRemainingMinor <= 0n) {
+      if (!fresh || fresh.currency !== "USD" || fresh.amountRemainingMinor !== invoice.amountRemainingMinor || fresh.amountRemainingMinor <= BigInt(0)) {
         throw new PaymentGatewayError("Invoice changed; refresh and retry.", "CONFLICT");
       }
       const created = await tx.billingPayment.create({
@@ -288,13 +288,13 @@ export async function createCryptoPaymentOrder(input: {
     throw new PaymentGatewayError("Selected crypto rail has not passed all configuration gates.", "NOT_CONFIGURED");
   }
   const invoice = await prisma.billingInvoice.findFirst({
-    where: { id: input.invoiceId, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: 0n } },
+    where: { id: input.invoiceId, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: BigInt(0) } },
     select: { id: true, invoiceNumber: true, currency: true, amountRemainingMinor: true },
   });
   if (!invoice) throw new PaymentGatewayError("Open USD invoice not found in the active organization.", "NOT_FOUND");
   const paymentReference = newPaymentReference("CRYPTO");
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-  const expectedTokenAmountBaseUnits = (invoice.amountRemainingMinor * 10_000n).toString();
+  const expectedTokenAmountBaseUnits = (invoice.amountRemainingMinor * BigInt(10000)).toString();
   const provider = `crypto:${rail.network.toLowerCase()}:${rail.asset.toLowerCase()}`;
 
   const result = await prisma.$transaction(async (tx) => {
@@ -302,7 +302,7 @@ export async function createCryptoPaymentOrder(input: {
       where: { id: invoice.id, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD" },
       select: { amountRemainingMinor: true },
     });
-    if (!fresh || fresh.amountRemainingMinor !== invoice.amountRemainingMinor || fresh.amountRemainingMinor <= 0n) {
+    if (!fresh || fresh.amountRemainingMinor !== invoice.amountRemainingMinor || fresh.amountRemainingMinor <= BigInt(0)) {
       throw new PaymentGatewayError("Invoice balance changed; refresh and create a new order.", "CONFLICT");
     }
     const payment = await tx.billingPayment.create({
@@ -343,7 +343,7 @@ export async function createCryptoPaymentOrder(input: {
       paymentReference, asset: rail.asset, network: rail.network, destinationAddress: rail.address,
       tokenIdentifier: rail.tokenIdentifier, tokenDecimals: rail.tokenDecimals,
       expectedTokenAmountBaseUnits,
-      expectedTokenAmount: `${invoice.amountRemainingMinor / 100n}.${(invoice.amountRemainingMinor % 100n).toString().padStart(2, "0")}`,
+      expectedTokenAmount: `${invoice.amountRemainingMinor / BigInt(100)}.${(invoice.amountRemainingMinor % BigInt(100)).toString().padStart(2, "0")}`,
       expiresAt: expiresAt.toISOString(),
     },
   };
@@ -460,7 +460,7 @@ export async function reconcileBankTransfer(input: {
     throw new PaymentGatewayError("Bank transfer reconciliation is disabled.", "DISABLED");
   }
   if (input.reason.trim().length < 8 || input.evidenceReference.trim().length < 4 ||
-      input.bankTransactionReference.trim().length < 4 || input.receivedAmountMinor <= 0n ||
+      input.bankTransactionReference.trim().length < 4 || input.receivedAmountMinor <= BigInt(0) ||
       !/^[A-Z]{3}$/.test(input.receivedCurrency)) {
     throw new PaymentGatewayError("Complete valid reconciliation evidence is required.", "INVALID");
   }
@@ -558,7 +558,7 @@ export async function reconcileCryptoPayment(input: {
     throw new PaymentGatewayError("Crypto reconciliation is disabled.", "DISABLED");
   }
   if (input.reason.trim().length < 8 || input.evidenceReference.trim().length < 8 ||
-      (input.decision === "APPROVE" && input.receivedAmountBaseUnits <= 0n)) {
+      (input.decision === "APPROVE" && input.receivedAmountBaseUnits <= BigInt(0))) {
     throw new PaymentGatewayError("Independent chain evidence, exact received base units, and a reason are required.", "INVALID");
   }
   try {
