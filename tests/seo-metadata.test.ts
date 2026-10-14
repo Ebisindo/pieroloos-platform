@@ -53,7 +53,7 @@ describe("sitemap and robots", () => {
   it("disallows everything except the public routes", () => {
     process.env.SITE_URL = "https://example.com";
     const result = robots();
-    expect(result.rules).toEqual({ userAgent: "*", allow: ["/$", "/partners", "/faq"], disallow: ["/", "/api/", "/admin/", "/portal", "/signin", "/clients", "/command-center", "/settings", "/terms", "/policies"] });
+    expect(result.rules).toEqual({ userAgent: "*", allow: ["/$", "/partners", "/faq", "/terms", "/policies", "/policies/"], disallow: ["/", "/api/", "/admin/", "/portal", "/signin", "/clients", "/command-center", "/settings"] });
     expect(result.sitemap).toBe("https://example.com/sitemap.xml");
   });
 });
