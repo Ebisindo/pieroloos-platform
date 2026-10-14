@@ -9,6 +9,7 @@ import { BillingInvoiceStatus, BillingPaymentStatus, Prisma } from "@prisma/clie
 import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
 import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 import { randomUUID } from "node:crypto";
+import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 
 const inputSchema = z.object({ invoiceId: z.string().min(1).max(128) }).strict();
 type StripeSessionResponse = { id?: string; url?: string | null; error?: { message?: string } };
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   if (process.env.STRIPE_CHECKOUT_MODE && process.env.STRIPE_CHECKOUT_MODE !== "payment") {
     return NextResponse.json({ error: "This checkout endpoint currently supports one-time invoice payments only." }, { status: 503 });
   }
-  if (process.env.STRIPE_ALLOW_PROMOTIONS === "true" || process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true") {
+  if (paymentControls.stripePromotionsEnabled || paymentControls.stripeAutomaticTaxEnabled) {
     return NextResponse.json({ error: "Promotions and automatic tax are not supported by this checkout implementation." }, { status: 503 });
   }
   if (!process.env.STRIPE_SECRET_KEY || !process.env.NEXTAUTH_URL) return NextResponse.json({ error: "Stripe checkout configuration is incomplete." }, { status: 503 });
