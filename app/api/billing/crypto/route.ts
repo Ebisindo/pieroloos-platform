@@ -5,6 +5,7 @@ import { canManageBilling } from "@/lib/auth/billing-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PORTAL_INTERACTION_LIMIT } from "@/lib/http/rate-limit";
 import { createCryptoPaymentOrder, submitCryptoPaymentClaim, PaymentGatewayError } from "@/lib/services/payment-gateway";
+import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
 
 const schema = z.discriminatedUnion("action", [
   z.object({
@@ -35,6 +36,9 @@ export async function POST(request: Request) {
   if (!context.userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   if (!context.activeWorkspace || !context.principal) return NextResponse.json({ error: "Select an authorized workspace." }, { status: 409 });
   if (!canManageBilling(context.principal.role)) return NextResponse.json({ error: "Billing administrator access required." }, { status: 403 });
+  if (process.env.PAYMENTS_ENABLED !== "true" || !paymentFeatureEnabled("CRYPTO")) {
+    return NextResponse.json({ error: "Cryptocurrency payments are disabled or no verified rail is configured." }, { status: 503 });
+  }
   const limited = await enforceRateLimit(PORTAL_INTERACTION_LIMIT, context.userId);
   if (limited) return limited;
 
