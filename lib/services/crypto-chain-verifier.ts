@@ -15,7 +15,7 @@ export type CryptoVerificationResult =
   | { status: "CONFIRMED"; receivedAmountBaseUnits: string; confirmations: number; blockReference: string; provider: string }
   | { status: "PENDING"; reason: string; confirmations?: number }
   | { status: "FAILED"; reason: string }
-  | { status: "MISMATCH"; reason: string }
+  | { status: "MISMATCH"; reason: string; confirmations?: number }
   | { status: "UNAVAILABLE"; reason: string };
 
 type JsonRecord = Record<string, unknown>;
