@@ -3,7 +3,7 @@ import { z } from "zod";
 const safeLine = (label: string, min: number, max: number) => z.string().trim()
   .min(min, `${label} must be at least ${min} characters.`)
   .max(max, `${label} must be at most ${max} characters.`)
-  .refine((value) => !/[\\u0000-\\u001f\\u007f]/.test(value), `${label} contains unsupported control characters.`);
+  .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), `${label} contains unsupported control characters.`);
 
 const optionalLine = (label: string, max: number) => z.preprocess(
   (value) => typeof value === "string" && !value.trim() ? undefined : value,
