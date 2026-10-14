@@ -489,8 +489,8 @@ export async function reconcileBankTransfer(input: {
   decision: "APPROVE" | "REJECT";
   reason: string;
 }) {
-  if (!paymentFeatureEnabled("BANK_TRANSFER")) {
-    throw new PaymentGatewayError("Bank transfer reconciliation is disabled.", "DISABLED");
+  if (input.decision === "APPROVE" && !paymentFeatureEnabled("BANK_TRANSFER")) {
+    throw new PaymentGatewayError("Bank transfer approval is disabled or the receiving instructions are no longer verified.", "DISABLED");
   }
   if (input.reason.trim().length < 8 || input.evidenceReference.trim().length < 4 ||
       input.bankTransactionReference.trim().length < 4 || input.receivedAmountMinor <= BigInt(0) ||
@@ -598,10 +598,11 @@ export async function reconcileCryptoPayment(input: {
   reason: string;
   decision: "APPROVE" | "REJECT";
 }) {
-  if (process.env.PAYMENTS_ENABLED !== "true" ||
-      process.env.CRYPTO_PAYMENTS_ENABLED !== "true" ||
-      process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true") {
-    throw new PaymentGatewayError("Crypto reconciliation is disabled.", "DISABLED");
+  if (input.decision === "APPROVE" &&
+      (process.env.PAYMENTS_ENABLED !== "true" ||
+       process.env.CRYPTO_PAYMENTS_ENABLED !== "true" ||
+       process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true")) {
+    throw new PaymentGatewayError("Crypto payment approval is disabled.", "DISABLED");
   }
   if (input.reason.trim().length < 8 || input.evidenceReference.trim().length < 8 ||
       (input.decision === "APPROVE" && input.receivedAmountBaseUnits <= BigInt(0))) {
