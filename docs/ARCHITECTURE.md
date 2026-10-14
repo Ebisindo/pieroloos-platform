@@ -59,6 +59,7 @@ Never commit values. Examples live in `.env.example` and `.env.auth.example`.
 | Storage | `OBJECT_STORAGE_BUCKET`, `_REGION`, `_ENDPOINT`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_SERVER_SIDE_ENCRYPTION`, `_KMS_KEY_ID` | Private bucket only |
 | Public site | `SITE_URL` | Optional; enables canonical URLs, sitemap, JSON-LD |
 | Partnerships | `PARTNERSHIP_INQUIRY_NOTIFY_EMAIL` | Optional; content-free alert, needs SMTP |
+| Payments | `PAYMENTS_ENABLED`, `STRIPE_PAYMENTS_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BANK_TRANSFER_ENABLED`, `BANK_TRANSFER_DETAILS_VERIFIED`, `CRYPTO_PAYMENTS_ENABLED`, per-rail crypto variables | All payment flags default to false. Secret/configure account and token/network values in deployment secret management. Review `PAYMENTS-IMPLEMENTATION-STATUS.md`; there is no automatic blockchain verifier in the current implementation. |
 
 ## Testing commands
 
