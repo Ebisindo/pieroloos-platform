@@ -46,9 +46,28 @@ export async function POST(request: Request) {
   const object = event.data.object;
   const metadata = object.metadata && typeof object.metadata === "object"
     ? object.metadata as Record<string, unknown> : {};
-  const paymentId = stringValue(metadata.paymentId);
+  let paymentId = stringValue(metadata.paymentId);
   const invoiceId = stringValue(metadata.invoiceId);
   const organizationId = stringValue(metadata.organizationId);
+
+  // Charge objects do not always include PaymentIntent metadata. Resolve the signed
+  // charge's PaymentIntent over Stripe's authenticated API before processing a refund.
+  if (event.type === "charge.refunded" && !paymentId) {
+    const paymentIntentId = stringValue(object.payment_intent);
+    if (!paymentIntentId) return errorResponse("Refund event is missing its PaymentIntent reference.", 400);
+    try {
+      const response = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(paymentIntentId)}`, {
+        headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
+        cache: "no-store",
+      });
+      if (!response.ok) return errorResponse("Unable to resolve refund payment metadata; retry later.", 500);
+      const intent = await response.json() as { metadata?: Record<string, unknown> };
+      paymentId = stringValue(intent.metadata?.paymentId);
+      if (!paymentId) return errorResponse("Refund PaymentIntent is not associated with a local payment.", 400);
+    } catch {
+      return errorResponse("Unable to resolve refund payment metadata; retry later.", 500);
+    }
+  }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -150,10 +169,11 @@ export async function POST(request: Request) {
         const refundAmount = object.amount_refunded;
         const refunded = object.refunded;
         const id = paymentId;
-        if (id && chargeId && typeof refundAmount === "number" && Number.isSafeInteger(refundAmount) && refundAmount >= 0 && refunded === true) {
+        if (id && chargeId && typeof refundAmount === "number" && Number.isSafeInteger(refundAmount) && refundAmount > 0) {
           const payment = await tx.billingPayment.findFirst({ where: { id, provider: "stripe" }, select: { id: true, amountMinor: true } });
           if (payment) {
             const refund = BigInt(refundAmount);
+            if (refund > payment.amountMinor) throw new Error("STRIPE_REFUND_EXCEEDS_PAYMENT");
             await tx.billingPayment.update({
               where: { id }, data: {
                 refundedAmountMinor: refund,
