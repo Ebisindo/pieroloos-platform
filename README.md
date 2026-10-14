@@ -16,6 +16,7 @@ PieroloOS is a professional decision-support and workflow-organization platform.
 | Sign-in providers and authorization | [docs/AUTH-SETUP.md](docs/AUTH-SETUP.md) |
 | Platform Super Admin, permissions, provisioning and limits | [docs/ADMINISTRATION.md](docs/ADMINISTRATION.md) |
 | Launch readiness checklist and pilot gate | [docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md](docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md) |
+| Public policy audit and publication blockers | [docs/POLICY-GOVERNANCE-AUDIT.md](docs/POLICY-GOVERNANCE-AUDIT.md) |
 | Library layering | [docs/ARCHITECTURE-LIB.md](docs/ARCHITECTURE-LIB.md) |
 | Lint/typecheck troubleshooting | [docs/LINT-PROJECT-DIRECTORY.md](docs/LINT-PROJECT-DIRECTORY.md) |
 | GitHub Codespaces localhost:3000 preview and port forwarding | [docs/CODESPACES-PREVIEW.md](docs/CODESPACES-PREVIEW.md) |

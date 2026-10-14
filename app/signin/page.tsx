@@ -31,6 +31,12 @@ export default async function SignInPage({
       <p className="mt-3 text-sm leading-6 text-slate-400">
         {t("signin.description")}
       </p>
+      <p className="mt-3 text-sm leading-6 text-slate-400">
+        By signing in, you acknowledge that use of the platform is subject to applicable terms. Review the{" "}
+        <Link className="underline underline-offset-4" href="/terms">Terms and Conditions</Link> and{" "}
+        <Link className="underline underline-offset-4" href="/policies">Policies &amp; Legal</Link>.
+        The Terms remain a draft pending legal review; this notice is not an acceptance record.
+      </p>
       {oidcConfigured && (
         <Link className="button button-primary mt-5" href={`/api/auth/signin/oidc?callbackUrl=${encodedCallbackUrl}`}>
           {t("signin.oidc")}

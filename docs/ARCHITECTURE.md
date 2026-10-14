@@ -12,9 +12,9 @@ Client Intake → Business Profile → Engagement → Jurisdiction Lens → Form
 
 ## Public website architecture
 
-- **Public routes:** `/` (for signed-out visitors) and `/partners`. They are listed in `lib/navigation.ts` (`publicRoutes`, `isPublicRoute`). `AppShell` and `BootLayer` bypass the workspace shell and splash for these routes; pages render `components/public/PublicShell.tsx` (header, footer, disclaimer).
-- **`/` behaviour:** signed-in users are redirected to their workspace landing page; signed-out visitors see `components/public/PublicHome.tsx`. Public pages read no workspace data.
-- **Private by default:** the root layout sets `robots: noindex`. Public pages opt in through `publicPageMetadata()` in `lib/site.ts`. `app/robots.ts` disallows everything except `/` and `/partners`; `app/sitemap.ts` lists only those.
+- **Public routes:** `/`, `/partners`, `/faq`, `/terms`, `/policies`, and explicitly allowlisted `/policies/{slug}` document routes. They are listed in `lib/navigation.ts` (`publicRoutes`, `isPublicRoute`). `AppShell` and `BootLayer` bypass the workspace shell and splash for these routes; pages render `components/public/PublicShell.tsx`. Signed-out public documents must not read workspace records.
+- **`/` behaviour:** signed-in users are redirected to their workspace landing page; signed-out visitors see `components/public/PublicHome.tsx`.
+- **Indexing is narrower than public access:** the root layout defaults to `noindex`; `INDEXABLE_PATHS`, `app/robots.ts`, and `app/sitemap.ts` control search discovery. FAQ is indexable. Draft Terms and policy pages remain excluded from indexing and the sitemap until approval. The Terms and policy routes remain crawlable so crawlers can read their `noindex` metadata. `SITE_URL` is never guessed.
 - **Site URL:** `SITE_URL` (optional) enables canonical URLs, sitemap entries and Organization JSON-LD. Unset means they are omitted, not guessed.
 - **Fonts:** `next/font/google` (Inter, Space Grotesk) in `app/layout.tsx`; this needs network access at build time.
 - **Honesty rule:** public copy distinguishes Available, Foundation and Planned capabilities (`productModules` in `lib/navigation.ts`) and states no partners, customers or approvals.
@@ -91,3 +91,8 @@ CI (`.github/workflows/ci.yml`) provisions PostgreSQL 16 and runs migrate, DB te
 - Unpaginated list queries can grow without bound.
 - Fonts download at build time.
 - Partnership inquiries contain personal data with no retention or privacy policy yet.
+
+
+## FAQ, Terms and policy document routes
+
+The public route allowlist now includes `/faq`, `/terms`, `/policies`, and the explicit policy slugs in `lib/navigation.ts`. These pages use `components/public/PublicShell.tsx` and must not read workspace records for signed-out visitors. Public accessibility does not imply permission to index a page: the FAQ is in `INDEXABLE_PATHS`, while the Terms page and the Policies directory/document routes remain `noindex` until their publication blockers are resolved. `SITE_URL` is never guessed; it supplies canonical URLs and sitemap origin only when configured. All Terms and policy pages remain conspicuously marked as drafts, and public policy drafts are not a substitute for a versioned, approval-enforced policy-management workflow.

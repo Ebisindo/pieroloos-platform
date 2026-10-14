@@ -362,3 +362,57 @@ select.form-input { appearance:auto; }
   .journey-list, .capability-grid, .public-footer-grid, .benefit-list, .funding-summary, .form-grid { grid-template-columns:1fr; }
   .public-cta { width:100%; }
 }
+
+
+/* Public FAQ, Terms and policy documents */
+.legal-page { padding-top: clamp(2rem, 5vw, 4rem); padding-bottom: clamp(3rem, 7vw, 5rem); }
+.legal-document { max-width: 860px; }
+.legal-document > h1 { max-width: 18ch; line-height: 1.12; margin-bottom: 1rem; }
+.legal-document .public-section-lead { max-width: 70ch; margin-bottom: 2rem; }
+.faq-section, .policy-group { margin-top: 2.25rem; }
+.faq-list { display: grid; gap: .75rem; margin-top: 1rem; }
+.faq-item { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: 1rem 1.15rem; }
+.faq-item summary { cursor: pointer; color: var(--color-text); font-weight: 600; line-height: 1.5; padding-right: .4rem; }
+.faq-item summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 4px; }
+.faq-item[open] summary { color: var(--color-brand); }
+.faq-item p { max-width: 72ch; margin: .85rem 0 .15rem; color: var(--color-text-muted); line-height: 1.75; }
+.legal-draft-notice { border: 1px solid var(--warning); border-left: 4px solid var(--warning); border-radius: var(--radius-md); padding: 1rem 1.15rem; margin: 1.5rem 0; background: rgba(232,199,109,.08); }
+.legal-draft-notice strong { display: block; color: var(--warning); line-height: 1.5; }
+.legal-draft-notice p { margin: .65rem 0 0; line-height: 1.7; }
+.legal-prose, .legal-clause p { max-width: 76ch; line-height: 1.8; color: var(--color-text-muted); margin: 1rem 0; overflow-wrap: anywhere; }
+.legal-clause { border-top: 1px solid var(--color-border); padding-top: 1.2rem; margin-top: 1.8rem; }
+.legal-clause h2, .policy-group h2, .policy-blockers h2 { font-family: var(--font-display); font-size: clamp(1.15rem, 2.5vw, 1.45rem); line-height: 1.35; margin: 0 0 .6rem; color: var(--color-text); }
+.legal-related-links { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 2rem; line-height: 1.8; }
+.legal-related-links a, .policy-directory-card h3 a { color: var(--color-brand); text-decoration: underline; text-underline-offset: .2em; }
+.legal-updated, .legal-language-note { font-size: .9rem; color: var(--color-text-muted); margin-top: 1rem; line-height: 1.6; }
+.policy-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin: 1.5rem 0; }
+.policy-meta > div { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: .8rem; min-width: 0; }
+.policy-meta dt { font-size: .8rem; color: var(--color-text-muted); }
+.policy-meta dd { margin: .25rem 0 0; overflow-wrap: anywhere; font-weight: 600; }
+.policy-blockers { border: 1px solid var(--color-border); padding: 1rem 1.2rem; border-radius: var(--radius-md); margin-top: 1.6rem; }
+.policy-blockers p, .policy-blockers li { color: var(--color-text-muted); line-height: 1.7; }
+.policy-blockers ul { padding-left: 1.35rem; margin-bottom: 0; }
+.policy-directory-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: .85rem; margin-top: 1rem; }
+.policy-directory-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: 1rem 1.1rem; min-width: 0; }
+.policy-directory-heading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: .6rem; }
+.policy-directory-card h3 { font-size: 1rem; line-height: 1.45; margin: 0; }
+.policy-directory-card p { color: var(--color-text-muted); line-height: 1.65; overflow-wrap: anywhere; }
+.policy-status { color: var(--warning); border: 1px solid rgba(232,199,109,.4); border-radius: var(--radius-pill); padding: .2rem .55rem; font-size: .72rem; line-height: 1.5; }
+.policy-meta-inline { font-size: .78rem; }
+@media (max-width: 540px) {
+  .legal-document { padding-left: 1rem; padding-right: 1rem; }
+  .policy-meta { grid-template-columns: 1fr; }
+  .faq-item { padding: .9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .legal-page *, .legal-page *::before, .legal-page *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+@media print {
+  .public-header, .public-footer, .app-backdrop, .skip-link, .public-disclaimer { display: none !important; }
+  body, html, .public-shell, .legal-page { background: #fff !important; color: #111 !important; }
+  .legal-document, .legal-prose, .legal-clause p, .faq-item p { color: #111 !important; max-width: none !important; }
+  .legal-draft-notice, .policy-directory-card, .faq-item, .policy-meta > div { background: #fff !important; break-inside: avoid; }
+  .legal-draft-notice, .policy-status { color: #111 !important; border-color: #777 !important; }
+  a { color: #111 !important; text-decoration: underline !important; }
+  .faq-item:not([open]) > *:not(summary) { display: none !important; }
+}

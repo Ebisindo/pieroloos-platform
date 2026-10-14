@@ -24,8 +24,13 @@ describe("site URL handling", () => {
   it("only sets a canonical URL when the site URL is configured", () => {
     delete process.env.SITE_URL;
     expect(publicPageMetadata("/partners")).toEqual({ robots: { index: true, follow: true } });
+    expect(publicPageMetadata("/faq")).toEqual({ robots: { index: true, follow: true } });
+    expect(INDEXABLE_PATHS).toEqual(["/", "/partners", "/faq"]);
     process.env.SITE_URL = "https://example.com";
     expect(publicPageMetadata("/partners").alternates?.canonical).toBe("https://example.com/partners");
+    expect(publicPageMetadata("/faq").alternates?.canonical).toBe("https://example.com/faq");
+    expect(publicPageMetadata("/terms").alternates?.canonical).toBe("https://example.com/terms");
+    expect(publicPageMetadata("/policies").alternates?.canonical).toBe("https://example.com/policies");
   });
 });
 
@@ -34,7 +39,7 @@ describe("sitemap and robots", () => {
     process.env.SITE_URL = "https://example.com";
     const urls = sitemap().map((entry) => entry.url);
     expect(urls).toEqual(INDEXABLE_PATHS.map((path) => new URL(path, "https://example.com").toString()));
-    for (const privatePath of ["/clients", "/command-center", "/portal", "/settings", "/api", "/signin"]) {
+    for (const privatePath of ["/clients", "/command-center", "/portal", "/settings", "/api", "/signin", "/admin", "/policies/privacy"]) {
       expect(urls.some((url) => url.includes(privatePath))).toBe(false);
     }
   });
@@ -48,7 +53,7 @@ describe("sitemap and robots", () => {
   it("disallows everything except the public routes", () => {
     process.env.SITE_URL = "https://example.com";
     const result = robots();
-    expect(result.rules).toEqual({ userAgent: "*", allow: ["/$", "/partners"], disallow: "/" });
+    expect(result.rules).toEqual({ userAgent: "*", allow: ["/$", "/partners", "/faq", "/terms", "/policies", "/policies/"], disallow: ["/", "/api/", "/admin/", "/portal", "/signin", "/clients", "/command-center", "/settings"] });
     expect(result.sitemap).toBe("https://example.com/sitemap.xml");
   });
 });
