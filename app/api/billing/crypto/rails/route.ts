@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   if (!invoice) return NextResponse.json({ error: "Open USD invoice not found in the active organization." }, { status: 404 });
 
   const enabled = paymentFeatureEnabled("CRYPTO")
-    ? cryptoRailConfiguration().filter((rail) => rail.enabled && rail.tokenDecimals === 6 && rail.address && rail.tokenIdentifier)
+    ? cryptoRailConfiguration().filter((rail) => rail.enabled && rail.tokenDecimals !== null && rail.tokenDecimals >= 2 && rail.tokenDecimals <= 18 && rail.address && rail.tokenIdentifier)
     : [];
   return NextResponse.json({
     data: {
@@ -31,12 +31,12 @@ export async function GET(request: Request) {
         invoiceNumber: invoice.invoiceNumber,
         currency: invoice.currency,
         amountRemainingMinor: invoice.amountRemainingMinor.toString(),
-        expectedTokenAmountBaseUnits: (invoice.amountRemainingMinor * BigInt(10000)).toString(),
-        expectedTokenAmount: `${invoice.amountRemainingMinor / BigInt(100)}.${(invoice.amountRemainingMinor % BigInt(100)).toString().padStart(2, "0")}`,
+        amountUsd: `${invoice.amountRemainingMinor / BigInt(100)}.${(invoice.amountRemainingMinor % BigInt(100)).toString().padStart(2, "0")}`,
       },
       verificationMode: enabled.length ? "MANUAL_FINANCE_RECONCILIATION" : "DISABLED",
       rails: enabled.map(({ asset, network, address, tokenIdentifier, tokenDecimals }) => ({
-        asset, network, address, tokenIdentifier, tokenDecimals,
+        asset, network, address, tokenIdentifier, tokenDecimals: tokenDecimals ?? 0,
+        expectedTokenAmountBaseUnits: (invoice.amountRemainingMinor * (BigInt(10) ** BigInt((tokenDecimals ?? 0) - 2))).toString(),
       })),
     },
   });
