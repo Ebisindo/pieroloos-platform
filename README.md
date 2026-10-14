@@ -19,6 +19,7 @@ PieroloOS is a professional decision-support and workflow-organization platform.
 | Library layering | [docs/ARCHITECTURE-LIB.md](docs/ARCHITECTURE-LIB.md) |
 | Lint/typecheck troubleshooting | [docs/LINT-PROJECT-DIRECTORY.md](docs/LINT-PROJECT-DIRECTORY.md) |
 | GitHub Codespaces localhost:3000 preview and port forwarding | [docs/CODESPACES-PREVIEW.md](docs/CODESPACES-PREVIEW.md) |
+| Permanent public pre-operation preview deployment standard | [docs/PERMANENT-PREVIEW-DEPLOYMENT.md](docs/PERMANENT-PREVIEW-DEPLOYMENT.md) |
 
 The `README-SESSION-*`, `SESSION-*` and `docs/SESSION-*` files are historical delivery notes. A feature described only there is not evidence that it is implemented; check the code and tests.
 
@@ -31,7 +32,7 @@ npm run db:generate
 npm run dev -- --hostname 0.0.0.0 --port 3000
 ```
 
-For Codespaces port forwarding, preview access, environment safety, and troubleshooting, follow [docs/CODESPACES-PREVIEW.md](docs/CODESPACES-PREVIEW.md).
+For Codespaces port forwarding, preview access, environment safety, and troubleshooting, follow [docs/CODESPACES-PREVIEW.md](docs/CODESPACES-PREVIEW.md). This is a temporary developer preview, not permanent hosting. For the permanent public pre-operation preview standard, follow [docs/PERMANENT-PREVIEW-DEPLOYMENT.md](docs/PERMANENT-PREVIEW-DEPLOYMENT.md).
 
 This repository uses a recent Next.js with breaking changes. Read the matching guide in `node_modules/next/dist/docs/` before changing framework-level code (see [AGENTS.md](AGENTS.md)).
 
