@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   if (!invoiceId || invoiceId.length > 128) return NextResponse.json({ error: "Invoice reference is required." }, { status: 422 });
 
   const invoice = await prisma.billingInvoice.findFirst({
-    where: { id: invoiceId, organizationId: context.activeWorkspace.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: 0n } },
+    where: { id: invoiceId, organizationId: context.activeWorkspace.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: BigInt(0) } },
     select: { id: true, invoiceNumber: true, currency: true, amountRemainingMinor: true, amountPaidMinor: true, amountDueMinor: true },
   });
   if (!invoice) return NextResponse.json({ error: "Open USD invoice not found in the active organization." }, { status: 404 });
@@ -31,8 +31,8 @@ export async function GET(request: Request) {
         invoiceNumber: invoice.invoiceNumber,
         currency: invoice.currency,
         amountRemainingMinor: invoice.amountRemainingMinor.toString(),
-        expectedTokenAmountBaseUnits: (invoice.amountRemainingMinor * 10_000n).toString(),
-        expectedTokenAmount: `${invoice.amountRemainingMinor / 100n}.${(invoice.amountRemainingMinor % 100n).toString().padStart(2, "0")}`,
+        expectedTokenAmountBaseUnits: (invoice.amountRemainingMinor * BigInt(10000)).toString(),
+        expectedTokenAmount: `${invoice.amountRemainingMinor / BigInt(100)}.${(invoice.amountRemainingMinor % BigInt(100)).toString().padStart(2, "0")}`,
       },
       verificationMode: enabled.length ? "MANUAL_FINANCE_RECONCILIATION" : "DISABLED",
       rails: enabled.map(({ asset, network, address, tokenIdentifier, tokenDecimals }) => ({
