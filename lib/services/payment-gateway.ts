@@ -279,6 +279,105 @@ export async function reconcileBankTransfer(input: {
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
+export async function reconcileCryptoPayment(input: {
+  actorUserId: string;
+  organizationId: string;
+  paymentId: string;
+  receivedAmountBaseUnits: bigint;
+  evidenceReference: string;
+  reason: string;
+}) {
+  if (process.env.PAYMENTS_ENABLED !== "true" ||
+      process.env.CRYPTO_PAYMENTS_ENABLED !== "true" ||
+      process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true") {
+    throw new PaymentGatewayError("Crypto reconciliation is disabled.", "DISABLED");
+  }
+  if (input.reason.trim().length < 8 || input.evidenceReference.trim().length < 8 ||
+      input.receivedAmountBaseUnits <= 0n) {
+    throw new PaymentGatewayError("Independent chain evidence, exact received base units, and a reason are required.", "INVALID");
+  }
+  return prisma.$transaction(async (tx) => {
+    const originalClaim = await tx.platformAuditEvent.findFirst({
+      where: { action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT", subjectId: input.paymentId, outcome: "SUCCESS" },
+      orderBy: { occurredAt: "asc" },
+      select: { actorUserId: true, details: true },
+    });
+    if (!originalClaim || originalClaim.actorUserId === input.actorUserId) {
+      throw new PaymentGatewayError("The submitter cannot reconcile their own crypto claim.", "FORBIDDEN");
+    }
+    const claimDetails = originalClaim.details as { organizationId?: unknown; claimMetadata?: unknown } | null;
+    if (claimDetails?.organizationId !== input.organizationId) {
+      throw new PaymentGatewayError("Claim organization does not match the review scope.", "FORBIDDEN");
+    }
+    const claimMetadata = claimDetails?.claimMetadata as {
+      expectedTokenAmountBaseUnits?: unknown;
+      transactionReference?: unknown;
+      tokenIdentifier?: unknown;
+      network?: unknown;
+      asset?: unknown;
+      submittedByUserId?: unknown;
+    } | undefined;
+    const payment = await tx.billingPayment.findFirst({
+      where: { id: input.paymentId, organizationId: input.organizationId, provider: { startsWith: "crypto:" } },
+      select: { id: true, invoiceId: true, status: true, amountMinor: true, currency: true, providerPaymentId: true, provider: true },
+    });
+    if (!payment || !payment.invoiceId) throw new PaymentGatewayError("Crypto payment claim not found.", "NOT_FOUND");
+    if (payment.status !== BillingPaymentStatus.PENDING) throw new PaymentGatewayError("Crypto claim is no longer pending.", "CONFLICT");
+    if (payment.currency !== "USD" || typeof claimMetadata?.expectedTokenAmountBaseUnits !== "string" ||
+        BigInt(claimMetadata.expectedTokenAmountBaseUnits) !== input.receivedAmountBaseUnits ||
+        payment.providerPaymentId !== claimMetadata.transactionReference) {
+      throw new PaymentGatewayError("Received token amount or transaction reference does not match the immutable claim.", "INVALID");
+    }
+    const invoice = await tx.billingInvoice.findFirst({
+      where: { id: payment.invoiceId, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN },
+      select: { id: true, amountRemainingMinor: true, currency: true },
+    });
+    if (!invoice || invoice.currency !== "USD" || invoice.amountRemainingMinor !== payment.amountMinor) {
+      throw new PaymentGatewayError("Invoice balance changed; crypto claim requires review.", "CONFLICT");
+    }
+    const updatedPayment = await tx.billingPayment.updateMany({
+      where: { id: payment.id, organizationId: input.organizationId, status: BillingPaymentStatus.PENDING },
+      data: { status: BillingPaymentStatus.SUCCEEDED, paidAt: new Date() },
+    });
+    if (updatedPayment.count !== 1) throw new PaymentGatewayError("Crypto claim has already been reviewed.", "CONFLICT");
+    const updatedInvoice = await tx.billingInvoice.updateMany({
+      where: { id: invoice.id, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, amountRemainingMinor: payment.amountMinor },
+      data: {
+        amountPaidMinor: { increment: payment.amountMinor },
+        amountRemainingMinor: { decrement: payment.amountMinor },
+        status: BillingInvoiceStatus.PAID,
+        paidAt: new Date(),
+      },
+    });
+    if (updatedInvoice.count !== 1) throw new PaymentGatewayError("Invoice changed during reconciliation; transaction rolled back.", "CONFLICT");
+    await tx.platformAuditEvent.create({
+      data: {
+        actorUserId: input.actorUserId,
+        actorRole: "SUPER_ADMIN",
+        action: "CRYPTO_PAYMENT_RECONCILED",
+        subjectType: "BILLING_PAYMENT",
+        subjectId: payment.id,
+        outcome: "SUCCESS",
+        reason: input.reason.trim(),
+        details: {
+          organizationId: input.organizationId,
+          invoiceId: invoice.id,
+          provider: payment.provider,
+          asset: typeof claimMetadata.asset === "string" ? claimMetadata.asset : null,
+          network: typeof claimMetadata.network === "string" ? claimMetadata.network : null,
+          tokenIdentifier: typeof claimMetadata.tokenIdentifier === "string" ? claimMetadata.tokenIdentifier : null,
+          transactionReference: payment.providerPaymentId,
+          receivedAmountBaseUnits: input.receivedAmountBaseUnits.toString(),
+          evidenceReference: input.evidenceReference.trim(),
+          submittedByUserId: typeof claimMetadata.submittedByUserId === "string" ? claimMetadata.submittedByUserId : null,
+          automaticVerification: false,
+        } as Prisma.InputJsonObject,
+      },
+    });
+    return { id: payment.id, status: BillingPaymentStatus.SUCCEEDED };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
+
 export async function recordCryptoClaimAudit(input: {
   actorUserId: string; organizationId: string; paymentId: string; reason: string;
 }) {
