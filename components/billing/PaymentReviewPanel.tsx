@@ -44,7 +44,26 @@ export function PaymentReviewPanel() {
       setError(e instanceof Error ? e.message : "Could not load payment review queue.");
     } finally { setLoading(false); }
   }
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/payments", { cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json() as ListResponse;
+        if (!response.ok) throw new Error(body.error ?? "Could not load payment review queue.");
+        if (!cancelled) {
+          setPending(body.data?.pending ?? []);
+          setRecent(body.data?.recent ?? []);
+          setError("");
+        }
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load payment review queue.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   function field(payment: Payment, key: "amount" | "currency" | "bankRef" | "tokenAmount" | "evidence" | "reason") {
     const existing = formValues[payment.id];
