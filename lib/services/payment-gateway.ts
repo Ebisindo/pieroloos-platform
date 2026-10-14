@@ -4,6 +4,7 @@ import {
   cryptoRailConfiguration,
   newPaymentReference,
   paymentFeatureEnabled,
+  parseTransactionReference,
   type PaymentMethod,
 } from "@/lib/domain/payment-gateway";
 
@@ -313,7 +314,8 @@ export async function submitCryptoPaymentClaim(input: {
       throw new PaymentGatewayError("Payment order snapshot is incomplete.", "CONFLICT");
     }
     const networkPrefix = `crypto:${String(snapshot.network).toLowerCase()}:`;
-    if (!payment.provider.startsWith(networkPrefix) || payment.currency !== "USD") {
+    if (!payment.provider.startsWith(networkPrefix) || payment.currency !== "USD" ||
+        !parseTransactionReference(input.transactionReference, String(snapshot.network))) {
       throw new PaymentGatewayError("Payment order network or currency does not match its snapshot.", "CONFLICT");
     }
     const transactionAlreadyClaimed = await tx.billingPayment.findFirst({
