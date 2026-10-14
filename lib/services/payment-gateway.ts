@@ -42,7 +42,8 @@ export async function activateSubscriptionAfterVerifiedPayment(
     actorRole?: string;
   },
 ) {
-  if (process.env.PAYMENT_SUBSCRIPTION_ACTIVATION_ENABLED !== "true" || !input.subscriptionId) {
+  if (process.env.PAYMENTS_ENABLED !== "true" ||
+      process.env.PAYMENT_SUBSCRIPTION_ACTIVATION_ENABLED !== "true" || !input.subscriptionId) {
     return { activated: false, reason: "ACTIVATION_DISABLED_OR_NO_SUBSCRIPTION" as const };
   }
   const now = new Date();
@@ -572,7 +573,9 @@ export async function reconcileCryptoPayment(input: {
   if (input.decision === "APPROVE" &&
       (process.env.PAYMENTS_ENABLED !== "true" ||
        process.env.CRYPTO_PAYMENTS_ENABLED !== "true" ||
-       process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true")) {
+       process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true" ||
+       process.env.PAYMENT_RECONCILIATION_ADMIN_ONLY === "false" ||
+       process.env.PAYMENT_REQUIRE_DISTINCT_REVIEWER === "false")) {
     throw new PaymentGatewayError("Crypto payment approval is disabled.", "DISABLED");
   }
   if (input.reason.trim().length < 8 || input.evidenceReference.trim().length < 8 ||
@@ -677,7 +680,10 @@ export async function reconcileCryptoPayment(input: {
         manualOverrideReason: null,
       };
     } else if (verification.status === "UNAVAILABLE") {
-      if (process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true" || process.env.CRYPTO_MANUAL_OVERRIDE_ON_RPC_OUTAGE !== "true") {
+      if (process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true" ||
+          process.env.CRYPTO_MANUAL_OVERRIDE_ON_RPC_OUTAGE !== "true" ||
+          process.env.PAYMENT_RECONCILIATION_ADMIN_ONLY === "false" ||
+          process.env.PAYMENT_REQUIRE_DISTINCT_REVIEWER === "false") {
         throw new PaymentGatewayError("RPC verification is unavailable; the claim remains pending.", "NOT_CONFIGURED");
       }
       // An explicitly authorized Super Administrator can fall back to evidence-led
