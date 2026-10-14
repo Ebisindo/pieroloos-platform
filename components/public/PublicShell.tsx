@@ -63,6 +63,14 @@ export function PublicFooter() {
               <li><Link href="/signin">{t("navigation.signIn")}</Link></li>
             </ul>
           </nav>
+          <nav aria-label={t("navigation.helpLegal")}>
+            <h2 className="public-footer-heading">{t("navigation.helpLegal")}</h2>
+            <ul>
+              <li><Link href="/faq">{t("navigation.faq")}</Link></li>
+              <li><Link href="/terms">{t("navigation.terms")}</Link></li>
+              <li><Link href="/policies">{t("navigation.policies")}</Link></li>
+            </ul>
+          </nav>
         </div>
         <p className="public-disclaimer">{t("footer.disclaimer")}</p>
         <p className="public-copyright">&copy; {new Date().getFullYear()} PieroloOS. {t("footer.copyright")}</p>
