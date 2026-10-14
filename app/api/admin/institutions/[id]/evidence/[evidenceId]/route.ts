@@ -43,14 +43,23 @@ export async function PATCH(
         },
         select: { id: true, institutionId: true, evidenceClass: true, verifiedAt: true, nextReviewAt: true },
       });
-      const verifiedCount = await tx.exportInstitutionEvidence.count({
+      const verifiedOfficialSources = await tx.exportInstitutionEvidence.findMany({
         where: { institutionId: id, verifiedAt: { not: null }, evidenceClass: "OFFICIAL_PRIMARY" },
+        select: { sourceUrl: true, sourceTitle: true },
       });
+      const independentSourceKeys = new Set(
+        verifiedOfficialSources.map((source) => source.sourceUrl?.trim().toLowerCase() || source.sourceTitle.trim().toLowerCase()),
+      );
+      const nextVerificationStatus = independentSourceKeys.size >= 2
+        ? "CROSS_VERIFIED"
+        : independentSourceKeys.size === 1
+          ? "SOURCE_REVIEWED"
+          : "UNVERIFIED";
       await tx.exportInstitution.update({
         where: { id },
         data: {
-          verificationStatus: verifiedCount > 0 ? "SOURCE_REVIEWED" : "UNVERIFIED",
-          lastVerifiedAt: verifiedCount > 0 ? new Date() : null,
+          verificationStatus: nextVerificationStatus,
+          lastVerifiedAt: nextVerificationStatus === "UNVERIFIED" ? null : new Date(),
         },
       });
       await tx.platformAuditEvent.create({
