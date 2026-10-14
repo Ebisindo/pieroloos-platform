@@ -620,12 +620,14 @@ export async function reconcileCryptoPayment(input: {
     verificationProvider: string;
     confirmations: number | null;
     blockReference: string | null;
+    blockTimestamp: string | null;
     manualOverrideReason: string | null;
   } = {
     automaticVerification: false,
     verificationProvider: "manual-finance-review",
     confirmations: null,
     blockReference: null,
+    blockTimestamp: null,
     manualOverrideReason: null,
   };
 
@@ -646,7 +648,7 @@ export async function reconcileCryptoPayment(input: {
     }
     const meta = claimDetails.claimMetadata as {
       transactionReference?: unknown; tokenIdentifier?: unknown; network?: unknown; asset?: unknown;
-      destinationAddress?: unknown; tokenDecimals?: unknown; expectedTokenAmountBaseUnits?: unknown;
+      destinationAddress?: unknown; tokenDecimals?: unknown; expectedTokenAmountBaseUnits?: unknown; expiresAt?: unknown;
     } | undefined;
     const payment = await prisma.billingPayment.findFirst({
       where: { id: input.paymentId, organizationId: input.organizationId, provider: { startsWith: "crypto:" }, status: BillingPaymentStatus.PENDING },
@@ -685,11 +687,22 @@ export async function reconcileCryptoPayment(input: {
           safeBigInt(verification.receivedAmountBaseUnits) !== input.receivedAmountBaseUnits) {
         throw new PaymentGatewayError("Independently verified chain amount does not match the payment order.", "INVALID");
       }
+      if (typeof meta.expiresAt !== "string" || Number.isNaN(Date.parse(meta.expiresAt))) {
+        throw new PaymentGatewayError("Payment order expiry snapshot is missing or invalid.", "CONFLICT");
+      }
+      const confirmedAt = Date.parse(verification.blockTimestamp);
+      if (!Number.isFinite(confirmedAt)) {
+        throw new PaymentGatewayError("The blockchain provider did not return a valid transfer timestamp.", "CONFLICT");
+      }
+      if (confirmedAt > Date.parse(meta.expiresAt)) {
+        throw new PaymentGatewayError("The transfer was confirmed after the payment order expired. It remains pending for separate manual policy review.", "CONFLICT");
+      }
       verificationAudit = {
         automaticVerification: true,
         verificationProvider: verification.provider,
         confirmations: verification.confirmations,
         blockReference: verification.blockReference,
+        blockTimestamp: verification.blockTimestamp,
         manualOverrideReason: null,
       };
     } else if (verification.status === "UNAVAILABLE") {
@@ -704,6 +717,7 @@ export async function reconcileCryptoPayment(input: {
         verificationProvider: "manual-finance-review-after-rpc-outage",
         confirmations: null,
         blockReference: null,
+        blockTimestamp: null,
         manualOverrideReason: verification.reason,
       };
     } else {
@@ -829,11 +843,12 @@ export async function reconcileCryptoPayment(input: {
           verificationProvider: verificationAudit.verificationProvider,
           confirmations: verificationAudit.confirmations,
           blockReference: verificationAudit.blockReference,
+          blockTimestamp: verificationAudit.blockTimestamp,
           manualOverrideReason: verificationAudit.manualOverrideReason,
         } as Prisma.InputJsonObject,
       },
     });
-    return { id: payment.id, status: BillingPaymentStatus.SUCCEEDED, automaticVerification: verificationAudit.automaticVerification, verificationProvider: verificationAudit.verificationProvider };
+    return { id: payment.id, status: BillingPaymentStatus.SUCCEEDED, automaticVerification: verificationAudit.automaticVerification, verificationProvider: verificationAudit.verificationProvider, blockTimestamp: verificationAudit.blockTimestamp };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
