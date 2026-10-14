@@ -46,7 +46,7 @@ export function cryptoRailConfiguration(env: NodeJS.ProcessEnv = process.env) {
       : `CRYPTO_${rail.asset}_${rail.network}_TOKEN_ID`;
     const tokenIdentifier = env[tokenIdentifierEnv]?.trim() ?? "";
     const configuredDecimals = env[`CRYPTO_${rail.asset}_${rail.network}_TOKEN_DECIMALS`];
-    const tokenDecimals = configuredDecimals && /^\\d+$/.test(configuredDecimals) ? Number(configuredDecimals) : null;
+    const tokenDecimals = configuredDecimals && /^\d+$/.test(configuredDecimals) ? Number(configuredDecimals) : null;
     const destinationVerified = env[`${rail.envKey}_VERIFIED`] === "true";
     const tokenVerified = env[`${tokenIdentifierEnv}_VERIFIED`] === "true";
     const networkEnabled = env[`CRYPTO_${rail.network}_ENABLED`] === "true";
