@@ -11,8 +11,12 @@ import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
 
 function money(amount: bigint, currency: string) {
   if (amount > BigInt(Number.MAX_SAFE_INTEGER) || amount < BigInt(Number.MIN_SAFE_INTEGER)) return `${currency} amount unavailable`;
-  try { return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(amount) / 100); }
-  catch { return `${currency} ${(Number(amount) / 100).toFixed(2)}`; }
+  try {
+    const digits = new Intl.NumberFormat("en-US", { style: "currency", currency }).resolvedOptions().maximumFractionDigits;
+    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(amount) / (10 ** digits));
+  } catch {
+    return `${currency} amount unavailable`;
+  }
 }
 
 function tone(status: string): "neutral" | "success" | "warning" | "danger" | "info" {
