@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
+import { canManageBilling } from "@/lib/auth/billing-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PORTAL_INTERACTION_LIMIT } from "@/lib/http/rate-limit";
 import { createBankTransferOrder, submitBankTransferClaim, PaymentGatewayError } from "@/lib/services/payment-gateway";
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
   const context = await getWorkspaceContext();
   if (!context.userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   if (!context.activeWorkspace || !context.principal) return NextResponse.json({ error: "Select an authorized workspace." }, { status: 409 });
-  if (!context.principal.permissions.includes("workspace:read")) return NextResponse.json({ error: "Workspace access required." }, { status: 403 });
+  if (!canManageBilling(context.principal.role)) return NextResponse.json({ error: "Billing administrator access required." }, { status: 403 });
   const limited = await enforceRateLimit(PORTAL_INTERACTION_LIMIT, context.userId);
   if (limited) return limited;
 
