@@ -52,7 +52,7 @@ export async function GET() {
     for (const claim of claims) {
       if (claim.subjectId && !latestClaimByPayment.has(claim.subjectId)) latestClaimByPayment.set(claim.subjectId, claim);
     }
-    const pending = pendingRows.map((payment) => {
+    const pending = pendingRows.filter((payment) => latestClaimByPayment.has(payment.id)).map((payment) => {
       const claim = latestClaimByPayment.get(payment.id);
       const details = claim?.details as { paymentReference?: unknown; claimMetadata?: unknown } | null;
       return {
@@ -70,7 +70,7 @@ export async function GET() {
         details: { pendingCount: pending.length, recentCount: recent.length },
       },
     });
-    return NextResponse.json({ data: { pending, recent } });
+    return NextResponse.json({ data: { pending: pending.map((payment) => ({ ...payment, amountMinor: payment.amountMinor.toString() })), recent: recent.map((payment) => ({ ...payment, amountMinor: payment.amountMinor.toString(), refundedAmountMinor: payment.refundedAmountMinor.toString() })) } });
   } catch {
     console.error("Unable to list payment records.");
     return NextResponse.json({ error: "Unable to load payment records." }, { status: 500 });
