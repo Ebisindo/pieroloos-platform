@@ -2,7 +2,7 @@
 
 ## Status
 
-This branch records the scoped implementation contract and production release gates. It does **not** claim that live payment processing has been implemented or that any provider, bank account, wallet, token, or compliance requirement has been independently verified.
+This document defines the implementation contract and production release gates. Initial code for Stripe hosted checkout/webhooks, bank-transfer instructions and claim reconciliation, crypto order/claim submission, and the restricted Super Admin review queue has been added on the feature branch. See [PAYMENTS-IMPLEMENTATION-STATUS.md](PAYMENTS-IMPLEMENTATION-STATUS.md) for the exact scope, validation status, and remaining blockers. **No provider/account/wallet/token has been independently verified by this repository work, and payment feature flags remain disabled by default.**
 
 Existing repository inspection confirmed that the Prisma billing foundation already contains `BillingPlan`, `BillingSubscription`, `BillingInvoice`, `BillingPayment`, and `BillingWebhookEvent`. Current billing documentation explicitly says checkout, provider integration, webhook verification, reconciliation, customer-facing billing, and production entitlement enforcement remain unimplemented. Extend these foundations rather than creating duplicate billing models.
 
