@@ -284,7 +284,8 @@ export async function createCryptoPaymentOrder(input: {
   const rail = cryptoRailConfiguration().find((item) =>
     item.asset === input.asset && item.network === input.network && item.enabled,
   );
-  if (!rail || !rail.address || !rail.tokenIdentifier || rail.tokenDecimals !== 6) {
+  if (!rail || !rail.address || !rail.tokenIdentifier || rail.tokenDecimals === null ||
+      rail.tokenDecimals < 2 || rail.tokenDecimals > 18) {
     throw new PaymentGatewayError("Selected crypto rail has not passed all configuration gates.", "NOT_CONFIGURED");
   }
   const invoice = await prisma.billingInvoice.findFirst({
