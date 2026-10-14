@@ -21,6 +21,12 @@ export async function POST(request: Request) {
   const limited = await enforceRateLimit(PORTAL_INTERACTION_LIMIT, context.userId);
   if (limited) return limited;
   if (!paymentFeatureEnabled("STRIPE")) return NextResponse.json({ error: "Stripe payments are disabled or not configured." }, { status: 503 });
+  if (process.env.STRIPE_CHECKOUT_MODE && process.env.STRIPE_CHECKOUT_MODE !== "payment") {
+    return NextResponse.json({ error: "This checkout endpoint currently supports one-time invoice payments only." }, { status: 503 });
+  }
+  if (process.env.STRIPE_ALLOW_PROMOTIONS === "true" || process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true") {
+    return NextResponse.json({ error: "Promotions and automatic tax are not supported by this checkout implementation." }, { status: 503 });
+  }
   if (!process.env.STRIPE_SECRET_KEY || !process.env.NEXTAUTH_URL) return NextResponse.json({ error: "Stripe checkout configuration is incomplete." }, { status: 503 });
 
   let body: unknown;
