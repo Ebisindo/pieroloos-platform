@@ -4,6 +4,7 @@ import { PageHeader, GlassPanel, StatusBadge } from "@/components/ui/primitives"
 import { StripeCheckoutButton } from "@/components/billing/PaymentActions";
 import { BankTransferOrderButton } from "@/components/billing/BankTransferOrderButton";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
+import { canManageBilling } from "@/lib/auth/billing-access";
 import { prisma } from "@/lib/db/prisma";
 import { BillingInvoiceStatus } from "@prisma/client";
 import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
@@ -27,7 +28,7 @@ export default async function BillingPage() {
   if (!context.activeWorkspace || !context.principal) {
     return <div className="page-stack"><PageHeader eyebrow="BILLING" title="Billing and payments" description="Select an authorized workspace to view invoices." /><GlassPanel><p>No active workspace selected.</p><Link className="button button-secondary" href="/settings">Choose workspace</Link></GlassPanel></div>;
   }
-  if (!context.principal.permissions.includes("workspace:read")) redirect("/command-center");
+  if (!canManageBilling(context.principal.role)) redirect("/command-center");
 
   const invoices = await prisma.billingInvoice.findMany({
     where: { organizationId: context.activeWorkspace.organizationId },
