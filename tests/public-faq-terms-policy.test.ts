@@ -61,5 +61,8 @@ describe("public FAQ and legal content", () => {
     expect(content).toContain('robots: { index: false, follow: true }');
     expect(content).toContain("DRAFT — NOT APPROVED FOR BINDING OR FINAL PUBLICATION.");
     expect(content).toContain("Approval and implementation requirements");
+    expect(content).toContain('"blockers"');
+    expect(content).toContain("DRAFT — NOT APPROVED FOR BINDING OR FINAL PUBLICATION.");
+    expect(content).toContain('"DRAFT — REVIEW REQUIRED"');
   });
 });
