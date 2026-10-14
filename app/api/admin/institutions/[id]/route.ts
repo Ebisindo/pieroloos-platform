@@ -34,8 +34,22 @@ export async function PATCH(
       to: parsed.data.status,
     }, { status: 409 });
   }
-  if (requiresWrittenEvidence(parsed.data.status) && !parsed.data.agreementEvidenceRef?.trim()) {
-    return NextResponse.json({ error: "A reviewed written-authorization evidence reference is required for this status." }, { status: 422 });
+  if (requiresWrittenEvidence(parsed.data.status)) {
+    if (!parsed.data.agreementEvidenceRef?.trim()) {
+      return NextResponse.json({ error: "A reviewed written-authorization evidence reference is required for this status." }, { status: 422 });
+    }
+    const evidence = await prisma.exportInstitutionEvidence.findFirst({
+      where: {
+        id: parsed.data.agreementEvidenceRef,
+        institutionId: id,
+        evidenceClass: "OFFICIAL_PRIMARY",
+        verifiedAt: { not: null },
+      },
+      select: { id: true },
+    });
+    if (!evidence) {
+      return NextResponse.json({ error: "The evidence reference must identify reviewed official primary evidence for this institution." }, { status: 422 });
+    }
   }
   if (parsed.data.status === "ACTIVE_UNDER_SIGNED_AGREEMENT" && !parsed.data.verificationStatus) {
     return NextResponse.json({ error: "A verification status is required before activating a partnership." }, { status: 422 });
