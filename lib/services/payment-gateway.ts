@@ -5,7 +5,6 @@ import {
   newPaymentReference,
   paymentFeatureEnabled,
   parseTransactionReference,
-  type PaymentMethod,
 } from "@/lib/domain/payment-gateway";
 
 export class PaymentGatewayError extends Error {
