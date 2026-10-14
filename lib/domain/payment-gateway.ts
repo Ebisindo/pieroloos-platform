@@ -16,7 +16,7 @@ export const CRYPTO_RAILS = [
   { asset: "USDC", network: "BNB_SMART_CHAIN", envKey: "CRYPTO_USDC_BSC_ADDRESS" },
 ] as const;
 
-export function paymentFeatureEnabled(method: PaymentMethod, env: NodeJS.ProcessEnv = process.env) {
+export function paymentFeatureEnabled(method: PaymentMethod, env: Record<string, string | undefined> = process.env) {
   if (env.PAYMENTS_ENABLED !== "true") return false;
   if (method === "STRIPE") return env.STRIPE_PAYMENTS_ENABLED === "true" &&
     Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET);
@@ -81,7 +81,7 @@ export function hashWebhookPayload(rawBody: string) {
 }
 
 export function validatePositiveMinorAmount(value: unknown): value is bigint {
-  return typeof value === "bigint" && value > 0n;
+  return typeof value === "bigint" && value > BigInt(0);
 }
 
 export function allowedPaymentTransition(from: PaymentWorkflowStatus, to: PaymentWorkflowStatus) {
