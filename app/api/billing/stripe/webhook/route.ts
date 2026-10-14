@@ -2,28 +2,13 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { BillingInvoiceStatus, BillingPaymentStatus, BillingWebhookStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { verifyStripeWebhookSignature } from "@/lib/domain/stripe-webhook-signature";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
-}
-
-function verifiedStripeEvent(rawBody: string, signatureHeader: string, secret: string): boolean {
-  const parts = signatureHeader.split(",").map((part) => part.trim().split("=", 2));
-  const timestampValue = parts.find(([key]) => key === "t")?.[1];
-  const signatures = parts.filter(([key]) => key === "v1").map(([, value]) => value).filter(Boolean);
-  if (!timestampValue || !/^\d+$/.test(timestampValue) || !signatures.length) return false;
-  const timestamp = Number(timestampValue);
-  // Stripe's documented default tolerance is five minutes. Reject stale/future events.
-  if (!Number.isSafeInteger(timestamp) || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 300) return false;
-  const expected = createHmac("sha256", secret).update(`${timestampValue}.${rawBody}`, "utf8").digest();
-  return signatures.some((candidate) => {
-    if (!/^[0-9a-f]{64}$/i.test(candidate)) return false;
-    const actual = Buffer.from(candidate, "hex");
-    return actual.length === expected.length && timingSafeEqual(actual, expected);
-  });
 }
 
 type StripeEventPayload = {
@@ -46,7 +31,7 @@ export async function POST(request: Request) {
   if (!signature) return errorResponse("Missing Stripe signature.", 400);
   const rawBody = await request.text().catch(() => "");
   if (!rawBody || Buffer.byteLength(rawBody, "utf8") > 1024 * 1024) return errorResponse("Invalid webhook body.", 400);
-  if (!verifiedStripeEvent(rawBody, signature, secret)) return errorResponse("Invalid or expired Stripe signature.", 400);
+  if (!verifyStripeWebhookSignature(rawBody, signature, secret)) return errorResponse("Invalid or expired Stripe signature.", 400);
 
   let event: StripeEventPayload;
   try {
