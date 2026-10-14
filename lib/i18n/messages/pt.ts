@@ -41,6 +41,7 @@ const pt = {
   "navigation.reports": "Relatórios",
   "navigation.engagements": "Atendimentos",
   "navigation.settings": "Configurações",
+  "navigation.billing": "Faturamento e pagamentos",
   "navigation.adminControlCentre": "Central de controle administrativo",
   "module.clientIntake": "Entrada de clientes",
   "module.businessProfile": "Perfil empresarial",
