@@ -42,9 +42,9 @@ export default async function FaqPage() {
       {structuredData ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredData }} /> : null}
       <section className="public-section legal-page" aria-labelledby="faq-title">
         <div className="public-container legal-document">
-          <p className="eyebrow">HELP CENTRE</p>
-          <h1 id="faq-title" className="public-h2">Frequently Asked Questions &amp; Answers</h1>
-          <p className="public-section-lead">Clear answers about PieroloOS, evidence, accounts, service availability and important limitations.</p>
+          <p className="eyebrow">{t("faq.eyebrow" as never)}</p>
+          <h1 id="faq-title" className="public-h2">{t("faq.heading" as never)}</h1>
+          <p className="public-section-lead">{t("faq.intro" as never)}</p>
           {faqSections.map((section) => (
             <section key={section.title} className="faq-section" aria-labelledby={section.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}>
               <h2 id={section.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()} className="public-h3-inline">{section.title}</h2>
@@ -59,7 +59,7 @@ export default async function FaqPage() {
             </section>
           ))}
           <p className="legal-related-links"><Link href="/terms">{t("navigation.terms" as never)}</Link> · <Link href="/policies">{t("navigation.policies" as never)}</Link></p>
-          <p className="legal-updated">Last updated: 14 October 2026</p>
+          <p className="legal-updated">{t("faq.lastUpdated" as never)}: 14 October 2026</p>
         </div>
       </section>
     </PublicShell>
