@@ -677,7 +677,7 @@ export async function reconcileCryptoPayment(input: {
         manualOverrideReason: null,
       };
     } else if (verification.status === "UNAVAILABLE") {
-      if (process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true") {
+      if (process.env.CRYPTO_MANUAL_RECONCILIATION_ENABLED !== "true" || process.env.CRYPTO_MANUAL_OVERRIDE_ON_RPC_OUTAGE !== "true") {
         throw new PaymentGatewayError("RPC verification is unavailable; the claim remains pending.", "NOT_CONFIGURED");
       }
       // An explicitly authorized Super Administrator can fall back to evidence-led
