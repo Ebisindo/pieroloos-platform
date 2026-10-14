@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { BillingInvoiceStatus, BillingPaymentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -80,7 +79,8 @@ export async function createManualPaymentClaim(input: {
   }
 
   let provider = "bank_transfer";
-  let paymentId = newPaymentReference("BANK");
+  let paymentReference = newPaymentReference("BANK");
+  let providerPaymentId = paymentReference;
   let metadata: Prisma.InputJsonObject = {
     claimType: "BANK_TRANSFER",
     paymentReference: paymentId,
@@ -101,7 +101,7 @@ export async function createManualPaymentClaim(input: {
     paymentId = newPaymentReference("CRYPTO");
     metadata = {
       claimType: "CRYPTO",
-      paymentReference: paymentId,
+      paymentReference,
       submittedByUserId: input.userId,
       submittedAt: new Date().toISOString(),
       verificationStatus: "PENDING",
@@ -140,7 +140,7 @@ export async function createManualPaymentClaim(input: {
           organizationId: input.organizationId,
           invoiceId: invoice.id,
           provider,
-          providerPaymentId: paymentId,
+          providerPaymentId,
           status: BillingPaymentStatus.PENDING,
           currency: invoice.currency,
           amountMinor,
@@ -163,7 +163,7 @@ export async function createManualPaymentClaim(input: {
             organizationId: input.organizationId,
             invoiceId: invoice.id,
             provider,
-            paymentReference: paymentId,
+            paymentReference,
             amountMinor: amountMinor.toString(),
             currency: invoice.currency,
             claimMetadata: metadata,
@@ -201,6 +201,14 @@ export async function reconcileBankTransfer(input: {
     throw new PaymentGatewayError("Complete valid reconciliation evidence is required.", "INVALID");
   }
   return prisma.$transaction(async (tx) => {
+    const originalClaim = await tx.platformAuditEvent.findFirst({
+      where: { action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT", subjectId: input.paymentId, outcome: "SUCCESS" },
+      orderBy: { occurredAt: "asc" },
+      select: { actorUserId: true },
+    });
+    if (!originalClaim || originalClaim.actorUserId === input.actorUserId) {
+      throw new PaymentGatewayError("The submitter cannot reconcile their own claim; an independent reviewer is required.", "FORBIDDEN");
+    }
     const payment = await tx.billingPayment.findFirst({
       where: { id: input.paymentId, organizationId: input.organizationId, provider: "bank_transfer" },
       select: { id: true, invoiceId: true, status: true, amountMinor: true, currency: true },
