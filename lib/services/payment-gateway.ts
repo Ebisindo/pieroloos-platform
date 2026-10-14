@@ -440,6 +440,12 @@ export async function reconcileCryptoPayment(input: {
       (input.decision === "APPROVE" && input.receivedAmountBaseUnits <= 0n)) {
     throw new PaymentGatewayError("Independent chain evidence, exact received base units, and a reason are required.", "INVALID");
   }
+  try {
+    const evidenceUrl = new URL(input.evidenceReference);
+    if (evidenceUrl.protocol !== "https:") throw new Error("HTTPS required");
+  } catch {
+    throw new PaymentGatewayError("Crypto evidence must be a valid HTTPS blockchain-explorer or evidence URL.", "INVALID");
+  }
   return prisma.$transaction(async (tx) => {
     const originalClaim = await tx.platformAuditEvent.findFirst({
       where: { action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT", subjectId: input.paymentId, outcome: "SUCCESS" },
