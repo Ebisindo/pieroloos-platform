@@ -48,7 +48,7 @@ export default async function TermsPage() {
             <strong>{t("terms.draftNoticeTitle" as never)}</strong>
             <p>{t("terms.draftNoticeBody" as never)}</p>
           </div>
-          <p className="legal-prose">Document status: <strong>DRAFT / NOT APPROVED</strong>. No effective date has been assigned. This text is an implementation draft for review, not a representation that binding Terms are currently in force.</p>
+          <p className="legal-prose">Document status: <strong>DRAFT / NOT APPROVED</strong>. Version: <strong>0.1-draft</strong>. Last updated: <strong>14 October 2026</strong>. Effective date: <strong>not assigned</strong>. This text is an implementation draft for review, not a representation that binding Terms are currently in force.</p>
           {termsSections.map(([title, body]) => (
             <section key={title} className="legal-clause">
               <h2>{title}</h2>
