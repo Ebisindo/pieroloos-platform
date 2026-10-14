@@ -1668,6 +1668,7 @@ enum ExportInstitutionVerificationStatus {
 
 enum ExportInstitutionEvidenceClass {
   OFFICIAL_PRIMARY
+  WRITTEN_AUTHORIZATION
   SECONDARY
   USER_PROVIDED
   INTERNAL_ASSESSMENT
