@@ -15,7 +15,7 @@ type Order = {
 
 function usd(minor: string) {
   const value = BigInt(minor);
-  return `USD ${value / 100n}.${(value % 100n).toString().padStart(2, "0")}`;
+  return `USD ${value / BigInt(100)}.${(value % BigInt(100)).toString().padStart(2, "0")}`;
 }
 
 export function BankTransferOrderButton({ invoiceId }: { invoiceId: string }) {
