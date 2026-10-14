@@ -4,7 +4,7 @@ import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PORTAL_INTERACTION_LIMIT } from "@/lib/http/rate-limit";
 import { listOpenInvoices, listPayments, createManualPaymentClaim, PaymentGatewayError } from "@/lib/services/payment-gateway";
-import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
+import { parseTransactionReference, paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
 
 const claimSchema = z.object({
   invoiceId: z.string().min(1).max(128),
@@ -82,8 +82,13 @@ export async function POST(request: Request) {
   if (!paymentFeatureEnabled(parsed.data.method)) {
     return NextResponse.json({ error: "This payment method is currently unavailable." }, { status: 503 });
   }
-  if (parsed.data.method === "CRYPTO" && (!parsed.data.asset || !parsed.data.network || !parsed.data.transactionReference)) {
-    return NextResponse.json({ error: "Crypto asset, network, and transaction reference are required for a verification claim." }, { status: 422 });
+  if (parsed.data.method === "CRYPTO") {
+    if (!parsed.data.asset || !parsed.data.network || !parsed.data.transactionReference) {
+      return NextResponse.json({ error: "Crypto asset, network, and transaction reference are required for a verification claim." }, { status: 422 });
+    }
+    if (!parseTransactionReference(parsed.data.transactionReference, parsed.data.network)) {
+      return NextResponse.json({ error: "Transaction reference format does not match the selected network." }, { status: 422 });
+    }
   }
 
   try {
