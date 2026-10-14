@@ -1,4 +1,5 @@
 import { BillingPaymentStatus } from "@prisma/client";
+import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentPlatformActor } from "@/lib/auth/platform-access";
@@ -82,6 +83,10 @@ export async function POST(request: Request) {
   const actor = await getCurrentPlatformActor();
   if (!actor) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   if (!actor.isSuperAdmin) return NextResponse.json({ error: "Only the platform Super Administrator may reconcile payment claims." }, { status: 403 });
+  const controls = paymentControlConfiguration();
+  if (!controls.paymentsEnabled || !controls.reconciliationAdminOnly || !controls.requireDistinctReviewer) {
+    return NextResponse.json({ error: "Payment reconciliation is disabled by the platform safety configuration." }, { status: 503 });
+  }
   const limited = await enforceRateLimit(PLATFORM_ADMIN_MUTATION_LIMIT, actor.userId);
   if (limited) return limited;
 
