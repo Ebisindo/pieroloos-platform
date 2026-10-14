@@ -1617,6 +1617,60 @@ enum PartnershipInquiryStatus {
   CLOSED
 }
 
+enum ExportInstitutionCategory {
+  NATIONAL_EXPORT_PROMOTION
+  TRADE_MINISTRY
+  EXPORT_DEVELOPMENT
+  INTERNATIONAL_TRADE_DEPARTMENT
+  INVESTMENT_TRADE_PROMOTION
+  CHAMBER_INDUSTRY_ORGANIZATION
+  REGIONAL_TRADE_BODY
+  MULTILATERAL_TRADE_SUPPORT
+  OTHER
+}
+
+enum ExportInstitutionScope {
+  SUBNATIONAL
+  NATIONAL
+  REGIONAL
+  MULTILATERAL
+  INTERNATIONAL
+  OTHER
+}
+
+enum ExportInstitutionRelationshipStatus {
+  PROSPECTIVE_NOT_CONFIRMED
+  RESEARCHING
+  RESEARCHED
+  CONCEPT_PREPARED
+  INTERNAL_REVIEW
+  OUTREACH_AUTHORIZED
+  CONTACTED
+  DISCOVERY_DISCUSSIONS
+  DUE_DILIGENCE
+  DRAFT_TERMS
+  WRITTEN_AUTHORIZATION_VERIFIED
+  ACTIVE_UNDER_SIGNED_AGREEMENT
+  PAUSED
+  DECLINED
+  CLOSED
+}
+
+enum ExportInstitutionVerificationStatus {
+  UNVERIFIED
+  RESEARCH_IN_PROGRESS
+  SOURCE_REVIEWED
+  CROSS_VERIFIED
+}
+
+enum ExportInstitutionEvidenceClass {
+  OFFICIAL_PRIMARY
+  SECONDARY
+  USER_PROVIDED
+  INTERNAL_ASSESSMENT
+  OTHER
+}
+
 // Public submissions; intentionally not tenant-scoped. Readable only by platform superadmins.
 model PartnershipInquiry {
   id                String                   @id @default(cuid())
@@ -1634,4 +1688,63 @@ model PartnershipInquiry {
 
   @@index([status, createdAt])
   @@index([createdAt])
+}
+
+// Internal institutional directory. New records are private and unconfirmed by default.
+model ExportInstitution {
+  id                    String                              @id @default(cuid())
+  officialName          String
+  acronym               String?
+  aliases               String[]                            @default([])
+  category              ExportInstitutionCategory
+  scope                 ExportInstitutionScope              @default(NATIONAL)
+  countryCode           String?
+  jurisdictions         String[]                            @default([])
+  officialWebsite       String?
+  publicContactChannels Json?
+  mandateSummary        String?
+  services              String[]                            @default([])
+  collaborationAreas    String[]                            @default([])
+  relationshipStatus    ExportInstitutionRelationshipStatus @default(PROSPECTIVE_NOT_CONFIRMED)
+  verificationStatus    ExportInstitutionVerificationStatus @default(UNVERIFIED)
+  internalOwnerUserId   String?
+  publicProfileApproved Boolean                             @default(false)
+  logoUseAuthorized     Boolean                             @default(false)
+  agreementEvidenceRef  String?
+  lastVerifiedAt        DateTime?
+  nextReviewAt          DateTime?
+  createdByUserId       String
+  createdAt             DateTime                            @default(now())
+  updatedAt             DateTime                            @updatedAt
+
+  createdBy User                         @relation("ExportInstitutionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  internalOwner User?                    @relation("ExportInstitutionOwner", fields: [internalOwnerUserId], references: [id], onDelete: SetNull)
+  evidence   ExportInstitutionEvidence[]
+
+  @@index([countryCode, category])
+  @@index([relationshipStatus, updatedAt])
+  @@index([verificationStatus, nextReviewAt])
+  @@index([createdAt])
+}
+
+model ExportInstitutionEvidence {
+  id             String                        @id @default(cuid())
+  institutionId  String
+  sourceUrl      String?
+  sourceTitle    String
+  evidenceClass  ExportInstitutionEvidenceClass
+  supportedClaim String
+  observedAt     DateTime                      @default(now())
+  publishedAt    DateTime?
+  verifiedAt     DateTime?
+  nextReviewAt   DateTime?
+  reviewerUserId String?
+  notes          String?
+  createdAt      DateTime                      @default(now())
+
+  institution ExportInstitution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  reviewer    User?             @relation("ExportInstitutionEvidenceReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull)
+
+  @@index([institutionId, observedAt])
+  @@index([evidenceClass, verifiedAt])
 }
