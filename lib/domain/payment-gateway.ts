@@ -45,18 +45,20 @@ export function cryptoRailConfiguration(env: Record<string, string | undefined> 
       ? "CRYPTO_USDC_SOLANA_MINT"
       : `CRYPTO_${rail.asset}_${rail.network}_TOKEN_ID`;
     const tokenIdentifier = env[tokenIdentifierEnv]?.trim() ?? "";
-    const configuredDecimals = env[`CRYPTO_${rail.asset}_${rail.network}_TOKEN_DECIMALS`];
+    const decimalsEnv = `CRYPTO_${rail.asset}_${rail.network}_TOKEN_DECIMALS`;
+    const configuredDecimals = env[decimalsEnv];
     const tokenDecimals = configuredDecimals && /^\d+$/.test(configuredDecimals) ? Number(configuredDecimals) : null;
+    const decimalsVerified = env[`${decimalsEnv}_VERIFIED`] === "true";
     const destinationVerified = env[`${rail.envKey}_VERIFIED`] === "true";
     const tokenVerified = env[`${tokenIdentifierEnv}_VERIFIED`] === "true";
     const networkEnabled = env[`CRYPTO_${rail.network}_ENABLED`] === "true";
-    // This implementation supports only an explicitly approved USD-parity quote and
-    // human finance review against independent chain evidence. It does not claim automatic
-    // on-chain verification. Stablecoin decimals must be explicitly configured as verified.
+    // Token decimals differ across networks and wrapped/native assets. Every rail requires
+    // an explicitly verified decimal count and an explicitly approved USD-parity quote.
+    // Transfers are reviewed manually; this is not automated on-chain verification.
     const reviewPolicyReady = env.CRYPTO_MANUAL_RECONCILIATION_ENABLED === "true" &&
       env.CRYPTO_USD_PARITY_QUOTE_APPROVED === "true" &&
-      env.CRYPTO_TOKEN_DECIMALS_VERIFIED === "true" &&
-      tokenDecimals === 6;
+      decimalsVerified &&
+      tokenDecimals !== null && tokenDecimals >= 2 && tokenDecimals <= 18;
     return {
       asset: rail.asset,
       network: rail.network,
