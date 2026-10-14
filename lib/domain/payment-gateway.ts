@@ -139,3 +139,26 @@ export function parseTransactionReference(value: unknown, network: string): stri
     ? candidate.toLowerCase()
     : candidate;
 }
+
+
+export function paymentControlConfiguration(env: Record<string, string | undefined> = process.env) {
+  const rawMaxAge = Number(env.PAYMENT_WEBHOOK_MAX_AGE_SECONDS ?? "300");
+  const maxAge = Number.isSafeInteger(rawMaxAge) && rawMaxAge >= 30 && rawMaxAge <= 900 ? rawMaxAge : 300;
+  return {
+    paymentsEnabled: env.PAYMENTS_ENABLED === "true",
+    stripeEnabled: env.STRIPE_PAYMENTS_ENABLED === "true",
+    bankTransferEnabled: env.BANK_TRANSFER_ENABLED === "true",
+    cryptoEnabled: env.CRYPTO_PAYMENTS_ENABLED === "true",
+    subscriptionActivationEnabled: env.PAYMENT_SUBSCRIPTION_ACTIVATION_ENABLED === "true",
+    reconciliationAdminOnly: env.PAYMENT_RECONCILIATION_ADMIN_ONLY !== "false",
+    requireDistinctReviewer: env.PAYMENT_REQUIRE_DISTINCT_REVIEWER !== "false",
+    webhookMaxAgeSeconds: maxAge,
+    stripeCheckoutMode: env.STRIPE_CHECKOUT_MODE === "payment" ? "payment" : "unsupported",
+    stripePromotionsEnabled: env.STRIPE_ALLOW_PROMOTIONS === "true",
+    stripeAutomaticTaxEnabled: env.STRIPE_AUTOMATIC_TAX_ENABLED === "true",
+    stripeBillingPortalEnabled: env.STRIPE_BILLING_PORTAL_ENABLED === "true",
+    cryptoManualOverrideOnRpcOutage: env.CRYPTO_MANUAL_OVERRIDE_ON_RPC_OUTAGE === "true",
+    cryptoRequireTransactionFinality: env.CRYPTO_REQUIRE_TRANSACTION_FINALITY !== "false",
+    cryptoRejectLateTransfers: env.CRYPTO_REJECT_LATE_TRANSFERS !== "false",
+  };
+}
