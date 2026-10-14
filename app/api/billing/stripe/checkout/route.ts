@@ -7,6 +7,7 @@ import { enforceRateLimit, PORTAL_INTERACTION_LIMIT } from "@/lib/http/rate-limi
 import { prisma } from "@/lib/db/prisma";
 import { BillingInvoiceStatus, BillingPaymentStatus, Prisma } from "@prisma/client";
 import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
+import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 import { randomUUID } from "node:crypto";
 
 const inputSchema = z.object({ invoiceId: z.string().min(1).max(128) }).strict();
@@ -20,7 +21,8 @@ export async function POST(request: Request) {
   if (!canManageBilling(context.principal.role)) return NextResponse.json({ error: "Billing administrator access required." }, { status: 403 });
   const limited = await enforceRateLimit(PORTAL_INTERACTION_LIMIT, context.userId);
   if (limited) return limited;
-  if (!paymentFeatureEnabled("STRIPE")) return NextResponse.json({ error: "Stripe payments are disabled or not configured." }, { status: 503 });
+  const paymentControls = paymentControlConfiguration();
+  if (!paymentControls.paymentsEnabled || !paymentControls.stripeEnabled || !paymentFeatureEnabled("STRIPE")) return NextResponse.json({ error: "Stripe payments are disabled or not configured." }, { status: 503 });
   if (process.env.STRIPE_CHECKOUT_MODE && process.env.STRIPE_CHECKOUT_MODE !== "payment") {
     return NextResponse.json({ error: "This checkout endpoint currently supports one-time invoice payments only." }, { status: 503 });
   }
