@@ -62,3 +62,16 @@ NEXTAUTH_SECRET=<non-production-test-secret> DATABASE_URL=<disposable-postgres-u
 ```
 
 `npm run test:db` requires a disposable PostgreSQL database. Do not point schema or migration tests at production. Record the actual CI status in the pull request before marking the work review-ready.
+
+
+## Explicit feature flags (disabled defaults)
+
+- `PAYMENTS_ENABLED`: master kill switch, defaults to `false`.
+- `STRIPE_PAYMENTS_ENABLED`: Stripe hosted Checkout/webhook, defaults to `false`.
+- `BANK_TRANSFER_ENABLED` and `BANK_TRANSFER_DETAILS_VERIFIED`: bank instructions and finance review, defaults to `false`.
+- `CRYPTO_PAYMENTS_ENABLED`: crypto order and claim endpoints, defaults to `false`.
+- `PAYMENT_SUBSCRIPTION_ACTIVATION_ENABLED`: verified-payment subscription activation, defaults to `false`.
+- `PAYMENT_RECONCILIATION_ADMIN_ONLY` and `PAYMENT_REQUIRE_DISTINCT_REVIEWER`: intended control flags; current endpoint enforces platform Super Admin and blocks self-review directly.
+- `PAYMENT_WEBHOOK_MAX_AGE_SECONDS`: timestamp tolerance for signed Stripe webhook events; defaults to 300 seconds.
+- `CRYPTO_MANUAL_OVERRIDE_ON_RPC_OUTAGE`: emergency review override for confirmed RPC outages; defaults to `false`. It must not bypass an explicit FAILED, PENDING, or MISMATCH result.
+- `CRYPTO_REQUIRE_TRANSACTION_FINALITY` / `CRYPTO_REJECT_LATE_TRANSFERS`: intended policy flags; server verification still requires the configured chain's confirmation threshold and rejects transactions confirmed after order expiry.
