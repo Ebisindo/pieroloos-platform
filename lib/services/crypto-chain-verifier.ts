@@ -12,7 +12,7 @@ export type CryptoVerificationInput = {
 };
 
 export type CryptoVerificationResult =
-  | { status: "CONFIRMED"; receivedAmountBaseUnits: string; confirmations: number; blockReference: string; provider: string }
+  | { status: "CONFIRMED"; receivedAmountBaseUnits: string; confirmations: number; blockReference: string; blockTimestamp: string; provider: string }
   | { status: "PENDING"; reason: string; confirmations?: number }
   | { status: "FAILED"; reason: string }
   | { status: "MISMATCH"; reason: string; confirmations?: number }
@@ -166,9 +166,17 @@ export async function verifyCryptoTransfer(
       if (asString(receipt.status)?.toLowerCase() !== "0x1") return { status: "FAILED", reason: "The blockchain receipt does not indicate a successful transaction." };
       const transactionBlock = hexNumber(receipt.blockNumber);
       if (transactionBlock === null) return { status: "PENDING", reason: "Transaction block information is not yet available." };
-      const latestBlock = hexNumber(await rpc(rpcUrl.toString(), "eth_blockNumber", [], fetcher));
-      if (latestBlock === null || latestBlock < transactionBlock) return { status: "PENDING", reason: "Latest block height is unavailable." };
-      const confirmations = latestBlock - transactionBlock + 1;
+      const [latestBlock, blockValue] = await Promise.all([
+        rpc(rpcUrl.toString(), "eth_blockNumber", [], fetcher),
+        rpc(rpcUrl.toString(), "eth_getBlockByNumber", [asString(receipt.blockNumber), false], fetcher),
+      ]);
+      const latestHeight = hexNumber(latestBlock);
+      const block = record(blockValue);
+      const blockTimeSeconds = hexNumber(block?.timestamp);
+      if (latestHeight === null || latestHeight < transactionBlock || blockTimeSeconds === null) {
+        return { status: "PENDING", reason: "Latest block height or transaction block timestamp is unavailable." };
+      }
+      const confirmations = latestHeight - transactionBlock + 1;
       if (confirmations < minConfirmations) return { status: "PENDING", reason: "The transaction has not reached the configured confirmation threshold.", confirmations };
       const logs = Array.isArray(receipt.logs) ? receipt.logs : [];
       let received = BigInt(0);
@@ -184,7 +192,7 @@ export async function verifyCryptoTransfer(
         received += BigInt(data);
       }
       if (received !== expectedAmount) return { status: "MISMATCH", reason: received === BigInt(0) ? "No matching successful token transfer to the configured destination was found." : "The received token amount does not exactly match the order.", confirmations };
-      return { status: "CONFIRMED", receivedAmountBaseUnits: received.toString(), confirmations, blockReference: String(transactionBlock), provider: "evm-json-rpc" };
+      return { status: "CONFIRMED", receivedAmountBaseUnits: received.toString(), confirmations, blockReference: String(transactionBlock), blockTimestamp: new Date(blockTimeSeconds * 1000).toISOString(), provider: "evm-json-rpc" };
     } catch {
       return unavailable("The EVM RPC provider could not verify the transaction. Keep it pending for manual review.");
     }
@@ -217,7 +225,9 @@ export async function verifyCryptoTransfer(
         return { status: "FAILED", reason: "TRON execution did not succeed." };
       }
       const transactionBlock = asSafeInteger(info.blockNumber);
-      if (transactionBlock === null || currentHeight === null || currentHeight < transactionBlock) return { status: "PENDING", reason: "TRON block confirmation information is unavailable." };
+      const blockTimeMilliseconds = asSafeInteger(info.blockTimeStamp);
+      if (transactionBlock === null || currentHeight === null || currentHeight < transactionBlock ||
+          blockTimeMilliseconds === null || blockTimeMilliseconds <= 0) return { status: "PENDING", reason: "TRON block confirmation or timestamp information is unavailable." };
       const confirmations = currentHeight - transactionBlock + 1;
       if (confirmations < minConfirmations) return { status: "PENDING", reason: "The TRON transaction has not reached the configured confirmation threshold.", confirmations };
       const logs = Array.isArray(info.log) ? info.log : [];
@@ -235,7 +245,7 @@ export async function verifyCryptoTransfer(
         received += BigInt("0x" + data);
       }
       if (received !== expectedAmount) return { status: "MISMATCH", reason: received === BigInt(0) ? "No matching successful TRC-20 transfer to the configured destination was found." : "The received token amount does not exactly match the order.", confirmations };
-      return { status: "CONFIRMED", receivedAmountBaseUnits: received.toString(), confirmations, blockReference: String(transactionBlock), provider: "tron-full-node-api" };
+      return { status: "CONFIRMED", receivedAmountBaseUnits: received.toString(), confirmations, blockReference: String(transactionBlock), blockTimestamp: new Date(blockTimeMilliseconds).toISOString(), provider: "tron-full-node-api" };
     } catch {
       return unavailable("The TRON RPC provider could not verify the transaction. Keep it pending for manual review.");
     }
@@ -254,7 +264,8 @@ export async function verifyCryptoTransfer(
     if (!meta) return { status: "PENDING", reason: "Solana transaction metadata is not yet available." };
     if (meta.err !== null) return { status: "FAILED", reason: "Solana transaction execution failed." };
     const slot = asSafeInteger(txValue.slot);
-    if (slot === null) return { status: "PENDING", reason: "Solana finalized slot is unavailable." };
+    const blockTimeSeconds = asSafeInteger(txValue.blockTime);
+    if (slot === null || blockTimeSeconds === null || blockTimeSeconds <= 0) return { status: "PENDING", reason: "Solana finalized slot or transaction timestamp is unavailable." };
     const currentSlot = asSafeInteger(await rpc(rpcUrl.toString(), "getSlot", [{ commitment: "finalized" }], fetcher));
     if (currentSlot === null || currentSlot < slot) return { status: "PENDING", reason: "Solana confirmation depth is unavailable." };
     const confirmations = currentSlot - slot + 1;
@@ -290,7 +301,7 @@ export async function verifyCryptoTransfer(
       matched = true;
     }
     if (!matched || received !== expectedAmount) return { status: "MISMATCH", reason: "The Solana transaction does not contain the exact net token balance increase for the configured owner and mint.", confirmations };
-    return { status: "CONFIRMED", receivedAmountBaseUnits: received.toString(), confirmations, blockReference: String(slot), provider: "solana-rpc-finalized" };
+    return { status: "CONFIRMED", receivedAmountBaseUnits: received.toString(), confirmations, blockReference: String(slot), blockTimestamp: new Date(blockTimeSeconds * 1000).toISOString(), provider: "solana-rpc-finalized" };
   } catch {
     return unavailable("The Solana RPC provider could not verify the transaction. Keep it pending for manual review.");
   }
