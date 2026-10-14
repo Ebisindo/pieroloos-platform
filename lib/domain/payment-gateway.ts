@@ -56,7 +56,7 @@ export function cryptoRailConfiguration(env: Record<string, string | undefined> 
     const rpcConfigured = Boolean(env[`${networkPrefix}_RPC_URL`]?.trim());
     const mainnetVerified = env[`${networkPrefix}_MAINNET_VERIFIED`] === "true";
     const confirmationValue = env[`${networkPrefix}_MIN_CONFIRMATIONS`];
-    const confirmationThreshold = confirmationValue && /^\\d+$/.test(confirmationValue)
+    const confirmationThreshold = confirmationValue && /^\d+$/.test(confirmationValue)
       ? Number(confirmationValue) : 0;
     // The expected mainnet, RPC, confirmation threshold, token identity, destination
     // and token decimals must all be independently verified before displaying a rail.
