@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   });
   if (!invoice) return NextResponse.json({ error: "Open invoice not found." }, { status: 404 });
   const existingPending = await prisma.billingPayment.findFirst({
-    where: { organizationId: context.activeWorkspace.organizationId, invoiceId: invoice.id, provider: "stripe", status: BillingPaymentStatus.PENDING },
+    where: { organizationId: context.activeWorkspace.organizationId, invoiceId: invoice.id, status: BillingPaymentStatus.PENDING },
     select: { id: true },
   });
   if (existingPending) return NextResponse.json({ error: "A Stripe payment attempt is already pending for this invoice. Complete it or wait for its expiry webhook before retrying." }, { status: 409 });
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
   try {
     await prisma.$transaction(async (tx) => {
       const pending = await tx.billingPayment.findFirst({
-        where: { organizationId: context.activeWorkspace!.organizationId, invoiceId: invoice.id, provider: "stripe", status: BillingPaymentStatus.PENDING },
+        where: { organizationId: context.activeWorkspace!.organizationId, invoiceId: invoice.id, status: BillingPaymentStatus.PENDING },
         select: { id: true },
       });
       if (pending) throw new Error("STRIPE_PAYMENT_ALREADY_PENDING");
