@@ -1,0 +1,30 @@
+import type { ExportInstitutionRelationshipStatus } from "@prisma/client";
+
+const transitions: Record<ExportInstitutionRelationshipStatus, readonly ExportInstitutionRelationshipStatus[]> = {
+  PROSPECTIVE_NOT_CONFIRMED: ["RESEARCHING", "DECLINED", "CLOSED"],
+  RESEARCHING: ["RESEARCHED", "PAUSED", "DECLINED", "CLOSED"],
+  RESEARCHED: ["CONCEPT_PREPARED", "PAUSED", "DECLINED", "CLOSED"],
+  CONCEPT_PREPARED: ["INTERNAL_REVIEW", "PAUSED", "DECLINED", "CLOSED"],
+  INTERNAL_REVIEW: ["OUTREACH_AUTHORIZED", "CONCEPT_PREPARED", "PAUSED", "DECLINED", "CLOSED"],
+  OUTREACH_AUTHORIZED: ["CONTACTED", "PAUSED", "DECLINED", "CLOSED"],
+  CONTACTED: ["DISCOVERY_DISCUSSIONS", "DUE_DILIGENCE", "PAUSED", "DECLINED", "CLOSED"],
+  DISCOVERY_DISCUSSIONS: ["DUE_DILIGENCE", "PAUSED", "DECLINED", "CLOSED"],
+  DUE_DILIGENCE: ["DRAFT_TERMS", "PAUSED", "DECLINED", "CLOSED"],
+  DRAFT_TERMS: ["WRITTEN_AUTHORIZATION_VERIFIED", "PAUSED", "DECLINED", "CLOSED"],
+  WRITTEN_AUTHORIZATION_VERIFIED: ["ACTIVE_UNDER_SIGNED_AGREEMENT", "PAUSED", "CLOSED"],
+  ACTIVE_UNDER_SIGNED_AGREEMENT: ["PAUSED", "CLOSED"],
+  PAUSED: ["RESEARCHING", "RESEARCHED", "CONCEPT_PREPARED", "INTERNAL_REVIEW", "OUTREACH_AUTHORIZED", "CONTACTED", "DISCOVERY_DISCUSSIONS", "DUE_DILIGENCE", "DRAFT_TERMS", "WRITTEN_AUTHORIZATION_VERIFIED", "ACTIVE_UNDER_SIGNED_AGREEMENT", "DECLINED", "CLOSED"],
+  DECLINED: ["CLOSED"],
+  CLOSED: [],
+};
+
+export function canTransitionExportInstitution(
+  from: ExportInstitutionRelationshipStatus,
+  to: ExportInstitutionRelationshipStatus,
+): boolean {
+  return from === to || transitions[from].includes(to);
+}
+
+export function requiresWrittenEvidence(status: ExportInstitutionRelationshipStatus): boolean {
+  return status === "WRITTEN_AUTHORIZATION_VERIFIED" || status === "ACTIVE_UNDER_SIGNED_AGREEMENT";
+}
