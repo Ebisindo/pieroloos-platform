@@ -331,6 +331,9 @@ model User {
   platformSuperAdmin        PlatformSuperAdmin?
   platformPermissionsGranted PlatformAdministratorPermission[] @relation("PlatformPermissionGrantor")
   platformAuditEvents       PlatformAuditEvent[] @relation("PlatformAuditActor")
+  exportInstitutionsCreated ExportInstitution[] @relation("ExportInstitutionCreator")
+  exportInstitutionsOwned   ExportInstitution[] @relation("ExportInstitutionOwner")
+  exportInstitutionEvidenceReviewed ExportInstitutionEvidence[] @relation("ExportInstitutionEvidenceReviewer")
 }
 
 model PlatformAdministrator {
