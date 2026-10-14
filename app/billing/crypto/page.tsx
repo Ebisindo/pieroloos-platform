@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { PageHeader, GlassPanel } from "@/components/ui/primitives";
 import { CryptoPaymentForm } from "@/components/billing/CryptoPaymentForm";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
+import { canManageBilling } from "@/lib/auth/billing-access";
 import { cryptoRailConfiguration, paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
 import { prisma } from "@/lib/db/prisma";
 import { BillingInvoiceStatus } from "@prisma/client";
@@ -15,7 +16,7 @@ export default async function CryptoPaymentPage({ searchParams }: { searchParams
   if (!context.activeWorkspace || !context.principal) {
     return <div className="page-stack"><PageHeader eyebrow="CRYPTO PAYMENT" title="Cryptocurrency payment" description="Choose an authorized workspace first." /><GlassPanel><Link className="button button-secondary" href="/settings">Choose workspace</Link></GlassPanel></div>;
   }
-  if (!context.principal.permissions.includes("workspace:read")) redirect("/command-center");
+  if (!canManageBilling(context.principal.role)) redirect("/command-center");
   const { invoiceId } = await searchParams;
   if (!invoiceId || invoiceId.length > 128) {
     return <div className="page-stack"><PageHeader eyebrow="CRYPTO PAYMENT" title="Cryptocurrency payment" description="An invoice reference is required." /><Link className="button button-secondary" href="/billing">Return to billing</Link></div>;
