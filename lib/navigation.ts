@@ -4,6 +4,7 @@ import {
   Building2,
   ClipboardCheck,
   FileBarChart,
+  CreditCard,
   GitBranch,
   Globe2,
   LayoutDashboard,
@@ -24,6 +25,7 @@ export const workspaceNavigation = [
   { href: "/compliance", label: "Compliance", icon: ClipboardCheck },
   { href: "/reports", label: "Reports", icon: FileBarChart },
   { href: "/engagements", label: "Engagements", icon: Activity },
+  { href: "/billing", label: "navigation.billing", icon: CreditCard },
 ] as const;
 
 export const systemNavigation = [
