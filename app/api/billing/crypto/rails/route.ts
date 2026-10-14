@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { BillingInvoiceStatus } from "@prisma/client";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
+import { canManageBilling } from "@/lib/auth/billing-access";
 import { cryptoRailConfiguration, paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
 import { prisma } from "@/lib/db/prisma";
 
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
   const context = await getWorkspaceContext();
   if (!context.userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   if (!context.activeWorkspace || !context.principal) return NextResponse.json({ error: "Select an authorized workspace." }, { status: 409 });
-  if (!context.principal.permissions.includes("workspace:read")) return NextResponse.json({ error: "Workspace access required." }, { status: 403 });
+  if (!canManageBilling(context.principal.role)) return NextResponse.json({ error: "Billing administrator access required." }, { status: 403 });
   const invoiceId = new URL(request.url).searchParams.get("invoiceId");
   if (!invoiceId || invoiceId.length > 128) return NextResponse.json({ error: "Invoice reference is required." }, { status: 422 });
 
