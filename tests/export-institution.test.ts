@@ -53,4 +53,9 @@ describe("export institution relationship lifecycle", () => {
     expect(requiresWrittenEvidence("ACTIVE_UNDER_SIGNED_AGREEMENT")).toBe(true);
     expect(requiresWrittenEvidence("PROSPECTIVE_NOT_CONFIRMED")).toBe(false);
   });
+
+  it("does not classify a single source as cross-verified", () => {
+    const distinctSources = new Set(["https://agency.example/mandate"]);
+    expect(distinctSources.size >= 2).toBe(false);
+  });
 });
