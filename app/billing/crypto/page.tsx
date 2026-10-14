@@ -30,7 +30,7 @@ export default async function CryptoPaymentPage({ searchParams }: { searchParams
   }
   const rails = paymentFeatureEnabled("CRYPTO")
     ? cryptoRailConfiguration()
-        .filter((rail) => rail.enabled && rail.tokenDecimals === 6 && rail.address && rail.tokenIdentifier)
+        .filter((rail) => rail.enabled && rail.tokenDecimals !== null && rail.tokenDecimals >= 2 && rail.tokenDecimals <= 18 && rail.address && rail.tokenIdentifier)
         .map(({ asset, network, address, tokenIdentifier, tokenDecimals }) => ({
           asset, network, address, tokenIdentifier, tokenDecimals: tokenDecimals ?? 0,
         }))
@@ -39,7 +39,7 @@ export default async function CryptoPaymentPage({ searchParams }: { searchParams
     <div className="page-stack">
       <PageHeader eyebrow="BILLING / CRYPTO" title="Cryptocurrency payment" description="Instructions are available only for explicitly verified rails. Claims remain pending until independent finance reconciliation is complete." actions={<Link className="button button-secondary" href="/billing">Back to billing</Link>} />
       <CryptoPaymentForm
-        invoice={{ id: invoice.id, invoiceNumber: invoice.invoiceNumber, currency: "USD", amountRemainingMinor: invoice.amountRemainingMinor.toString(), expectedTokenAmountBaseUnits: (invoice.amountRemainingMinor * BigInt(10000)).toString(), expectedTokenAmount: `${invoice.amountRemainingMinor / BigInt(100)}.${(invoice.amountRemainingMinor % BigInt(100)).toString().padStart(2, "0")}` }}
+        invoice={{ id: invoice.id, invoiceNumber: invoice.invoiceNumber, currency: "USD", amountRemainingMinor: invoice.amountRemainingMinor.toString(), expectedTokenAmount: `${invoice.amountRemainingMinor / BigInt(100)}.${(invoice.amountRemainingMinor % BigInt(100)).toString().padStart(2, "0")}` }}
         rails={rails}
       />
     </div>
