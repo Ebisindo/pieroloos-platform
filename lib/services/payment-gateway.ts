@@ -190,6 +190,179 @@ export async function submitBankTransferClaim(input: {
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
+export async function createCryptoPaymentOrder(input: {
+  userId: string;
+  organizationId: string;
+  invoiceId: string;
+  asset: "USDT" | "USDC";
+  network: "TRON" | "BNB_SMART_CHAIN" | "ETHEREUM" | "SOLANA";
+}) {
+  if (!paymentFeatureEnabled("CRYPTO")) {
+    throw new PaymentGatewayError("Cryptocurrency payments are disabled.", "DISABLED");
+  }
+  const rail = cryptoRailConfiguration().find((item) =>
+    item.asset === input.asset && item.network === input.network && item.enabled,
+  );
+  if (!rail || !rail.address || !rail.tokenIdentifier || rail.tokenDecimals !== 6) {
+    throw new PaymentGatewayError("Selected crypto rail has not passed all configuration gates.", "NOT_CONFIGURED");
+  }
+  const invoice = await prisma.billingInvoice.findFirst({
+    where: { id: input.invoiceId, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: 0n } },
+    select: { id: true, invoiceNumber: true, currency: true, amountRemainingMinor: true },
+  });
+  if (!invoice) throw new PaymentGatewayError("Open USD invoice not found in the active organization.", "NOT_FOUND");
+  const paymentReference = newPaymentReference("CRYPTO");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+  const expectedTokenAmountBaseUnits = (invoice.amountRemainingMinor * 10_000n).toString();
+  const provider = `crypto:${rail.network.toLowerCase()}:${rail.asset.toLowerCase()}`;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const fresh = await tx.billingInvoice.findFirst({
+      where: { id: invoice.id, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD" },
+      select: { amountRemainingMinor: true },
+    });
+    if (!fresh || fresh.amountRemainingMinor !== invoice.amountRemainingMinor || fresh.amountRemainingMinor <= 0n) {
+      throw new PaymentGatewayError("Invoice balance changed; refresh and create a new order.", "CONFLICT");
+    }
+    const payment = await tx.billingPayment.create({
+      data: {
+        organizationId: input.organizationId, invoiceId: invoice.id,
+        provider, providerPaymentId: paymentReference,
+        status: BillingPaymentStatus.PENDING, currency: "USD",
+        amountMinor: invoice.amountRemainingMinor,
+      },
+      select: { id: true, invoiceId: true, provider: true, providerPaymentId: true, status: true, currency: true, amountMinor: true, createdAt: true },
+    });
+    await tx.platformAuditEvent.create({
+      data: {
+        actorUserId: input.userId, actorRole: "CUSTOMER",
+        action: "CRYPTO_ORDER_CREATED", subjectType: "BILLING_PAYMENT",
+        subjectId: payment.id, outcome: "SUCCESS",
+        details: {
+          organizationId: input.organizationId, invoiceId: invoice.id,
+          paymentReference, amountMinor: invoice.amountRemainingMinor.toString(), currency: "USD",
+          submittedByUserId: input.userId,
+          orderSnapshot: {
+            asset: rail.asset, network: rail.network, destinationAddress: rail.address,
+            tokenIdentifier: rail.tokenIdentifier, tokenDecimals: rail.tokenDecimals,
+            expectedTokenAmountBaseUnits, quotePolicy: "USD_PARITY_EXPLICITLY_APPROVED",
+            createdAt: new Date().toISOString(), expiresAt: expiresAt.toISOString(),
+            verificationMode: "MANUAL_FINANCE_RECONCILIATION",
+          },
+        } as Prisma.InputJsonObject,
+      },
+    });
+    return { ...payment, amountMinor: payment.amountMinor.toString() };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+  return {
+    payment: result,
+    invoice: { id: invoice.id, invoiceNumber: invoice.invoiceNumber, currency: invoice.currency, amountRemainingMinor: invoice.amountRemainingMinor.toString() },
+    order: {
+      paymentReference, asset: rail.asset, network: rail.network, destinationAddress: rail.address,
+      tokenIdentifier: rail.tokenIdentifier, tokenDecimals: rail.tokenDecimals,
+      expectedTokenAmountBaseUnits,
+      expectedTokenAmount: `${invoice.amountRemainingMinor / 100n}.${(invoice.amountRemainingMinor % 100n).toString().padStart(2, "0")}`,
+      expiresAt: expiresAt.toISOString(),
+    },
+  };
+}
+
+export async function submitCryptoPaymentClaim(input: {
+  userId: string;
+  organizationId: string;
+  paymentId: string;
+  transactionReference: string;
+}) {
+  if (!paymentFeatureEnabled("CRYPTO")) {
+    throw new PaymentGatewayError("Cryptocurrency payments are disabled.", "DISABLED");
+  }
+  return prisma.$transaction(async (tx) => {
+    const payment = await tx.billingPayment.findFirst({
+      where: { id: input.paymentId, organizationId: input.organizationId, provider: { startsWith: "crypto:" }, status: BillingPaymentStatus.PENDING },
+      select: { id: true, invoiceId: true, provider: true, providerPaymentId: true, currency: true, amountMinor: true },
+    });
+    if (!payment || !payment.invoiceId || !payment.provider || !payment.providerPaymentId) {
+      throw new PaymentGatewayError("Pending cryptocurrency payment order not found.", "NOT_FOUND");
+    }
+    const orderEvent = await tx.platformAuditEvent.findFirst({
+      where: { action: "CRYPTO_ORDER_CREATED", subjectType: "BILLING_PAYMENT", subjectId: payment.id, outcome: "SUCCESS" },
+      orderBy: { occurredAt: "asc" }, select: { actorUserId: true, details: true },
+    });
+    if (!orderEvent || orderEvent.actorUserId !== input.userId) {
+      throw new PaymentGatewayError("Only the user who created this crypto order may submit its transaction claim.", "FORBIDDEN");
+    }
+    const orderDetails = orderEvent.details as {
+      organizationId?: unknown;
+      paymentReference?: unknown;
+      amountMinor?: unknown;
+      currency?: unknown;
+      orderSnapshot?: {
+        asset?: unknown; network?: unknown; destinationAddress?: unknown; tokenIdentifier?: unknown;
+        tokenDecimals?: unknown; expectedTokenAmountBaseUnits?: unknown; expiresAt?: unknown;
+        quotePolicy?: unknown; verificationMode?: unknown;
+      };
+    } | null;
+    if (orderDetails?.organizationId !== input.organizationId || typeof orderDetails.paymentReference !== "string" ||
+        typeof orderDetails.amountMinor !== "string" || orderDetails.amountMinor !== payment.amountMinor.toString()) {
+      throw new PaymentGatewayError("Payment order integrity check failed.", "CONFLICT");
+    }
+    const snapshot = orderDetails.orderSnapshot;
+    if (!snapshot || typeof snapshot.network !== "string" || typeof snapshot.asset !== "string" ||
+        typeof snapshot.expectedTokenAmountBaseUnits !== "string" || typeof snapshot.expiresAt !== "string") {
+      throw new PaymentGatewayError("Payment order snapshot is incomplete.", "CONFLICT");
+    }
+    const networkPrefix = `crypto:${String(snapshot.network).toLowerCase()}:`;
+    if (!payment.provider.startsWith(networkPrefix) || payment.currency !== "USD") {
+      throw new PaymentGatewayError("Payment order network or currency does not match its snapshot.", "CONFLICT");
+    }
+    const transactionAlreadyClaimed = await tx.billingPayment.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        provider: { startsWith: networkPrefix },
+        providerPaymentId: input.transactionReference,
+      },
+      select: { id: true },
+    });
+    if (transactionAlreadyClaimed) {
+      throw new PaymentGatewayError("This transaction has already been associated with a payment order on this network.", "CONFLICT");
+    }
+    const expiry = new Date(snapshot.expiresAt);
+    if (Number.isNaN(expiry.getTime())) throw new PaymentGatewayError("Payment order expiry is invalid.", "CONFLICT");
+    const latePayment = Date.now() > expiry.getTime();
+
+    const updated = await tx.billingPayment.updateMany({
+      where: { id: payment.id, organizationId: input.organizationId, status: BillingPaymentStatus.PENDING, providerPaymentId: orderDetails.paymentReference },
+      data: { providerPaymentId: input.transactionReference },
+    });
+    if (updated.count !== 1) throw new PaymentGatewayError("Payment order was already submitted or changed.", "CONFLICT");
+    await tx.platformAuditEvent.create({
+      data: {
+        actorUserId: input.userId, actorRole: "CUSTOMER",
+        action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT",
+        subjectId: payment.id, outcome: "SUCCESS",
+        details: {
+          organizationId: input.organizationId, invoiceId: payment.invoiceId,
+          provider: payment.provider, paymentReference: orderDetails.paymentReference,
+          amountMinor: payment.amountMinor.toString(), currency: payment.currency,
+          claimMetadata: {
+            claimType: "CRYPTO", paymentReference: orderDetails.paymentReference,
+            submittedByUserId: input.userId, submittedAt: new Date().toISOString(),
+            verificationStatus: "PENDING", network: snapshot.network, asset: snapshot.asset,
+            destinationAddress: snapshot.destinationAddress, tokenIdentifier: snapshot.tokenIdentifier,
+            tokenDecimals: snapshot.tokenDecimals,
+            expectedTokenAmountBaseUnits: snapshot.expectedTokenAmountBaseUnits,
+            transactionReference: input.transactionReference, expiresAt: snapshot.expiresAt,
+            latePayment, quotePolicy: snapshot.quotePolicy,
+            verificationMode: "MANUAL_FINANCE_RECONCILIATION",
+          },
+        } as Prisma.InputJsonObject,
+      },
+    });
+    return { id: payment.id, status: BillingPaymentStatus.PENDING, paymentReference: orderDetails.paymentReference, latePayment };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
+
 export async function createManualPaymentClaim(input: {
   userId: string;
   organizationId: string;
