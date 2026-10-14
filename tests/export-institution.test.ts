@@ -10,7 +10,7 @@ describe("global export institution validation", () => {
       countryCode: "ng",
       initialEvidence: [],
     });
-    expect(result.success).toBe(true);
+    expect(result.success, JSON.stringify(result.success ? null : result.error.issues)).toBe(true);
     if (result.success) expect(result.data.countryCode).toBe("NG");
   });
 
