@@ -20,7 +20,8 @@ describe("public FAQ and legal content", () => {
 
   it("keeps draft notice and the required sections in Terms", () => {
     const content = readFileSync(join(process.cwd(), "app/terms/page.tsx"), "utf8");
-    expect(content).toContain("DRAFT — LEGAL REVIEW REQUIRED BEFORE PUBLICATION AS BINDING TERMS.");
+    expect(content).toContain('t("terms.draftNoticeTitle" as never)');
+    expect(readFileSync(join(process.cwd(), "lib/i18n/messages/en.ts"), "utf8")).toContain("DRAFT — LEGAL REVIEW REQUIRED BEFORE PUBLICATION AS BINDING TERMS.");
     expect(content).toContain("operator's legal identity, registered address, effective date, governing law");
     expect(content).toContain("No liability cap or blanket exclusion is established by this draft.");
     expect(content).toContain("No governing law or dispute forum is selected by this draft.");
@@ -30,7 +31,7 @@ describe("public FAQ and legal content", () => {
     const content = readFileSync(join(process.cwd(), "app/faq/page.tsx"), "utf8");
     expect(content).toContain('const questions = faqSections.flatMap((section) => section.items);');
     expect(content).toContain('mainEntity: questions.map(([question, answer])');
-    expect(content).toContain('.replace(/</g, "\\u003c")');
+    expect(content).toContain(String.raw`.replace(/</g, "\\u003c")`);
     expect(content).toContain('{section.items.map(([question, answer])');
   });
 
