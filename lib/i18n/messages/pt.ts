@@ -1,6 +1,17 @@
 import type { MessageCatalog } from "../messages";
 
 const pt = {
+  "language.legalReviewNotice": "Os textos das políticas em francês, português e espanhol são apresentados apenas para prévia e não passaram por revisão jurídica profissional da tradução.",
+  "navigation.helpLegal": "Ajuda e Jurídico",
+  "navigation.faq": "Perguntas frequentes",
+  "navigation.terms": "Termos e Condições",
+  "navigation.policies": "Políticas e Jurídico",
+  "metadata.faq.title": "Perguntas frequentes",
+  "metadata.faq.description": "Respostas sobre os recursos do PieroloOS, evidências, privacidade, contas e limitações da plataforma.",
+  "metadata.terms.title": "Termos e Condições — Minuta para revisão",
+  "metadata.terms.description": "Minuta dos termos do PieroloOS, sujeita à aprovação jurídica e do produto antes da ativação.",
+  "metadata.policies.title": "Políticas e Jurídico",
+  "metadata.policies.description": "Consulte os documentos de políticas do PieroloOS e o estado de publicação e idioma.",
   "language.select": "Selecionar idioma",
   "language.preview": "prévia",
   "language.reviewNotice": "Este idioma está em prévia. Alguns conteúdos do produto podem permanecer em inglês, e as traduções ainda não foram revisadas por profissionais.",
