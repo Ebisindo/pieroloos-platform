@@ -48,7 +48,7 @@ export const exportInstitutionCreateSchema = z.object({
   initialEvidence: z.array(z.object({
     sourceUrl: httpUrl,
     sourceTitle: safeLine("Source title", 2, 240),
-    evidenceClass: z.enum(["OFFICIAL_PRIMARY", "SECONDARY", "USER_PROVIDED", "INTERNAL_ASSESSMENT", "OTHER"]),
+    evidenceClass: z.enum(["OFFICIAL_PRIMARY", "WRITTEN_AUTHORIZATION", "SECONDARY", "USER_PROVIDED", "INTERNAL_ASSESSMENT", "OTHER"]),
     supportedClaim: safeLine("Supported claim", 5, 1000),
     notes: z.string().trim().max(2000).optional(),
   }).strict()).max(20).default([]),
@@ -63,7 +63,6 @@ export const exportInstitutionStatusSchema = z.object({
   ]),
   reason: safeLine("Reason", 5, 1000),
   agreementEvidenceRef: optionalLine("Agreement evidence reference", 500),
-  verificationStatus: z.enum(["UNVERIFIED", "RESEARCH_IN_PROGRESS", "SOURCE_REVIEWED", "CROSS_VERIFIED"]).optional(),
 }).strict();
 
 export type ExportInstitutionCreateInput = z.infer<typeof exportInstitutionCreateSchema>;
