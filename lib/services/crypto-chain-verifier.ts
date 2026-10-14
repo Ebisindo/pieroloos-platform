@@ -260,6 +260,11 @@ export async function verifyCryptoTransfer(
       { encoding: "jsonParsed", commitment: "finalized", maxSupportedTransactionVersion: 0 },
     ], fetcher));
     if (!txValue) return { status: "PENDING", reason: "The finalized Solana transaction is not yet available." };
+    const transaction = record(txValue.transaction);
+    const signatures = Array.isArray(transaction?.signatures) ? transaction.signatures.map(asString) : [];
+    if (!signatures.includes(transactionSignature)) {
+      return { status: "MISMATCH", reason: "Solana RPC returned a transaction that does not contain the submitted signature." };
+    }
     const meta = record(txValue.meta);
     if (!meta) return { status: "PENDING", reason: "Solana transaction metadata is not yet available." };
     if (meta.err !== null) return { status: "FAILED", reason: "Solana transaction execution failed." };
