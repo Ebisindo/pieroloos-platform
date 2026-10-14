@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
+import { canManageBilling } from "@/lib/auth/billing-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PORTAL_INTERACTION_LIMIT } from "@/lib/http/rate-limit";
 import { listOpenInvoices, listPayments, createManualPaymentClaim, PaymentGatewayError } from "@/lib/services/payment-gateway";
@@ -32,7 +33,7 @@ export async function GET() {
   if (!context.principal || !context.activeWorkspace) {
     return NextResponse.json({ error: "Select an authorized workspace." }, { status: 409 });
   }
-  if (!context.principal.permissions.includes("workspace:read")) {
+  if (!canManageBilling(context.principal.role)) {
     return NextResponse.json({ error: "Workspace read access required." }, { status: 403 });
   }
   try {
