@@ -35,7 +35,7 @@ export const adminNavigation = [
 ] as const;
 
 // Unauthenticated marketing routes; rendered without the workspace shell or boot splash.
-export const publicRoutes = ["/", "/partners"] as const;
+export const publicRoutes = ["/", "/partners", "/faq", "/terms", "/policies", "/policies/privacy", "/policies/cookies", "/policies/acceptable-use", "/policies/security", "/policies/data-retention", "/policies/data-processing", "/policies/subscription", "/policies/billing", "/policies/refunds-cancellations", "/policies/intellectual-property", "/policies/third-party-services", "/policies/partnerships", "/policies/complaints", "/policies/accessibility", "/policies/ai-and-automation", "/policies/jurisdictional-notice"] as const;
 
 export function isPublicRoute(pathname: string): boolean {
   return (publicRoutes as readonly string[]).includes(pathname);
