@@ -83,6 +83,49 @@ describe("crypto chain verifier", () => {
     });
   });
 
+  it("confirms an exact TRC-20 transfer after the configured block depth", async () => {
+    const destinationHex = "2222222222222222222222222222222222222222";
+    const tokenHex = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const txId = "c".repeat(64);
+    const fetcher = fetchSequence([
+      {
+        id: txId,
+        blockNumber: 100,
+        receipt: { result: "SUCCESS" },
+        log: [{
+          address: tokenHex,
+          topics: [
+            TRANSFER.replace(/^0x/, ""),
+            "0".repeat(24) + "1111111111111111111111111111111111111111",
+            "0".repeat(24) + destinationHex,
+          ],
+          data: "f4240",
+        }],
+      },
+      { block_header: { raw_data: { number: 119 } } },
+    ]);
+    const result = await verifyCryptoTransfer({
+      network: "TRON",
+      transactionReference: txId,
+      destinationAddress: `41${destinationHex}`,
+      tokenIdentifier: `41${tokenHex}`,
+      tokenDecimals: 6,
+      expectedTokenAmountBaseUnits: "1000000",
+    }, {
+      CRYPTO_TRON_RPC_URL: "https://tron-rpc.example.invalid",
+      CRYPTO_TRON_MAINNET_VERIFIED: "true",
+      CRYPTO_TRON_MIN_CONFIRMATIONS: "20",
+    }, fetcher);
+
+    expect(result).toEqual({
+      status: "CONFIRMED",
+      receivedAmountBaseUnits: "1000000",
+      confirmations: 20,
+      blockReference: "100",
+      provider: "tron-full-node-api",
+    });
+  });
+
   it("rejects an RPC connected to the wrong EVM chain", async () => {
     const fetcher = fetchSequence([{ jsonrpc: "2.0", id: 1, result: "0x38" }]);
     const result = await verifyCryptoTransfer({
