@@ -4,15 +4,12 @@ import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { canManageBilling } from "@/lib/auth/billing-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PORTAL_INTERACTION_LIMIT } from "@/lib/http/rate-limit";
-import { listOpenInvoices, listPayments, createManualPaymentClaim, PaymentGatewayError } from "@/lib/services/payment-gateway";
-import { parseTransactionReference, paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
+import { listOpenInvoices, listPayments, submitCryptoPaymentClaim, PaymentGatewayError } from "@/lib/services/payment-gateway";
+import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
 
 const claimSchema = z.object({
-  invoiceId: z.string().min(1).max(128),
-  method: z.enum(["CRYPTO"]),
-  asset: z.enum(["USDT", "USDC"]).optional(),
-  network: z.enum(["TRON", "BNB_SMART_CHAIN", "ETHEREUM", "SOLANA"]).optional(),
-  transactionReference: z.string().trim().min(32).max(160).optional(),
+  paymentId: z.string().min(1).max(128),
+  transactionReference: z.string().trim().min(32).max(160),
 }).strict();
 
 function errorResponse(error: unknown) {
@@ -61,8 +58,8 @@ export async function POST(request: Request) {
   if (!context.principal || !context.activeWorkspace) {
     return NextResponse.json({ error: "Select an authorized workspace." }, { status: 409 });
   }
-  if (!context.principal.permissions.includes("workspace:read")) {
-    return NextResponse.json({ error: "Workspace read access required." }, { status: 403 });
+  if (!canManageBilling(context.principal.role)) {
+    return NextResponse.json({ error: "Billing administrator access required." }, { status: 403 });
   }
   const limited = await enforceRateLimit(PORTAL_INTERACTION_LIMIT, context.userId);
   if (limited) return limited;
@@ -80,31 +77,20 @@ export async function POST(request: Request) {
   const parsed = claimSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Validation failed.", issues: parsed.error.flatten().fieldErrors }, { status: 422 });
 
-  if (!paymentFeatureEnabled(parsed.data.method)) {
-    return NextResponse.json({ error: "This payment method is currently unavailable." }, { status: 503 });
-  }
-  if (parsed.data.method === "CRYPTO") {
-    if (!parsed.data.asset || !parsed.data.network || !parsed.data.transactionReference) {
-      return NextResponse.json({ error: "Crypto asset, network, and transaction reference are required for a verification claim." }, { status: 422 });
-    }
-    if (!parseTransactionReference(parsed.data.transactionReference, parsed.data.network)) {
-      return NextResponse.json({ error: "Transaction reference format does not match the selected network." }, { status: 422 });
-    }
+  if (!paymentFeatureEnabled("CRYPTO")) {
+    return NextResponse.json({ error: "Cryptocurrency payments are currently unavailable." }, { status: 503 });
   }
 
   try {
-    const payment = await createManualPaymentClaim({
+    const payment = await submitCryptoPaymentClaim({
       userId: context.userId,
       organizationId: context.activeWorkspace.organizationId,
-      invoiceId: parsed.data.invoiceId,
-      method: parsed.data.method,
-      asset: parsed.data.asset,
-      network: parsed.data.network,
+      paymentId: parsed.data.paymentId,
       transactionReference: parsed.data.transactionReference,
     });
     return NextResponse.json({
-      data: { ...payment, amountMinor: payment.amountMinor.toString() },
-      message: "Your payment claim has been recorded as pending. This submission does not confirm receipt of funds or activate paid access.",
+      data: payment,
+      message: "Transaction claim recorded as pending manual verification. This submission does not confirm receipt of funds or activate paid access.",
     }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
