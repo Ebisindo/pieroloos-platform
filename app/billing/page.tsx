@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader, GlassPanel, StatusBadge } from "@/components/ui/primitives";
-import { StripeCheckoutButton, ManualPaymentClaimButton } from "@/components/billing/PaymentActions";
+import { StripeCheckoutButton } from "@/components/billing/PaymentActions";
+import { BankTransferOrderButton } from "@/components/billing/BankTransferOrderButton";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import { BillingInvoiceStatus } from "@prisma/client";
@@ -58,7 +59,7 @@ export default async function BillingPage() {
 
       <section className="page-stack" aria-labelledby="invoice-list-heading">
         <div className="section-header"><div><h2 id="invoice-list-heading">Invoices</h2><p>Only open invoices with an outstanding balance can be paid.</p></div></div>
-        {invoices.length ? <GlassPanel className="admin-table-wrap"><table className="admin-table"><thead><tr><th scope="col">Invoice</th><th scope="col">Due</th><th scope="col">Amount due</th><th scope="col">Paid</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead><tbody>{invoices.map((invoice) => <tr key={invoice.id}><td>{invoice.invoiceNumber ?? invoice.id}</td><td>{invoice.dueAt ? invoice.dueAt.toLocaleDateString("en-GB", { timeZone: "UTC" }) : "—"}</td><td>{money(invoice.amountDueMinor, invoice.currency)}</td><td>{money(invoice.amountPaidMinor, invoice.currency)}</td><td><StatusBadge tone={tone(invoice.status)}>{invoice.status}</StatusBadge></td><td>{invoice.status === BillingInvoiceStatus.OPEN && invoice.amountRemainingMinor > 0n ? <div className="page-actions">{stripeEnabled ? <StripeCheckoutButton invoiceId={invoice.id} /> : null}{bankEnabled ? <ManualPaymentClaimButton invoiceId={invoice.id} method="BANK_TRANSFER" /> : null}{cryptoEnabled ? <Link className="button button-secondary" href={`/billing/crypto?invoiceId=${encodeURIComponent(invoice.id)}`}>Crypto options</Link> : null}{!stripeEnabled && !bankEnabled && !cryptoEnabled ? <span className="muted">Not enabled</span> : null}</div> : "—"}</td></tr>)}</tbody></table></GlassPanel> : <GlassPanel><p>No invoices found for this organization.</p></GlassPanel>}
+        {invoices.length ? <GlassPanel className="admin-table-wrap"><table className="admin-table"><thead><tr><th scope="col">Invoice</th><th scope="col">Due</th><th scope="col">Amount due</th><th scope="col">Paid</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead><tbody>{invoices.map((invoice) => <tr key={invoice.id}><td>{invoice.invoiceNumber ?? invoice.id}</td><td>{invoice.dueAt ? invoice.dueAt.toLocaleDateString("en-GB", { timeZone: "UTC" }) : "—"}</td><td>{money(invoice.amountDueMinor, invoice.currency)}</td><td>{money(invoice.amountPaidMinor, invoice.currency)}</td><td><StatusBadge tone={tone(invoice.status)}>{invoice.status}</StatusBadge></td><td>{invoice.status === BillingInvoiceStatus.OPEN && invoice.amountRemainingMinor > 0n ? <div className="page-actions">{stripeEnabled ? <StripeCheckoutButton invoiceId={invoice.id} /> : null}{bankEnabled ? <BankTransferOrderButton invoiceId={invoice.id} /> : null}{cryptoEnabled ? <Link className="button button-secondary" href={`/billing/crypto?invoiceId=${encodeURIComponent(invoice.id)}`}>Crypto options</Link> : null}{!stripeEnabled && !bankEnabled && !cryptoEnabled ? <span className="muted">Not enabled</span> : null}</div> : "—"}</td></tr>)}</tbody></table></GlassPanel> : <GlassPanel><p>No invoices found for this organization.</p></GlassPanel>}
       </section>
 
       <section className="page-stack" aria-labelledby="payment-history-heading">
