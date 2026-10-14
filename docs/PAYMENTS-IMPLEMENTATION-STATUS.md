@@ -71,7 +71,7 @@ NEXTAUTH_SECRET=<non-production-test-secret> DATABASE_URL=<disposable-postgres-u
 - `BANK_TRANSFER_ENABLED` and `BANK_TRANSFER_DETAILS_VERIFIED`: bank instructions and finance review, defaults to `false`.
 - `CRYPTO_PAYMENTS_ENABLED`: crypto order and claim endpoints, defaults to `false`.
 - `PAYMENT_SUBSCRIPTION_ACTIVATION_ENABLED`: verified-payment subscription activation, defaults to `false`.
-- `PAYMENT_RECONCILIATION_ADMIN_ONLY` and `PAYMENT_REQUIRE_DISTINCT_REVIEWER`: intended control flags; current endpoint enforces platform Super Admin and blocks self-review directly.
+- `PAYMENT_RECONCILIATION_ADMIN_ONLY` and `PAYMENT_REQUIRE_DISTINCT_REVIEWER`: reconciliation fails closed if either control is explicitly disabled; the endpoint also enforces platform Super Admin and blocks self-review.
 - `PAYMENT_WEBHOOK_MAX_AGE_SECONDS`: timestamp tolerance for signed Stripe webhook events; defaults to 300 seconds.
 - `CRYPTO_MANUAL_OVERRIDE_ON_RPC_OUTAGE`: emergency review override for confirmed RPC outages; defaults to `false`. It must not bypass an explicit FAILED, PENDING, or MISMATCH result.
-- `CRYPTO_REQUIRE_TRANSACTION_FINALITY` / `CRYPTO_REJECT_LATE_TRANSFERS`: intended policy flags; server verification still requires the configured chain's confirmation threshold and rejects transactions confirmed after order expiry.
+- `CRYPTO_REQUIRE_TRANSACTION_FINALITY` / `CRYPTO_REJECT_LATE_TRANSFERS`: additional safeguards; the verifier requires the configured chain's confirmation threshold and rejects transactions confirmed after order expiry regardless of an unsafe attempt to weaken configuration.
