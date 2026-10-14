@@ -22,7 +22,7 @@ export default async function CryptoPaymentPage({ searchParams }: { searchParams
     return <div className="page-stack"><PageHeader eyebrow="CRYPTO PAYMENT" title="Cryptocurrency payment" description="An invoice reference is required." /><Link className="button button-secondary" href="/billing">Return to billing</Link></div>;
   }
   const invoice = await prisma.billingInvoice.findFirst({
-    where: { id: invoiceId, organizationId: context.activeWorkspace.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: 0n } },
+    where: { id: invoiceId, organizationId: context.activeWorkspace.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: BigInt(0) } },
     select: { id: true, invoiceNumber: true, currency: true, amountRemainingMinor: true },
   });
   if (!invoice) {
@@ -33,7 +33,7 @@ export default async function CryptoPaymentPage({ searchParams }: { searchParams
     <div className="page-stack">
       <PageHeader eyebrow="BILLING / CRYPTO" title="Cryptocurrency payment" description="Instructions are available only for explicitly verified rails. Claims remain pending until independent finance reconciliation is complete." actions={<Link className="button button-secondary" href="/billing">Back to billing</Link>} />
       <CryptoPaymentForm
-        invoice={{ id: invoice.id, invoiceNumber: invoice.invoiceNumber, currency: "USD", amountRemainingMinor: invoice.amountRemainingMinor.toString(), expectedTokenAmountBaseUnits: (invoice.amountRemainingMinor * 10_000n).toString(), expectedTokenAmount: `${invoice.amountRemainingMinor / 100n}.${(invoice.amountRemainingMinor % 100n).toString().padStart(2, "0")}` }}
+        invoice={{ id: invoice.id, invoiceNumber: invoice.invoiceNumber, currency: "USD", amountRemainingMinor: invoice.amountRemainingMinor.toString(), expectedTokenAmountBaseUnits: (invoice.amountRemainingMinor * BigInt(10000)).toString(), expectedTokenAmount: `${invoice.amountRemainingMinor / BigInt(100)}.${(invoice.amountRemainingMinor % BigInt(100)).toString().padStart(2, "0")}` }}
         rails={rails}
       />
     </div>
