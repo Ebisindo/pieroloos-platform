@@ -6,6 +6,7 @@ import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PORTAL_INTERACTION_LIMIT } from "@/lib/http/rate-limit";
 import { createBankTransferOrder, submitBankTransferClaim, PaymentGatewayError } from "@/lib/services/payment-gateway";
 import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
+import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 
 const schema = z.object({
   action: z.enum(["INITIATE", "SUBMIT"]),
@@ -28,7 +29,8 @@ export async function POST(request: Request) {
   if (!context.userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   if (!context.activeWorkspace || !context.principal) return NextResponse.json({ error: "Select an authorized workspace." }, { status: 409 });
   if (!canManageBilling(context.principal.role)) return NextResponse.json({ error: "Billing administrator access required." }, { status: 403 });
-  if (process.env.PAYMENTS_ENABLED !== "true" || !paymentFeatureEnabled("BANK_TRANSFER")) {
+  const paymentControls = paymentControlConfiguration();
+  if (!paymentControls.paymentsEnabled || !paymentControls.bankTransferEnabled || !paymentFeatureEnabled("BANK_TRANSFER")) {
     return NextResponse.json({ error: "Bank transfer is disabled or has not passed its account-verification gate." }, { status: 503 });
   }
   const limited = await enforceRateLimit(PORTAL_INTERACTION_LIMIT, context.userId);
