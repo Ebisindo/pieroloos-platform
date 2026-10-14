@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { BillingInvoiceStatus } from "@prisma/client";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { canManageBilling } from "@/lib/auth/billing-access";
+import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 import { cryptoRailConfiguration, paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
 import { prisma } from "@/lib/db/prisma";
 
@@ -21,7 +22,8 @@ export async function GET(request: Request) {
   });
   if (!invoice) return NextResponse.json({ error: "Open USD invoice not found in the active organization." }, { status: 404 });
 
-  const enabled = paymentFeatureEnabled("CRYPTO")
+  const paymentControls = paymentControlConfiguration();
+  const enabled = paymentControls.paymentsEnabled && paymentControls.cryptoEnabled && paymentFeatureEnabled("CRYPTO")
     ? cryptoRailConfiguration().filter((rail) => rail.enabled && rail.tokenDecimals !== null && rail.tokenDecimals >= 2 && rail.tokenDecimals <= 18 && rail.address && rail.tokenIdentifier)
     : [];
   return NextResponse.json({
