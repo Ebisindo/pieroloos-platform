@@ -51,8 +51,17 @@ export async function PATCH(
       return NextResponse.json({ error: "The evidence reference must identify reviewed official primary evidence for this institution." }, { status: 422 });
     }
   }
-  if (parsed.data.status === "ACTIVE_UNDER_SIGNED_AGREEMENT" && !parsed.data.verificationStatus) {
-    return NextResponse.json({ error: "A verification status is required before activating a partnership." }, { status: 422 });
+  if (parsed.data.status === "ACTIVE_UNDER_SIGNED_AGREEMENT") {
+    const nextVerification = parsed.data.verificationStatus ?? current.verificationStatus;
+    if (nextVerification !== "SOURCE_REVIEWED" && nextVerification !== "CROSS_VERIFIED") {
+      return NextResponse.json({ error: "Reviewed source evidence is required before activating a partnership." }, { status: 422 });
+    }
+    const verifiedOfficialSources = await prisma.exportInstitutionEvidence.count({
+      where: { institutionId: id, evidenceClass: "OFFICIAL_PRIMARY", verifiedAt: { not: null } },
+    });
+    if (!verifiedOfficialSources) {
+      return NextResponse.json({ error: "At least one verified official primary source is required before activation." }, { status: 422 });
+    }
   }
 
   try {
