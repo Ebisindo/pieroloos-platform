@@ -33,7 +33,7 @@ export function paymentFeatureEnabled(method: PaymentMethod, env: Record<string,
       env.BANK_TRANSFER_CURRENCY === "USD" &&
       env.BANK_TRANSFER_SUPPORTED_SENDING_REGION === "US"
     );
-  return env.CRYPTO_PAYMENTS_ENABLED === "true";
+  return env.CRYPTO_PAYMENTS_ENABLED === "true" && cryptoRailConfiguration(env).some((rail) => rail.enabled);
 }
 
 export function cryptoRailConfiguration(env: Record<string, string | undefined> = process.env) {
