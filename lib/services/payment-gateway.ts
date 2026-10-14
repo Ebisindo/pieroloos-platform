@@ -25,7 +25,7 @@ function safeInvoiceAmount(invoice: { amountDueMinor: bigint; amountPaidMinor: b
 
 function safeBigInt(value: string): bigint | null {
   try {
-    if (!/^\\d+$/.test(value)) return null;
+    if (!/^\d+$/.test(value)) return null;
     return BigInt(value);
   } catch {
     return null;
