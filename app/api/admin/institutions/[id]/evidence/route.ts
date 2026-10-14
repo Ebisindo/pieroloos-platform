@@ -11,7 +11,7 @@ const schema = z.object({
     catch { return false; }
   }),
   sourceTitle: z.string().trim().min(2).max(240),
-  evidenceClass: z.enum(["OFFICIAL_PRIMARY", "SECONDARY", "USER_PROVIDED", "INTERNAL_ASSESSMENT", "OTHER"]),
+  evidenceClass: z.enum(["OFFICIAL_PRIMARY", "WRITTEN_AUTHORIZATION", "SECONDARY", "USER_PROVIDED", "INTERNAL_ASSESSMENT", "OTHER"]),
   supportedClaim: z.string().trim().min(5).max(1000),
   notes: z.string().trim().max(2000).optional(),
 }).strict();
