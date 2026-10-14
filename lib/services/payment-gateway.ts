@@ -83,7 +83,7 @@ export async function createManualPaymentClaim(input: {
   let providerPaymentId = paymentReference;
   let metadata: Prisma.InputJsonObject = {
     claimType: "BANK_TRANSFER",
-    paymentReference: paymentId,
+    paymentReference,
     submittedByUserId: input.userId,
     submittedAt: new Date().toISOString(),
     verificationStatus: "PENDING",
@@ -98,7 +98,8 @@ export async function createManualPaymentClaim(input: {
       throw new PaymentGatewayError("A transaction reference is required.", "INVALID");
     }
     provider = `crypto:${rail.network.toLowerCase()}:${rail.asset.toLowerCase()}`;
-    paymentId = newPaymentReference("CRYPTO");
+    paymentReference = newPaymentReference("CRYPTO");
+    providerPaymentId = input.transactionReference;
     metadata = {
       claimType: "CRYPTO",
       paymentReference,
