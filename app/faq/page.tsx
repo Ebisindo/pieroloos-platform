@@ -4,6 +4,7 @@ import { PublicShell } from "@/components/public/PublicShell";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { createTranslator } from "@/lib/i18n/messages";
 import { getSiteUrl, publicPageMetadata } from "@/lib/site";
+import { serializeFaqJsonLd } from "@/lib/seo/faq-json-ld";
 
 const faqSections: readonly { title: string; items: readonly (readonly [question: string, answer: string])[] }[] = [
   { title: "About PieroloOS", items: [["What is PieroloOS?","PieroloOS is a business intelligence and formation platform designed to organise business information, prepare analyses and drafts, coordinate workflows, track evidence, and support human review across business formation, compliance preparation, and cross-border market expansion."],["Who is PieroloOS for?","It is designed for founders, business owners, companies exploring new markets, professional-service providers, and potential institutional or ecosystem partners. Available services and features may vary by release and access level."],["Does PieroloOS operate globally?","The platform is designed with a country-agnostic, globally scalable direction. Jurisdiction coverage and authoritative country-specific content are not complete by default. Review the evidence, source, date, coverage, and limitations shown for jurisdiction-specific information."],["Is PieroloOS a law firm, accounting firm, tax adviser, or financial adviser?","No. PieroloOS is software for decision support and workflow organisation. It does not replace qualified professionals, government agencies, business registries, or other competent authorities."]] },
@@ -27,15 +28,7 @@ export default async function FaqPage() {
   const t = createTranslator(locale);
   const site = getSiteUrl();
   const questions = faqSections.flatMap((section) => section.items);
-  const structuredData = site ? JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: questions.map(([question, answer]) => ({
-      "@type": "Question",
-      name: question,
-      acceptedAnswer: { "@type": "Answer", text: answer },
-    })),
-  }).replace(/</g, "\\u003c") : null;
+  const structuredData = site ? serializeFaqJsonLd(questions) : null;
 
   return (
     <PublicShell>
