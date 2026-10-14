@@ -25,6 +25,7 @@ describe("site URL handling", () => {
     delete process.env.SITE_URL;
     expect(publicPageMetadata("/partners")).toEqual({ robots: { index: true, follow: true } });
     expect(publicPageMetadata("/faq")).toEqual({ robots: { index: true, follow: true } });
+    expect(INDEXABLE_PATHS).toEqual(["/", "/partners", "/faq"]);
     process.env.SITE_URL = "https://example.com";
     expect(publicPageMetadata("/partners").alternates?.canonical).toBe("https://example.com/partners");
     expect(publicPageMetadata("/faq").alternates?.canonical).toBe("https://example.com/faq");
@@ -52,7 +53,7 @@ describe("sitemap and robots", () => {
   it("disallows everything except the public routes", () => {
     process.env.SITE_URL = "https://example.com";
     const result = robots();
-    expect(result.rules).toEqual({ userAgent: "*", allow: ["/$", "/partners", "/faq", "/terms", "/policies"], disallow: ["/", "/api/", "/admin/", "/portal", "/signin", "/clients", "/command-center", "/settings"] });
+    expect(result.rules).toEqual({ userAgent: "*", allow: ["/$", "/partners", "/faq"], disallow: ["/", "/api/", "/admin/", "/portal", "/signin", "/clients", "/command-center", "/settings", "/terms", "/policies"] });
     expect(result.sitemap).toBe("https://example.com/sitemap.xml");
   });
 });
