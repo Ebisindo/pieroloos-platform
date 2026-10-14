@@ -45,6 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const t = createTranslator(await getRequestLocale());
   return {
     ...publicPageMetadata("/policies"),
+    robots: { index: false, follow: true },
     title: { absolute: t("metadata.policies.title") },
     description: t("metadata.policies.description"),
     openGraph: { title: t("metadata.policies.title"), description: t("metadata.policies.description"), type: "website" },
