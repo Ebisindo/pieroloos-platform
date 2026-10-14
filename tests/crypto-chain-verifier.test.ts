@@ -60,6 +60,7 @@ describe("crypto chain verifier", () => {
       { jsonrpc: "2.0", id: 1, result: "0x1" },
       { jsonrpc: "2.0", id: 1, result: receipt },
       { jsonrpc: "2.0", id: 1, result: "0x1b" },
+      { jsonrpc: "2.0", id: 1, result: { timestamp: "0x67748580" } },
     ]);
     const result = await verifyCryptoTransfer({
       network: "ETHEREUM",
@@ -79,6 +80,7 @@ describe("crypto chain verifier", () => {
       receivedAmountBaseUnits: "1000000",
       confirmations: 12,
       blockReference: "16",
+      blockTimestamp: "2025-01-01T00:00:00.000Z",
       provider: "evm-json-rpc",
     });
   });
@@ -91,6 +93,7 @@ describe("crypto chain verifier", () => {
       {
         id: txId,
         blockNumber: 100,
+        blockTimeStamp: 1735689600000,
         receipt: { result: "SUCCESS" },
         log: [{
           address: tokenHex,
@@ -122,6 +125,7 @@ describe("crypto chain verifier", () => {
       receivedAmountBaseUnits: "1000000",
       confirmations: 20,
       blockReference: "100",
+      blockTimestamp: "2025-01-01T00:00:00.000Z",
       provider: "tron-full-node-api",
     });
   });
@@ -158,6 +162,7 @@ describe("crypto chain verifier", () => {
       { jsonrpc: "2.0", id: 1, result: "0x1" },
       { jsonrpc: "2.0", id: 1, result: receipt },
       { jsonrpc: "2.0", id: 1, result: "0x20" },
+      { jsonrpc: "2.0", id: 1, result: { timestamp: "0x67748580" } },
     ]);
     const result = await verifyCryptoTransfer({
       network: "ETHEREUM",
@@ -187,7 +192,7 @@ describe("crypto chain verifier", () => {
     const fetcher = fetchSequence([
       {
         jsonrpc: "2.0", id: 1, result: {
-          slot: 100, meta: { err: null, preTokenBalances: [tokenBalance("0")], postTokenBalances: [tokenBalance("2500000")] },
+          slot: 100, blockTime: 1735689600, meta: { err: null, preTokenBalances: [tokenBalance("0")], postTokenBalances: [tokenBalance("2500000")] },
         },
       },
       { jsonrpc: "2.0", id: 1, result: 200 },
@@ -209,6 +214,7 @@ describe("crypto chain verifier", () => {
       receivedAmountBaseUnits: "2500000",
       confirmations: 101,
       blockReference: "100",
+      blockTimestamp: "2025-01-01T00:00:00.000Z",
       provider: "solana-rpc-finalized",
     });
   });
