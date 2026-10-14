@@ -1,0 +1,42 @@
+import { NextResponse } from "next/server";
+import { BillingInvoiceStatus } from "@prisma/client";
+import { getWorkspaceContext } from "@/lib/auth/workspace-context";
+import { cryptoRailConfiguration, paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
+import { prisma } from "@/lib/db/prisma";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  const context = await getWorkspaceContext();
+  if (!context.userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (!context.activeWorkspace || !context.principal) return NextResponse.json({ error: "Select an authorized workspace." }, { status: 409 });
+  if (!context.principal.permissions.includes("workspace:read")) return NextResponse.json({ error: "Workspace access required." }, { status: 403 });
+  const invoiceId = new URL(request.url).searchParams.get("invoiceId");
+  if (!invoiceId || invoiceId.length > 128) return NextResponse.json({ error: "Invoice reference is required." }, { status: 422 });
+
+  const invoice = await prisma.billingInvoice.findFirst({
+    where: { id: invoiceId, organizationId: context.activeWorkspace.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: 0n } },
+    select: { id: true, invoiceNumber: true, currency: true, amountRemainingMinor: true, amountPaidMinor: true, amountDueMinor: true },
+  });
+  if (!invoice) return NextResponse.json({ error: "Open USD invoice not found in the active organization." }, { status: 404 });
+
+  const enabled = paymentFeatureEnabled("CRYPTO")
+    ? cryptoRailConfiguration().filter((rail) => rail.enabled && rail.tokenDecimals === 6 && rail.address && rail.tokenIdentifier)
+    : [];
+  return NextResponse.json({
+    data: {
+      invoice: {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        currency: invoice.currency,
+        amountRemainingMinor: invoice.amountRemainingMinor.toString(),
+        expectedTokenAmountBaseUnits: (invoice.amountRemainingMinor * 10_000n).toString(),
+        expectedTokenAmount: `${invoice.amountRemainingMinor / 100n}.${(invoice.amountRemainingMinor % 100n).toString().padStart(2, "0")}`,
+      },
+      verificationMode: enabled.length ? "MANUAL_FINANCE_RECONCILIATION" : "DISABLED",
+      rails: enabled.map(({ asset, network, address, tokenIdentifier, tokenDecimals }) => ({
+        asset, network, address, tokenIdentifier, tokenDecimals,
+      })),
+    },
+  });
+}
