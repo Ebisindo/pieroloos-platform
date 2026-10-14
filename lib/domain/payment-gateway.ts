@@ -21,7 +21,18 @@ export function paymentFeatureEnabled(method: PaymentMethod, env: NodeJS.Process
   if (method === "STRIPE") return env.STRIPE_PAYMENTS_ENABLED === "true" &&
     Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET);
   if (method === "BANK_TRANSFER") return env.BANK_TRANSFER_ENABLED === "true" &&
-    env.BANK_TRANSFER_DETAILS_VERIFIED === "true";
+    env.BANK_TRANSFER_DETAILS_VERIFIED === "true" &&
+    Boolean(
+      env.BANK_TRANSFER_ACCOUNT_HOLDER?.trim() &&
+      env.BANK_TRANSFER_BANK_NAME?.trim() &&
+      env.BANK_TRANSFER_ACCOUNT_NUMBER?.trim() &&
+      env.BANK_TRANSFER_ACH_ROUTING?.trim() &&
+      env.BANK_TRANSFER_WIRE_ROUTING?.trim() &&
+      env.BANK_TRANSFER_BANK_ADDRESS?.trim() &&
+      env.BANK_TRANSFER_ACCOUNT_TYPE?.trim() &&
+      env.BANK_TRANSFER_CURRENCY === "USD" &&
+      env.BANK_TRANSFER_SUPPORTED_SENDING_REGION === "US"
+    );
   return env.CRYPTO_PAYMENTS_ENABLED === "true";
 }
 
