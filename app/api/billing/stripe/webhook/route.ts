@@ -161,6 +161,14 @@ export async function POST(request: Request) {
             details: { eventId: event.id, invoiceId, organizationId, sessionId },
           },
         });
+      } else if (event.type === "checkout.session.expired") {
+        const sessionId = stringValue(object.id);
+        if (paymentId && sessionId) {
+          await tx.billingPayment.updateMany({
+            where: { id: paymentId, organizationId: organizationId ?? undefined, provider: "stripe", providerPaymentId: sessionId, status: BillingPaymentStatus.PENDING },
+            data: { status: BillingPaymentStatus.FAILED, failureCode: "STRIPE_SESSION_EXPIRED", failureMessage: "Checkout session expired before payment confirmation." },
+          });
+        }
       } else if (event.type === "checkout.session.async_payment_failed" || event.type === "payment_intent.payment_failed") {
         const id = paymentId;
         if (id) {
