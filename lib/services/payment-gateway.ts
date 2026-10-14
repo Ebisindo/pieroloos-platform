@@ -506,6 +506,19 @@ export async function reconcileBankTransfer(input: {
         (input.receivedAmountMinor !== payment.amountMinor || input.receivedCurrency !== payment.currency)) {
       throw new PaymentGatewayError("Received amount or currency does not exactly match the claim; escalate for manual review.", "INVALID");
     }
+    if (input.decision === "APPROVE") {
+      const duplicateBankReference = await tx.billingPayment.findFirst({
+        where: {
+          provider: "bank_transfer",
+          providerPaymentId: `bank-transfer:${input.bankTransactionReference.trim()}`,
+          id: { not: payment.id },
+        },
+        select: { id: true },
+      });
+      if (duplicateBankReference) {
+        throw new PaymentGatewayError("This bank transaction reference has already been reconciled against another payment.", "CONFLICT");
+      }
+    }
     const invoice = await tx.billingInvoice.findFirst({
       where: { id: payment.invoiceId, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN },
       select: { id: true, amountRemainingMinor: true, currency: true, amountPaidMinor: true, subscriptionId: true },
