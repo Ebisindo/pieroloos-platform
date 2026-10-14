@@ -167,7 +167,6 @@ export async function POST(request: Request) {
       } else if (event.type === "charge.refunded") {
         const chargeId = stringValue(object.id);
         const refundAmount = object.amount_refunded;
-        const refunded = object.refunded;
         const id = paymentId;
         if (id && chargeId && typeof refundAmount === "number" && Number.isSafeInteger(refundAmount) && refundAmount > 0) {
           const payment = await tx.billingPayment.findFirst({ where: { id, provider: "stripe" }, select: { id: true, amountMinor: true } });
