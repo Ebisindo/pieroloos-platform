@@ -2,6 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { BillingInvoiceStatus, BillingPaymentStatus, BillingWebhookStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { activateSubscriptionAfterVerifiedPayment } from "@/lib/services/payment-gateway";
 import { verifyStripeWebhookSignature } from "@/lib/domain/stripe-webhook-signature";
 
 export const runtime = "nodejs";
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
         }
         const invoice = await tx.billingInvoice.findFirst({
           where: { id: payment.invoiceId!, organizationId, status: BillingInvoiceStatus.OPEN },
-          select: { id: true, amountRemainingMinor: true, currency: true },
+          select: { id: true, amountRemainingMinor: true, currency: true, subscriptionId: true },
         });
         if (!invoice || invoice.amountRemainingMinor !== payment.amountMinor ||
             invoice.currency.toLowerCase() !== currency) {
@@ -149,6 +150,10 @@ export async function POST(request: Request) {
           },
         });
         if (invoiceUpdated.count !== 1) throw new Error("STRIPE_INVOICE_RACE");
+        await activateSubscriptionAfterVerifiedPayment(tx, {
+          organizationId, subscriptionId: invoice.subscriptionId,
+          paymentId: payment.id, actorRole: "SYSTEM",
+        });
         await tx.platformAuditEvent.create({
           data: {
             actorRole: "SYSTEM", action: "STRIPE_PAYMENT_CONFIRMED", subjectType: "BILLING_PAYMENT",
