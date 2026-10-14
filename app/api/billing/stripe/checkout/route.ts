@@ -6,10 +6,8 @@ import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PORTAL_INTERACTION_LIMIT } from "@/lib/http/rate-limit";
 import { prisma } from "@/lib/db/prisma";
 import { BillingInvoiceStatus, BillingPaymentStatus, Prisma } from "@prisma/client";
-import { paymentFeatureEnabled } from "@/lib/domain/payment-gateway";
-import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
+import { paymentFeatureEnabled, paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 import { randomUUID } from "node:crypto";
-import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
 
 const inputSchema = z.object({ invoiceId: z.string().min(1).max(128) }).strict();
 type StripeSessionResponse = { id?: string; url?: string | null; error?: { message?: string } };
