@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  paymentControlConfiguration,
   allowedPaymentTransition,
   cryptoRailConfiguration,
   newPaymentReference,
@@ -68,6 +69,31 @@ describe("payment gateway configuration", () => {
     expect(cryptoRailConfiguration({ ...base, CRYPTO_USDT_TRON_TOKEN_DECIMALS: "18" })[0].enabled).toBe(true);
     expect(cryptoRailConfiguration({ ...base, CRYPTO_USDT_TRON_TOKEN_DECIMALS_VERIFIED: "false" })[0].enabled).toBe(false);
     expect(cryptoRailConfiguration({ ...base, CRYPTO_USDT_TRON_ADDRESS_VERIFIED: "false" })[0].enabled).toBe(false);
+  });
+});
+
+describe("payment control configuration", () => {
+  it("fails closed on payment and subscription activation defaults", () => {
+    const config = paymentControlConfiguration({});
+    expect(config.paymentsEnabled).toBe(false);
+    expect(config.stripeEnabled).toBe(false);
+    expect(config.bankTransferEnabled).toBe(false);
+    expect(config.cryptoEnabled).toBe(false);
+    expect(config.subscriptionActivationEnabled).toBe(false);
+    expect(config.reconciliationAdminOnly).toBe(true);
+    expect(config.requireDistinctReviewer).toBe(true);
+    expect(config.webhookMaxAgeSeconds).toBe(300);
+  });
+
+  it("bounds configured webhook signature timestamp tolerance", () => {
+    expect(paymentControlConfiguration({ PAYMENT_WEBHOOK_MAX_AGE_SECONDS: "600" }).webhookMaxAgeSeconds).toBe(600);
+    expect(paymentControlConfiguration({ PAYMENT_WEBHOOK_MAX_AGE_SECONDS: "1" }).webhookMaxAgeSeconds).toBe(300);
+    expect(paymentControlConfiguration({ PAYMENT_WEBHOOK_MAX_AGE_SECONDS: "9999" }).webhookMaxAgeSeconds).toBe(300);
+  });
+
+  it("accepts only supported one-time Stripe checkout mode", () => {
+    expect(paymentControlConfiguration({ STRIPE_CHECKOUT_MODE: "payment" }).stripeCheckoutMode).toBe("payment");
+    expect(paymentControlConfiguration({ STRIPE_CHECKOUT_MODE: "subscription" }).stripeCheckoutMode).toBe("unsupported");
   });
 });
 
