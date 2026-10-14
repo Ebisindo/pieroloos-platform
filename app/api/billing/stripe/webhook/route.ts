@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { BillingInvoiceStatus, BillingPaymentStatus, BillingWebhookStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
@@ -32,7 +32,12 @@ export async function POST(request: Request) {
   if (!signature) return errorResponse("Missing Stripe signature.", 400);
   const rawBody = await request.text().catch(() => "");
   if (!rawBody || Buffer.byteLength(rawBody, "utf8") > 1024 * 1024) return errorResponse("Invalid webhook body.", 400);
-  if (!verifyStripeWebhookSignature(rawBody, signature, secret)) return errorResponse("Invalid or expired Stripe signature.", 400);
+  const configuredTolerance = Number(process.env.PAYMENT_WEBHOOK_MAX_AGE_SECONDS ?? "300");
+  const signatureTolerance = Number.isSafeInteger(configuredTolerance) && configuredTolerance >= 30 && configuredTolerance <= 900
+    ? configuredTolerance : 300;
+  if (!verifyStripeWebhookSignature(rawBody, signature, secret, Math.floor(Date.now() / 1000), signatureTolerance)) {
+    return errorResponse("Invalid or expired Stripe signature.", 400);
+  }
 
   let event: StripeEventPayload;
   try {
