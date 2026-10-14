@@ -18,6 +18,7 @@ PieroloOS is a professional decision-support and workflow-organization platform.
 | Launch readiness checklist and pilot gate | [docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md](docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md) |
 | Library layering | [docs/ARCHITECTURE-LIB.md](docs/ARCHITECTURE-LIB.md) |
 | Lint/typecheck troubleshooting | [docs/LINT-PROJECT-DIRECTORY.md](docs/LINT-PROJECT-DIRECTORY.md) |
+| GitHub Codespaces localhost:3000 preview and port forwarding | [docs/CODESPACES-PREVIEW.md](docs/CODESPACES-PREVIEW.md) |
 
 The `README-SESSION-*`, `SESSION-*` and `docs/SESSION-*` files are historical delivery notes. A feature described only there is not evidence that it is implemented; check the code and tests.
 
@@ -27,8 +28,10 @@ The `README-SESSION-*`, `SESSION-*` and `docs/SESSION-*` files are historical de
 npm install
 cp .env.example .env.local   # fill in values; never commit secrets
 npm run db:generate
-npm run dev
+npm run dev -- --hostname 0.0.0.0 --port 3000
 ```
+
+For Codespaces port forwarding, preview access, environment safety, and troubleshooting, follow [docs/CODESPACES-PREVIEW.md](docs/CODESPACES-PREVIEW.md).
 
 This repository uses a recent Next.js with breaking changes. Read the matching guide in `node_modules/next/dist/docs/` before changing framework-level code (see [AGENTS.md](AGENTS.md)).
 
