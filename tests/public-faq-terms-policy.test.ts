@@ -21,7 +21,6 @@ describe("public FAQ and legal content", () => {
   it("keeps draft notice and the required sections in Terms", () => {
     const content = readFileSync(join(process.cwd(), "app/terms/page.tsx"), "utf8");
     expect(content).toContain('t("terms.draftNoticeTitle" as never)');
-    expect(readFileSync(join(process.cwd(), "lib/i18n/messages/en.ts"), "utf8")).toContain("DRAFT — LEGAL REVIEW REQUIRED BEFORE PUBLICATION AS BINDING TERMS.");
     const englishMessages = readFileSync(join(process.cwd(), "lib/i18n/messages/en.ts"), "utf8");
     expect(englishMessages).toContain("DRAFT — LEGAL REVIEW REQUIRED BEFORE PUBLICATION AS BINDING TERMS.");
     expect(englishMessages).toContain("operator\'s legal identity, registered address, effective date, governing law");
