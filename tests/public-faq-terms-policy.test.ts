@@ -39,6 +39,8 @@ describe("public FAQ and legal content", () => {
     const content = readFileSync(join(process.cwd(), "app/policies/[slug]/page.tsx"), "utf8");
     expect(content).toContain('robots: { index: false, follow: true }');
     expect(content).toContain("DRAFT — NOT APPROVED FOR BINDING OR FINAL PUBLICATION.");
-    expect(content).toContain("Approval and implementation requirements");
+    expect(content).not.toContain("Approval and implementation requirements");
+    const audit = readFileSync(join(process.cwd(), "docs/POLICY-GOVERNANCE-AUDIT.md"), "utf8");
+    expect(audit).toContain("Internal legal and operational publication checklist");
   });
 });
