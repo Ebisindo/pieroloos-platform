@@ -52,17 +52,18 @@ describe("payment gateway configuration", () => {
       CRYPTO_PAYMENTS_ENABLED: "true",
       CRYPTO_MANUAL_RECONCILIATION_ENABLED: "true",
       CRYPTO_USD_PARITY_QUOTE_APPROVED: "true",
-      CRYPTO_TOKEN_DECIMALS_VERIFIED: "true",
       CRYPTO_TRON_ENABLED: "true",
       CRYPTO_USDT_TRON_ADDRESS: "T123",
       CRYPTO_USDT_TRON_ADDRESS_VERIFIED: "true",
       CRYPTO_USDT_TRON_TOKEN_ID: "verified-contract-id",
       CRYPTO_USDT_TRON_TOKEN_ID_VERIFIED: "true",
       CRYPTO_USDT_TRON_TOKEN_DECIMALS: "6",
+      CRYPTO_USDT_TRON_TOKEN_DECIMALS_VERIFIED: "true",
     };
     expect(cryptoRailConfiguration(base)[0].enabled).toBe(true);
     expect(cryptoRailConfiguration({ ...base, CRYPTO_USDT_TRON_TOKEN_ID_VERIFIED: "false" })[0].enabled).toBe(false);
-    expect(cryptoRailConfiguration({ ...base, CRYPTO_USDT_TRON_TOKEN_DECIMALS: "18" })[0].enabled).toBe(false);
+    expect(cryptoRailConfiguration({ ...base, CRYPTO_USDT_TRON_TOKEN_DECIMALS: "18" })[0].enabled).toBe(true);
+    expect(cryptoRailConfiguration({ ...base, CRYPTO_USDT_TRON_TOKEN_DECIMALS_VERIFIED: "false" })[0].enabled).toBe(false);
     expect(cryptoRailConfiguration({ ...base, CRYPTO_USDT_TRON_ADDRESS_VERIFIED: "false" })[0].enabled).toBe(false);
   });
 });
