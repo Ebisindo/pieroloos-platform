@@ -22,7 +22,9 @@ describe("public FAQ and legal content", () => {
     const content = readFileSync(join(process.cwd(), "app/terms/page.tsx"), "utf8");
     expect(content).toContain('t("terms.draftNoticeTitle" as never)');
     expect(readFileSync(join(process.cwd(), "lib/i18n/messages/en.ts"), "utf8")).toContain("DRAFT — LEGAL REVIEW REQUIRED BEFORE PUBLICATION AS BINDING TERMS.");
-    expect(readFileSync(join(process.cwd(), "lib/i18n/messages/en.ts"), "utf8")).toContain("operator's legal identity, registered address, effective date, governing law");
+    const englishMessages = readFileSync(join(process.cwd(), "lib/i18n/messages/en.ts"), "utf8");
+    expect(englishMessages).toContain("DRAFT — LEGAL REVIEW REQUIRED BEFORE PUBLICATION AS BINDING TERMS.");
+    expect(englishMessages).toContain("operator\'s legal identity, registered address, effective date, governing law");
     expect(content).toContain("No liability cap or blanket exclusion is established by this draft.");
     expect(content).toContain("No governing law or dispute forum is selected by this draft.");
   });
