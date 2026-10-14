@@ -41,11 +41,11 @@ export default async function TermsPage() {
     <PublicShell>
       <section className="public-section legal-page" aria-labelledby="terms-title">
         <article className="public-container legal-document">
-          <p className="eyebrow">TERMS &amp; CONDITIONS · DRAFT</p>
-          <h1 id="terms-title" className="public-h2">Terms and Conditions</h1>
+          <p className="eyebrow">{t("terms.draftLabel" as never)}</p>
+          <h1 id="terms-title" className="public-h2">{t("terms.heading" as never)}</h1>
           <div className="legal-draft-notice" role="alert">
-            <strong>DRAFT — LEGAL REVIEW REQUIRED BEFORE PUBLICATION AS BINDING TERMS.</strong>
-            <p>The operator's legal identity, registered address, effective date, governing law, contact details, privacy disclosures, consumer protections, liability language, and market-specific requirements must be completed and reviewed by qualified counsel before these Terms are activated.</p>
+            <strong>{t("terms.draftNoticeTitle" as never)}</strong>
+            <p>{t("terms.draftNoticeBody" as never)}</p>
           </div>
           <p className="legal-prose">Document status: <strong>DRAFT / NOT APPROVED</strong>. No effective date has been assigned. This text is an implementation draft for review, not a representation that binding Terms are currently in force.</p>
           {termsSections.map(([title, body]) => (
