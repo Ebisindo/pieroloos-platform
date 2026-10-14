@@ -114,7 +114,12 @@ export async function POST(request: Request) {
         evidenceReference: parsed.data.evidenceReference,
         reason: parsed.data.reason,
       });
-      return NextResponse.json({ data: result, notice: "Recorded as a manually reconciled decision from evidence supplied by the reviewer; this API does not itself query a blockchain." });
+      return NextResponse.json({
+        data: result,
+        notice: parsed.data.action === "APPROVE_CRYPTO_PAYMENT"
+          ? "The server verified this transaction against the configured read-only chain RPC and recorded the result with audit evidence."
+          : "The rejected claim was recorded with audit evidence.",
+      });
     }
     const result = await reconcileBankTransfer({
       actorUserId: actor.userId,
