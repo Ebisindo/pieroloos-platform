@@ -8,7 +8,7 @@ import { parseTransactionReference, paymentFeatureEnabled } from "@/lib/domain/p
 
 const claimSchema = z.object({
   invoiceId: z.string().min(1).max(128),
-  method: z.enum(["BANK_TRANSFER", "CRYPTO"]),
+  method: z.enum(["CRYPTO"]),
   asset: z.enum(["USDT", "USDC"]).optional(),
   network: z.enum(["TRON", "BNB_SMART_CHAIN", "ETHEREUM", "SOLANA"]).optional(),
   transactionReference: z.string().trim().min(32).max(160).optional(),
