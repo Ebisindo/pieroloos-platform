@@ -1,0 +1,164 @@
+import { createHash, randomUUID } from "node:crypto";
+
+export const PAYMENT_METHODS = ["STRIPE", "BANK_TRANSFER", "CRYPTO"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+export const PAYMENT_STATUSES = [
+  "CREATED", "AWAITING_PAYMENT", "PENDING_VERIFICATION", "PROCESSING",
+  "PAID", "FAILED", "EXPIRED", "REJECTED", "REFUNDED", "DISPUTED", "REQUIRES_REVIEW",
+] as const;
+export type PaymentWorkflowStatus = (typeof PAYMENT_STATUSES)[number];
+
+export const CRYPTO_RAILS = [
+  { asset: "USDT", network: "TRON", envKey: "CRYPTO_USDT_TRON_ADDRESS" },
+  { asset: "USDT", network: "BNB_SMART_CHAIN", envKey: "CRYPTO_USDT_BNB_SMART_CHAIN_ADDRESS" },
+  { asset: "USDC", network: "ETHEREUM", envKey: "CRYPTO_USDC_ETHEREUM_ADDRESS" },
+  { asset: "USDC", network: "SOLANA", envKey: "CRYPTO_USDC_SOLANA_ADDRESS" },
+  { asset: "USDC", network: "BNB_SMART_CHAIN", envKey: "CRYPTO_USDC_BNB_SMART_CHAIN_ADDRESS" },
+] as const;
+
+export function paymentFeatureEnabled(method: PaymentMethod, env: Record<string, string | undefined> = process.env) {
+  if (env.PAYMENTS_ENABLED !== "true") return false;
+  if (method === "STRIPE") return env.STRIPE_PAYMENTS_ENABLED === "true" &&
+    Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET);
+  if (method === "BANK_TRANSFER") return env.BANK_TRANSFER_ENABLED === "true" &&
+    env.BANK_TRANSFER_DETAILS_VERIFIED === "true" &&
+    Boolean(
+      env.BANK_TRANSFER_ACCOUNT_HOLDER?.trim() &&
+      env.BANK_TRANSFER_BANK_NAME?.trim() &&
+      env.BANK_TRANSFER_ACCOUNT_NUMBER?.trim() &&
+      env.BANK_TRANSFER_ACH_ROUTING?.trim() &&
+      env.BANK_TRANSFER_WIRE_ROUTING?.trim() &&
+      env.BANK_TRANSFER_BANK_ADDRESS?.trim() &&
+      env.BANK_TRANSFER_ACCOUNT_TYPE?.trim() &&
+      env.BANK_TRANSFER_CURRENCY === "USD" &&
+      env.BANK_TRANSFER_SUPPORTED_SENDING_REGION === "US"
+    );
+  return env.CRYPTO_PAYMENTS_ENABLED === "true" && cryptoRailConfiguration(env).some((rail) => rail.enabled);
+}
+
+function looksLikeConfiguredAddress(network: string, value: string): boolean {
+  if (network === "TRON") {
+    const hex = value.replace(/^0x/i, "");
+    return /^(?:41)?[0-9a-f]{40}$/i.test(hex) || /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(value);
+  }
+  if (network === "SOLANA") return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+  return /^0x[0-9a-f]{40}$/i.test(value);
+}
+
+export function cryptoRailConfiguration(env: Record<string, string | undefined> = process.env) {
+  return CRYPTO_RAILS.map((rail) => {
+    const address = env[rail.envKey]?.trim() ?? "";
+    // Destination addresses alone are not enough: token identity, mainnet RPC and
+    // independent address-control verification are required before a rail is offered.
+    const tokenIdentifierEnv = rail.network === "SOLANA"
+      ? "CRYPTO_USDC_SOLANA_MINT"
+      : `CRYPTO_${rail.asset}_${rail.network}_TOKEN_ID`;
+    const tokenIdentifier = env[tokenIdentifierEnv]?.trim() ?? "";
+    const decimalsEnv = `CRYPTO_${rail.asset}_${rail.network}_TOKEN_DECIMALS`;
+    const configuredDecimals = env[decimalsEnv];
+    const tokenDecimals = configuredDecimals && /^\d+$/.test(configuredDecimals) ? Number(configuredDecimals) : null;
+    const decimalsVerified = env[`${decimalsEnv}_VERIFIED`] === "true";
+    const destinationVerified = env[`${rail.envKey}_VERIFIED`] === "true";
+    const tokenVerified = env[`${tokenIdentifierEnv}_VERIFIED`] === "true";
+    const networkPrefix = `CRYPTO_${rail.network}`;
+    const networkEnabled = env[`${networkPrefix}_ENABLED`] === "true";
+    const rpcConfigured = Boolean(env[`${networkPrefix}_RPC_URL`]?.trim());
+    const mainnetVerified = env[`${networkPrefix}_MAINNET_VERIFIED`] === "true";
+    const confirmationValue = env[`${networkPrefix}_MIN_CONFIRMATIONS`];
+    const confirmationThreshold = confirmationValue && /^\d+$/.test(confirmationValue)
+      ? Number(confirmationValue) : 0;
+    // The expected mainnet, RPC, confirmation threshold, token identity, destination
+    // and token decimals must all be independently verified before displaying a rail.
+    // A separate human-review fallback remains available for provider outages.
+    const reviewPolicyReady = env.CRYPTO_MANUAL_RECONCILIATION_ENABLED === "true" &&
+      env.CRYPTO_USD_PARITY_QUOTE_APPROVED === "true" &&
+      decimalsVerified &&
+      tokenDecimals !== null && tokenDecimals >= 2 && tokenDecimals <= 18 &&
+      rpcConfigured && mainnetVerified &&
+      Number.isSafeInteger(confirmationThreshold) && confirmationThreshold > 0;
+    return {
+      asset: rail.asset,
+      network: rail.network,
+      address,
+      tokenIdentifier,
+      tokenDecimals,
+      enabled: env.PAYMENTS_ENABLED === "true" &&
+        env.CRYPTO_PAYMENTS_ENABLED === "true" &&
+        networkEnabled &&
+        Boolean(address && tokenIdentifier) &&
+        looksLikeConfiguredAddress(rail.network, address) &&
+        looksLikeConfiguredAddress(rail.network, tokenIdentifier) &&
+        destinationVerified && tokenVerified && reviewPolicyReady,
+    };
+  });
+}
+
+export function newPaymentReference(prefix = "PLO") {
+  return `${prefix}-${randomUUID().replaceAll("-", "").slice(0, 20).toUpperCase()}`;
+}
+
+export function hashWebhookPayload(rawBody: string) {
+  return createHash("sha256").update(rawBody, "utf8").digest("hex");
+}
+
+export function validatePositiveMinorAmount(value: unknown): value is bigint {
+  return typeof value === "bigint" && value > BigInt(0);
+}
+
+export function allowedPaymentTransition(from: PaymentWorkflowStatus, to: PaymentWorkflowStatus) {
+  if (from === to) return true;
+  const transitions: Record<PaymentWorkflowStatus, readonly PaymentWorkflowStatus[]> = {
+    CREATED: ["AWAITING_PAYMENT", "PENDING_VERIFICATION", "FAILED", "EXPIRED", "REQUIRES_REVIEW"],
+    AWAITING_PAYMENT: ["PENDING_VERIFICATION", "PROCESSING", "PAID", "FAILED", "EXPIRED", "REQUIRES_REVIEW"],
+    PENDING_VERIFICATION: ["PROCESSING", "PAID", "FAILED", "EXPIRED", "REJECTED", "REQUIRES_REVIEW"],
+    PROCESSING: ["PENDING_VERIFICATION", "PAID", "FAILED", "REQUIRES_REVIEW"],
+    PAID: ["REFUNDED", "DISPUTED", "REQUIRES_REVIEW"],
+    FAILED: ["PENDING_VERIFICATION", "REQUIRES_REVIEW"],
+    EXPIRED: ["PENDING_VERIFICATION", "REQUIRES_REVIEW"],
+    REJECTED: ["PENDING_VERIFICATION", "REQUIRES_REVIEW"],
+    REFUNDED: ["REQUIRES_REVIEW"],
+    DISPUTED: ["PAID", "REFUNDED", "REQUIRES_REVIEW"],
+    REQUIRES_REVIEW: ["PENDING_VERIFICATION", "PAID", "FAILED", "REJECTED", "REFUNDED", "DISPUTED"],
+  };
+  return transitions[from].includes(to);
+}
+
+export function parseTransactionReference(value: unknown, network: string): string | null {
+  if (typeof value !== "string") return null;
+  const candidate = value.trim();
+  if (!candidate || candidate.length > 160) return null;
+  // Conservative syntactic validation only. Successful format validation is NOT payment proof.
+  const patterns: Record<string, RegExp> = {
+    TRON: /^[0-9a-fA-F]{64}$/,
+    BNB_SMART_CHAIN: /^0x[0-9a-fA-F]{64}$/,
+    ETHEREUM: /^0x[0-9a-fA-F]{64}$/,
+    SOLANA: /^[1-9A-HJ-NP-Za-km-z]{64,90}$/,
+  };
+  if (!patterns[network] || !patterns[network].test(candidate)) return null;
+  return network === "TRON" || network === "ETHEREUM" || network === "BNB_SMART_CHAIN"
+    ? candidate.toLowerCase()
+    : candidate;
+}
+
+
+export function paymentControlConfiguration(env: Record<string, string | undefined> = process.env) {
+  const rawMaxAge = Number(env.PAYMENT_WEBHOOK_MAX_AGE_SECONDS ?? "300");
+  const maxAge = Number.isSafeInteger(rawMaxAge) && rawMaxAge >= 30 && rawMaxAge <= 900 ? rawMaxAge : 300;
+  return {
+    paymentsEnabled: env.PAYMENTS_ENABLED === "true",
+    stripeEnabled: env.STRIPE_PAYMENTS_ENABLED === "true",
+    bankTransferEnabled: env.BANK_TRANSFER_ENABLED === "true",
+    cryptoEnabled: env.CRYPTO_PAYMENTS_ENABLED === "true",
+    subscriptionActivationEnabled: env.PAYMENT_SUBSCRIPTION_ACTIVATION_ENABLED === "true",
+    reconciliationAdminOnly: env.PAYMENT_RECONCILIATION_ADMIN_ONLY !== "false",
+    requireDistinctReviewer: env.PAYMENT_REQUIRE_DISTINCT_REVIEWER !== "false",
+    webhookMaxAgeSeconds: maxAge,
+    stripeCheckoutMode: env.STRIPE_CHECKOUT_MODE === "payment" ? "payment" : "unsupported",
+    stripePromotionsEnabled: env.STRIPE_ALLOW_PROMOTIONS === "true",
+    stripeAutomaticTaxEnabled: env.STRIPE_AUTOMATIC_TAX_ENABLED === "true",
+    stripeBillingPortalEnabled: env.STRIPE_BILLING_PORTAL_ENABLED === "true",
+    cryptoManualOverrideOnRpcOutage: env.CRYPTO_MANUAL_OVERRIDE_ON_RPC_OUTAGE === "true",
+    cryptoRequireTransactionFinality: env.CRYPTO_REQUIRE_TRANSACTION_FINALITY !== "false",
+    cryptoRejectLateTransfers: env.CRYPTO_REJECT_LATE_TRANSFERS !== "false",
+  };
+}

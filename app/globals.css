@@ -362,3 +362,44 @@ select.form-input { appearance:auto; }
   .journey-list, .capability-grid, .public-footer-grid, .benefit-list, .funding-summary, .form-grid { grid-template-columns:1fr; }
   .public-cta { width:100%; }
 }
+
+
+/* Payment gateway and reconciliation surfaces */
+.payment-method-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:18px; }
+.payment-method-grid > div { border:1px solid var(--color-border); background:rgba(12,18,40,.5); border-radius:var(--radius-md); padding:18px; min-width:0; }
+.payment-method-grid h3, .payment-review-card h3 { margin:0 0 10px; font-family:var(--font-display); font-size:15px; }
+.payment-method-grid p { color:var(--color-text-muted); font-size:13px; line-height:1.6; margin:12px 0 0; }
+.payment-action { display:flex; flex-direction:column; align-items:flex-start; gap:8px; min-width:160px; }
+.payment-action .button { white-space:normal; }
+.payment-success { color:var(--green); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.payment-error { color:var(--danger); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.payment-warning { margin:16px 0; padding:12px 14px; border:1px solid rgba(232,199,109,.35); border-radius:var(--radius-md); background:rgba(232,199,109,.07); color:#f1daa0; font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+.payment-address { padding:12px; border:1px solid var(--color-border); background:rgba(0,0,0,.18); border-radius:var(--radius-sm); overflow-wrap:anywhere; }
+.token-identifier { display:block; overflow-wrap:anywhere; margin-top:8px; }
+.bank-instructions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; margin:18px 0; }
+.bank-instructions > div { min-width:0; }
+.bank-instructions dt, .field-label { color:var(--color-text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:5px; }
+.bank-instructions dd { margin:0; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.input-field { width:100%; min-width:0; color:var(--color-text); background:rgba(4,7,21,.72); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:10px 12px; margin-top:6px; }
+select.input-field { color-scheme:dark; }
+.payment-review-card { display:flex; flex-direction:column; gap:18px; }
+.payment-review-card > header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.payment-review-card p { color:var(--color-text-muted); font-size:13px; line-height:1.55; margin:5px 0; overflow-wrap:anywhere; }
+.payment-review-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.payment-review-fields label { display:flex; flex-direction:column; color:var(--color-text-muted); font-size:12px; gap:5px; min-width:0; }
+.payment-review-fields label:has(textarea) { grid-column:1 / -1; }
+.payment-review-fields .payment-warning { grid-column:1 / -1; }
+.bank-transfer-order { width:100%; align-items:stretch; }
+.bank-transfer-order > section { width:100%; }
+.inline-form { display:inline-flex; }
+.muted { color:var(--color-text-muted); font-size:13px; line-height:1.6; }
+@media (max-width: 900px) {
+  .payment-method-grid { grid-template-columns:1fr; }
+}
+@media (max-width: 620px) {
+  .bank-instructions, .payment-review-fields { grid-template-columns:1fr; }
+  .payment-review-fields label:has(textarea), .payment-review-fields .payment-warning { grid-column:auto; }
+  .payment-review-card { padding:14px; }
+  .payment-method-grid > div { padding:14px; }
+  .payment-review-card .page-actions, .payment-action .button { width:100%; }
+}

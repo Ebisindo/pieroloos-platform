@@ -38,6 +38,7 @@ const en = {
   "navigation.compliance": "Compliance",
   "navigation.reports": "Reports",
   "navigation.engagements": "Engagements",
+  "navigation.billing": "Billing & payments",
   "navigation.settings": "Settings",
   "navigation.adminControlCentre": "Administrative Control Centre",
   "module.clientIntake": "Client Intake",
