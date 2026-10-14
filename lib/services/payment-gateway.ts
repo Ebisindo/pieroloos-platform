@@ -47,6 +47,139 @@ export async function listPayments(organizationId: string) {
   });
 }
 
+export async function createBankTransferOrder(input: {
+  userId: string;
+  organizationId: string;
+  invoiceId: string;
+}) {
+  if (!paymentFeatureEnabled("BANK_TRANSFER")) {
+    throw new PaymentGatewayError("Bank transfer is disabled or its institution details are not verified.", "DISABLED");
+  }
+  const bankInstructions = {
+    accountHolder: process.env.BANK_TRANSFER_ACCOUNT_HOLDER!,
+    bankName: process.env.BANK_TRANSFER_BANK_NAME!,
+    accountType: process.env.BANK_TRANSFER_ACCOUNT_TYPE!,
+    accountNumber: process.env.BANK_TRANSFER_ACCOUNT_NUMBER!,
+    achRouting: process.env.BANK_TRANSFER_ACH_ROUTING!,
+    wireRouting: process.env.BANK_TRANSFER_WIRE_ROUTING!,
+    bankAddress: process.env.BANK_TRANSFER_BANK_ADDRESS!,
+    currency: "USD",
+    supportedSendingRegion: "US",
+    achFee: process.env.BANK_TRANSFER_ACH_FEE_USD ?? "",
+    wireFee: process.env.BANK_TRANSFER_WIRE_FEE_USD ?? "",
+    processingTime: process.env.BANK_TRANSFER_PROCESSING_TIME ?? "1–3 business days (confirm with the financial institution)",
+    swiftSupported: false,
+  };
+  const invoice = await prisma.billingInvoice.findFirst({
+    where: { id: input.invoiceId, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN, currency: "USD", amountRemainingMinor: { gt: 0n } },
+    select: { id: true, invoiceNumber: true, currency: true, amountRemainingMinor: true },
+  });
+  if (!invoice) throw new PaymentGatewayError("Open USD invoice not found in the active organization.", "NOT_FOUND");
+  const paymentReference = newPaymentReference("BANK");
+  try {
+    const payment = await prisma.$transaction(async (tx) => {
+      const fresh = await tx.billingInvoice.findFirst({
+        where: { id: invoice.id, organizationId: input.organizationId, status: BillingInvoiceStatus.OPEN },
+        select: { amountRemainingMinor: true, currency: true },
+      });
+      if (!fresh || fresh.currency !== "USD" || fresh.amountRemainingMinor !== invoice.amountRemainingMinor || fresh.amountRemainingMinor <= 0n) {
+        throw new PaymentGatewayError("Invoice changed; refresh and retry.", "CONFLICT");
+      }
+      const created = await tx.billingPayment.create({
+        data: {
+          organizationId: input.organizationId,
+          invoiceId: invoice.id,
+          provider: "bank_transfer",
+          providerPaymentId: paymentReference,
+          status: BillingPaymentStatus.PENDING,
+          currency: invoice.currency,
+          amountMinor: invoice.amountRemainingMinor,
+        },
+        select: { id: true, invoiceId: true, provider: true, providerPaymentId: true, status: true, currency: true, amountMinor: true, createdAt: true },
+      });
+      await tx.platformAuditEvent.create({
+        data: {
+          actorUserId: input.userId, actorRole: "CUSTOMER",
+          action: "BANK_TRANSFER_ORDER_CREATED", subjectType: "BILLING_PAYMENT",
+          subjectId: created.id, outcome: "SUCCESS",
+          details: {
+            organizationId: input.organizationId, invoiceId: invoice.id,
+            paymentReference, amountMinor: invoice.amountRemainingMinor.toString(),
+            currency: invoice.currency, submittedByUserId: input.userId,
+          },
+        },
+      });
+      return created;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    return {
+      payment: { ...payment, amountMinor: payment.amountMinor.toString() },
+      invoice: { id: invoice.id, invoiceNumber: invoice.invoiceNumber, amountRemainingMinor: invoice.amountRemainingMinor.toString(), currency: invoice.currency },
+      instructions: bankInstructions,
+    };
+  } catch (error) {
+    if (error instanceof PaymentGatewayError) throw error;
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new PaymentGatewayError("Could not create a unique bank transfer reference; retry.", "CONFLICT");
+    }
+    throw error;
+  }
+}
+
+export async function submitBankTransferClaim(input: {
+  userId: string;
+  organizationId: string;
+  paymentId: string;
+}) {
+  if (!paymentFeatureEnabled("BANK_TRANSFER")) {
+    throw new PaymentGatewayError("Bank transfer is disabled.", "DISABLED");
+  }
+  return prisma.$transaction(async (tx) => {
+    const payment = await tx.billingPayment.findFirst({
+      where: { id: input.paymentId, organizationId: input.organizationId, provider: "bank_transfer", status: BillingPaymentStatus.PENDING },
+      select: { id: true, invoiceId: true, currency: true, amountMinor: true, providerPaymentId: true },
+    });
+    if (!payment || !payment.invoiceId || !payment.providerPaymentId) {
+      throw new PaymentGatewayError("Pending bank-transfer order not found.", "NOT_FOUND");
+    }
+    const order = await tx.platformAuditEvent.findFirst({
+      where: { action: "BANK_TRANSFER_ORDER_CREATED", subjectType: "BILLING_PAYMENT", subjectId: payment.id, outcome: "SUCCESS" },
+      orderBy: { occurredAt: "asc" }, select: { actorUserId: true, details: true },
+    });
+    if (!order || order.actorUserId !== input.userId) {
+      throw new PaymentGatewayError("Only the user who created the transfer instructions may submit its payment claim.", "FORBIDDEN");
+    }
+    const alreadySubmitted = await tx.platformAuditEvent.findFirst({
+      where: { action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT", subjectId: payment.id, outcome: "SUCCESS" },
+      select: { id: true },
+    });
+    if (alreadySubmitted) throw new PaymentGatewayError("This transfer has already been submitted for verification.", "CONFLICT");
+    const orderDetails = order.details as { paymentReference?: unknown } | null;
+    await tx.platformAuditEvent.create({
+      data: {
+        actorUserId: input.userId, actorRole: "CUSTOMER",
+        action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT",
+        subjectId: payment.id, outcome: "SUCCESS",
+        details: {
+          organizationId: input.organizationId,
+          invoiceId: payment.invoiceId,
+          provider: payment.provider,
+          paymentReference: payment.providerPaymentId,
+          amountMinor: payment.amountMinor.toString(),
+          currency: payment.currency,
+          claimMetadata: {
+            claimType: "BANK_TRANSFER",
+            paymentReference: typeof orderDetails?.paymentReference === "string" ? orderDetails.paymentReference : payment.providerPaymentId,
+            submittedByUserId: input.userId,
+            submittedAt: new Date().toISOString(),
+            verificationStatus: "PENDING",
+          },
+        },
+      },
+    });
+    return { id: payment.id, status: payment.status, paymentReference: payment.providerPaymentId };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
+
 export async function createManualPaymentClaim(input: {
   userId: string;
   organizationId: string;
