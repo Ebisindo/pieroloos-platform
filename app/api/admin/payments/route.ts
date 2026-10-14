@@ -1,4 +1,4 @@
-import { BillingPaymentStatus, PlatformPermission } from "@prisma/client";
+import { BillingPaymentStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentPlatformActor } from "@/lib/auth/platform-access";
@@ -30,7 +30,7 @@ export async function GET() {
   if (!allowed(actor)) return NextResponse.json({ error: "Financial administration access required." }, { status: 403 });
 
   try {
-    const where = actor.isSuperAdmin ? {} : { organizationId: { in: actor.organizationIds } };
+    const where = {};
     const [pendingRows, recent] = await Promise.all([
       prisma.billingPayment.findMany({
         where: { ...where, status: BillingPaymentStatus.PENDING },
