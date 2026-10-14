@@ -192,7 +192,7 @@ describe("crypto chain verifier", () => {
     const fetcher = fetchSequence([
       {
         jsonrpc: "2.0", id: 1, result: {
-          slot: 100, blockTime: 1735689600, meta: { err: null, preTokenBalances: [tokenBalance("0")], postTokenBalances: [tokenBalance("2500000")] },
+          slot: 100, blockTime: 1735689600, transaction: { signatures: [txSignature] }, meta: { err: null, preTokenBalances: [tokenBalance("0")], postTokenBalances: [tokenBalance("2500000")] },
         },
       },
       { jsonrpc: "2.0", id: 1, result: 200 },
