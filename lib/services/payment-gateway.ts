@@ -591,6 +591,10 @@ export async function reconcileCryptoPayment(input: {
       network?: unknown;
       asset?: unknown;
       submittedByUserId?: unknown;
+      destinationAddress?: unknown;
+      tokenDecimals?: unknown;
+      expiresAt?: unknown;
+      quotePolicy?: unknown;
     } | undefined;
     const payment = await tx.billingPayment.findFirst({
       where: { id: input.paymentId, organizationId: input.organizationId, provider: { startsWith: "crypto:" } },
@@ -600,6 +604,15 @@ export async function reconcileCryptoPayment(input: {
     if (payment.status !== BillingPaymentStatus.PENDING) throw new PaymentGatewayError("Crypto claim is no longer pending.", "CONFLICT");
     if (payment.providerPaymentId !== claimMetadata?.transactionReference) {
       throw new PaymentGatewayError("Transaction reference does not match the immutable claim.", "INVALID");
+    }
+    const activeRail = cryptoRailConfiguration().find((rail) =>
+      rail.enabled && rail.asset === claimMetadata?.asset && rail.network === claimMetadata?.network,
+    );
+    if (!activeRail ||
+        activeRail.address !== claimMetadata?.destinationAddress ||
+        activeRail.tokenIdentifier !== claimMetadata?.tokenIdentifier ||
+        activeRail.tokenDecimals !== claimMetadata?.tokenDecimals) {
+      throw new PaymentGatewayError("The payment rail configuration has changed or is disabled; escalate the claim for controlled review.", "NOT_CONFIGURED");
     }
     if (input.decision === "REJECT") {
       const changed = await tx.billingPayment.updateMany({
