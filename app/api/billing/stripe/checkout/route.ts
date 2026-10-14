@@ -39,6 +39,11 @@ export async function POST(request: Request) {
     select: { id: true, currency: true, amountRemainingMinor: true, invoiceNumber: true },
   });
   if (!invoice) return NextResponse.json({ error: "Open invoice not found." }, { status: 404 });
+  const existingPending = await prisma.billingPayment.findFirst({
+    where: { organizationId: context.activeWorkspace.organizationId, invoiceId: invoice.id, provider: "stripe", status: BillingPaymentStatus.PENDING },
+    select: { id: true },
+  });
+  if (existingPending) return NextResponse.json({ error: "A Stripe payment attempt is already pending for this invoice. Complete it or wait for its expiry webhook before retrying." }, { status: 409 });
   if (invoice.amountRemainingMinor > BigInt(Number.MAX_SAFE_INTEGER)) return NextResponse.json({ error: "Invoice amount exceeds supported checkout bounds." }, { status: 422 });
   if (!/^[a-zA-Z]{3}$/.test(invoice.currency)) return NextResponse.json({ error: "Invoice currency is invalid." }, { status: 422 });
   let base: URL;
@@ -90,6 +95,11 @@ export async function POST(request: Request) {
 
   try {
     await prisma.$transaction(async (tx) => {
+      const pending = await tx.billingPayment.findFirst({
+        where: { organizationId: context.activeWorkspace!.organizationId, invoiceId: invoice.id, provider: "stripe", status: BillingPaymentStatus.PENDING },
+        select: { id: true },
+      });
+      if (pending) throw new Error("STRIPE_PAYMENT_ALREADY_PENDING");
       await tx.billingPayment.create({
         data: {
           id: paymentId,
