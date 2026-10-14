@@ -36,6 +36,15 @@ export function paymentFeatureEnabled(method: PaymentMethod, env: Record<string,
   return env.CRYPTO_PAYMENTS_ENABLED === "true" && cryptoRailConfiguration(env).some((rail) => rail.enabled);
 }
 
+function looksLikeConfiguredAddress(network: string, value: string): boolean {
+  if (network === "TRON") {
+    const hex = value.replace(/^0x/i, "");
+    return /^(?:41)?[0-9a-f]{40}$/i.test(hex) || /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(value);
+  }
+  if (network === "SOLANA") return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+  return /^0x[0-9a-f]{40}$/i.test(value);
+}
+
 export function cryptoRailConfiguration(env: Record<string, string | undefined> = process.env) {
   return CRYPTO_RAILS.map((rail) => {
     const address = env[rail.envKey]?.trim() ?? "";
@@ -77,6 +86,8 @@ export function cryptoRailConfiguration(env: Record<string, string | undefined> 
         env.CRYPTO_PAYMENTS_ENABLED === "true" &&
         networkEnabled &&
         Boolean(address && tokenIdentifier) &&
+        looksLikeConfiguredAddress(rail.network, address) &&
+        looksLikeConfiguredAddress(rail.network, tokenIdentifier) &&
         destinationVerified && tokenVerified && reviewPolicyReady,
     };
   });
