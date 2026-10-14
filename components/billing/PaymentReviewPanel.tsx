@@ -14,6 +14,8 @@ type Claim = {
   destinationAddress?: string;
   tokenIdentifier?: string;
   verificationMode?: string;
+  latePayment?: boolean;
+  expiresAt?: string;
 };
 type Payment = {
   id: string; organizationId: string; invoiceId: string | null; provider: string | null;
@@ -159,6 +161,8 @@ export function PaymentReviewPanel() {
             <div><dt>Expected token base units</dt><dd><code>{claim?.expectedTokenAmountBaseUnits ?? "Missing"}</code></dd></div>
           </> : null}
         </dl>
+        {crypto && claim?.latePayment ? <p className="payment-warning">This transaction claim was submitted after the order expiry. Verify the actual transfer timestamp and order association carefully; it must not be approved solely because the transaction exists.</p> : null}
+        {crypto && claim?.expiresAt ? <p className="muted">Payment order expiry: {new Date(claim.expiresAt).toLocaleString("en-GB", { timeZone: "UTC" })} UTC.</p> : null}
         <div className="payment-review-fields">
           {!crypto ? <>
             <label>Received amount in minor units (cents)<input className="input-field" inputMode="numeric" value={field(payment, "amount")} onChange={(e) => change(payment, "amount", e.target.value)} /></label>
