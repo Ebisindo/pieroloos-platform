@@ -23,6 +23,15 @@ function safeInvoiceAmount(invoice: { amountDueMinor: bigint; amountPaidMinor: b
   return invoice.amountRemainingMinor;
 }
 
+function safeBigInt(value: string): bigint | null {
+  try {
+    if (!/^\\d+$/.test(value)) return null;
+    return BigInt(value);
+  } catch {
+    return null;
+  }
+}
+
 export async function activateSubscriptionAfterVerifiedPayment(
   tx: Prisma.TransactionClient,
   input: {
