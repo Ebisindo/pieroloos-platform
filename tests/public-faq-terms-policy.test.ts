@@ -25,7 +25,7 @@ describe("public FAQ and legal content", () => {
     expect(page).toContain('t("terms.draftNoticeTitle" as never)');
     expect(page).toContain('t("terms.draftNoticeBody" as never)');
     expect(englishMessages).toContain('"terms.draftNoticeTitle": "DRAFT — LEGAL REVIEW REQUIRED BEFORE PUBLICATION AS BINDING TERMS."');
-    expect(page).toContain("operator's legal identity, registered address, effective date, governing law");
+    expect(englishMessages).toContain("operator's legal identity, registered address, effective date, governing law");
     expect(page).toContain("No liability cap or blanket exclusion is established by this draft.");
     expect(page).toContain("No governing law or dispute forum is selected by this draft.");
     expect(page).toContain('robots: { index: false, follow: true }');
