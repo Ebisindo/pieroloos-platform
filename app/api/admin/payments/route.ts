@@ -19,8 +19,9 @@ const actionSchema = z.object({
   reason: z.string().trim().min(8).max(500),
 }).strict();
 
-function allowed(actor: { isSuperAdmin: boolean; permissions: PlatformPermission[] }) {
-  return actor.isSuperAdmin || actor.permissions.includes(PlatformPermission.DASHBOARD_READ);
+function allowed(actor: { isSuperAdmin: boolean }) {
+  // Financial account data and reconciliation controls are restricted to the platform Super Administrator.
+  return actor.isSuperAdmin;
 }
 
 export async function GET() {
@@ -30,7 +31,7 @@ export async function GET() {
 
   try {
     const where = actor.isSuperAdmin ? {} : { organizationId: { in: actor.organizationIds } };
-    const [pending, recent] = await Promise.all([
+    const [pendingRows, recent] = await Promise.all([
       prisma.billingPayment.findMany({
         where: { ...where, status: BillingPaymentStatus.PENDING },
         orderBy: { createdAt: "asc" }, take: 100,
@@ -42,9 +43,29 @@ export async function GET() {
         select: { id: true, organizationId: true, invoiceId: true, provider: true, providerPaymentId: true, status: true, currency: true, amountMinor: true, refundedAmountMinor: true, createdAt: true, paidAt: true },
       }),
     ]);
+    const claims = pendingRows.length ? await prisma.platformAuditEvent.findMany({
+      where: { action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT", subjectId: { in: pendingRows.map((p) => p.id) }, outcome: "SUCCESS" },
+      orderBy: { occurredAt: "desc" },
+      select: { subjectId: true, actorUserId: true, details: true, occurredAt: true },
+    }) : [];
+    const latestClaimByPayment = new Map<string, typeof claims[number]>();
+    for (const claim of claims) {
+      if (claim.subjectId && !latestClaimByPayment.has(claim.subjectId)) latestClaimByPayment.set(claim.subjectId, claim);
+    }
+    const pending = pendingRows.map((payment) => {
+      const claim = latestClaimByPayment.get(payment.id);
+      const details = claim?.details as { paymentReference?: unknown; claimMetadata?: unknown } | null;
+      return {
+        ...payment,
+        claim: details?.claimMetadata ?? null,
+        paymentReference: typeof details?.paymentReference === "string" ? details.paymentReference : null,
+        submittedByUserId: claim?.actorUserId ?? null,
+        submittedAt: claim?.occurredAt ?? payment.createdAt,
+      };
+    });
     await prisma.platformAuditEvent.create({
       data: {
-        actorUserId: actor.userId, actorRole: actor.isSuperAdmin ? "SUPER_ADMIN" : "PLATFORM_ADMIN",
+        actorUserId: actor.userId, actorRole: "SUPER_ADMIN",
         action: "BILLING_PAYMENTS_READ", subjectType: "BILLING_PAYMENT", outcome: "SUCCESS",
         details: { pendingCount: pending.length, recentCount: recent.length },
       },
