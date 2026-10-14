@@ -30,7 +30,7 @@ export function PaymentReviewPanel() {
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [formValues, setFormValues] = useState<Record<string, { amount: string; currency: string; bankRef: string; evidence: string; reason: string }>>({});
+  const [formValues, setFormValues] = useState<Record<string, { amount: string; currency: string; bankRef: string; tokenAmount: string; evidence: string; reason: string }>>({});
 
   async function refresh() {
     setLoading(true); setError("");
@@ -46,23 +46,25 @@ export function PaymentReviewPanel() {
   }
   useEffect(() => { void refresh(); }, []);
 
-  function field(payment: Payment, key: "amount" | "currency" | "bankRef" | "evidence" | "reason") {
+  function field(payment: Payment, key: "amount" | "currency" | "bankRef" | "tokenAmount" | "evidence" | "reason") {
     const existing = formValues[payment.id];
     if (existing) return existing[key];
     if (key === "amount") return payment.amountMinor;
     if (key === "currency") return payment.currency;
     if (key === "bankRef") return "";
+    if (key === "tokenAmount") return payment.claim?.expectedTokenAmountBaseUnits ?? "";
     if (key === "evidence") return payment.claim?.network && payment.claim?.transactionReference
       ? `https://` : "";
     return "";
   }
-  function change(payment: Payment, key: "amount" | "currency" | "bankRef" | "evidence" | "reason", value: string) {
+  function change(payment: Payment, key: "amount" | "currency" | "bankRef" | "tokenAmount" | "evidence" | "reason", value: string) {
     setFormValues((prev) => ({
       ...prev,
       [payment.id]: {
         amount: prev[payment.id]?.amount ?? payment.amountMinor,
         currency: prev[payment.id]?.currency ?? payment.currency,
         bankRef: prev[payment.id]?.bankRef ?? "",
+        tokenAmount: prev[payment.id]?.tokenAmount ?? payment.claim?.expectedTokenAmountBaseUnits ?? "",
         evidence: prev[payment.id]?.evidence ?? "",
         reason: prev[payment.id]?.reason ?? "",
         [key]: value,
@@ -74,7 +76,7 @@ export function PaymentReviewPanel() {
     setBusyId(payment.id); setError(""); setMessage("");
     const claim = payment.claim;
     const values = formValues[payment.id] ?? {
-      amount: payment.amountMinor, currency: payment.currency, bankRef: "", evidence: "", reason: "",
+      amount: payment.amountMinor, currency: payment.currency, bankRef: "", tokenAmount: claim?.expectedTokenAmountBaseUnits ?? "", evidence: "", reason: "",
     };
     if (!values.reason.trim() || values.reason.trim().length < 8 || values.evidence.trim().length < 8) {
       setError("Enter independent evidence and a reason of at least 8 characters."); setBusyId(""); return;
@@ -91,7 +93,7 @@ export function PaymentReviewPanel() {
         setError("Enter the independently matched bank transaction reference."); setBusyId(""); return;
       }
     } else if (action === "APPROVE_CRYPTO_PAYMENT") {
-      body.receivedAmountBaseUnits = claim?.expectedTokenAmountBaseUnits ?? "";
+      body.receivedAmountBaseUnits = values.tokenAmount;
     }
     if (action.includes("CRYPTO")) {
       if (!claim?.transactionReference || !/^https:\/\//i.test(values.evidence.trim())) {
@@ -143,7 +145,10 @@ export function PaymentReviewPanel() {
             <label>Received amount in minor units (cents)<input className="input-field" inputMode="numeric" value={field(payment, "amount")} onChange={(e) => change(payment, "amount", e.target.value)} /></label>
             <label>Currency<input className="input-field" value={field(payment, "currency")} onChange={(e) => change(payment, "currency", e.target.value.toUpperCase())} maxLength={3} /></label>
             <label>Matched bank transaction reference<input className="input-field" value={field(payment, "bankRef")} onChange={(e) => change(payment, "bankRef", e.target.value)} maxLength={160} /></label>
-          </> : <p className="payment-warning">This app does not query a blockchain automatically. Do not approve unless an authorized reviewer has independently verified the transaction, chain, token, destination, successful status, actual token transfer, confirmations, exact amount, and no previous credit.</p>}
+          </> : <>
+            <p className="payment-warning">This app does not query a blockchain automatically. Do not approve unless an authorized reviewer has independently verified the transaction, chain, token, destination, successful status, actual token transfer, confirmations, exact amount, and no previous credit.</p>
+            <label>Observed token amount in base units<input className="input-field" inputMode="numeric" value={field(payment, "tokenAmount")} onChange={(e) => change(payment, "tokenAmount", e.target.value)} /></label>
+          </>}
           <label>Independent evidence reference{crypto ? " (HTTPS explorer URL)" : " (bank record/reference)"}<input className="input-field" value={field(payment, "evidence")} onChange={(e) => change(payment, "evidence", e.target.value)} maxLength={500} /></label>
           <label>Reason / review notes<textarea className="input-field" value={field(payment, "reason")} onChange={(e) => change(payment, "reason", e.target.value)} minLength={8} maxLength={500} rows={3} /></label>
         </div>
