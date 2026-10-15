@@ -73,6 +73,9 @@ export const businessProfileRepository = {
       const profile = await transaction.businessProfile.update({
         where: { id },
         data: updateData,
+        include: {
+          client: { select: { id: true, name: true, organizationName: true, email: true, country: true, updatedAt: true } },
+        },
       });
       await transaction.activity.create({
         data: {
