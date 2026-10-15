@@ -52,7 +52,7 @@ describe("next product phase validation contracts", () => {
 describe("workspace workflow security seams", () => {
   it("uses workspace scope and authorized writes in the profile repository", () => {
     const profileRepo = source("lib/db/business-profile-repository.ts");
-    expect(profileRepo).toContain('client: { workspaceId: principal.workspaceId }');
+    expect(profileRepo).toContain('client: { workspaceId: principal.workspaceId, organizationId: principal.organizationId }');
     expect(profileRepo).toContain('withAuthorizedWorkspaceTransaction(principal, "client:write"');
     expect(profileRepo).toContain('title: "Business profile updated"');
   });
@@ -60,7 +60,7 @@ describe("workspace workflow security seams", () => {
   it("uses workspace scope, transactional audit and truthful data limitations in report generation", () => {
     const reports = source("lib/db/report-repository.ts");
     expect(reports).toContain('withAuthorizedWorkspaceTransaction(principal, "reports:write"');
-    expect(reports).toContain('where: { id: clientId, workspaceId: principal.workspaceId }');
+    expect(reports).toContain('where: { id: clientId, workspaceId: principal.workspaceId, organizationId: principal.organizationId }');
     expect(reports).toContain('title: "Client summary report generated"');
     expect(reports).toContain("does not establish that no obligations apply");
     expect(source("app/api/reports/[id]/route.ts")).toContain("escapeHtml");
