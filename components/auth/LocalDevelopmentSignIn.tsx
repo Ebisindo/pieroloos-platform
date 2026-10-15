@@ -9,6 +9,7 @@ type LocalDevelopmentSignInProps = {
   passwordLabel: string;
   submitLabel: string;
   errorMessage: string;
+  providerId?: string;
 };
 
 export function LocalDevelopmentSignIn({
@@ -17,6 +18,7 @@ export function LocalDevelopmentSignIn({
   passwordLabel,
   submitLabel,
   errorMessage,
+  providerId = "credentials",
 }: LocalDevelopmentSignInProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
@@ -28,7 +30,7 @@ export function LocalDevelopmentSignIn({
 
     const formData = new FormData(event.currentTarget);
     try {
-      const result = await signIn("credentials", {
+      const result = await signIn(providerId, {
         email: formData.get("email"),
         password: formData.get("password"),
         callbackUrl,
