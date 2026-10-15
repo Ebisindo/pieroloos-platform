@@ -40,6 +40,21 @@ test.describe("cross-device responsive smoke matrix", () => {
     }
   });
 
+  test("workspace shell skip link can be reached and activated by keyboard while signed out", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/reports", { waitUntil: "domcontentloaded" });
+
+    const skipLink = page.locator("a.skip-link");
+    await expect(skipLink).toHaveAttribute("href", "#main-content");
+    await page.keyboard.press("Tab");
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toBeInViewport();
+
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/#main-content$/);
+    await expect(page.locator("#main-content")).toBeVisible();
+  });
+
   test("axe reports no serious or critical findings on representative public routes", async ({ page }) => {
     for (const route of publicRoutes) {
       await page.setViewportSize({ width: 1280, height: 900 });
