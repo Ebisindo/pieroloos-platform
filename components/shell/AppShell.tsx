@@ -108,7 +108,7 @@ export function AppShell({
 
       {mobileOpen ? <button className="mobile-scrim" onClick={() => setMobileOpen(false)} aria-label={t("navigation.close")} /> : null}
 
-      <main id="main-content" className="main-shell">
+      <div className="main-shell">
         <header className="topbar">
           <div className="topbar-left">
             <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label={t("navigation.open")} aria-expanded={mobileOpen} aria-controls="primary-sidebar">
@@ -138,8 +138,8 @@ export function AppShell({
             <div className="avatar" aria-label={t("navigation.currentUser")}>JE</div>
           </div>
         </header>
-        <div className="workspace">{children}</div>
-      </main>
+        <div id="main-content" tabIndex={-1} className="workspace">{children}</div>
+      </div>
     </div>
   );
 }
