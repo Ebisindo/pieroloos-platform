@@ -14,7 +14,7 @@ export const engagementRepository = {
     assertPermission(principal, "engagement:read");
     return prisma.engagement.findFirst({
       where: { id, workspaceId: principal.workspaceId },
-      include: engagementInclude,
+      include: { ...engagementInclude, activities: { orderBy: { createdAt: "desc" as const }, take: 50 } },
     });
   },
 
