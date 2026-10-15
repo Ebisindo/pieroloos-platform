@@ -10,7 +10,10 @@ export default defineConfig({
     command: `npm start -- -p ${port}`,
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: true,
-    env: { NEXTAUTH_SECRET: "build-validation-only" },
+    env: {
+      ...process.env,
+      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? "build-validation-only",
+    },
     timeout: 60_000,
   },
 });
