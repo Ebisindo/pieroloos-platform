@@ -20,10 +20,12 @@ export default async function BusinessProfileDetailPage({ params }: PageContext)
   const profile = await businessProfileRepository.findById(id, context.principal);
   if (!profile) notFound();
 
+  const editorProfile = { ...profile, data: profile.data && typeof profile.data === "object" && !Array.isArray(profile.data) ? profile.data as Record<string, unknown> : null };
+
   return (
     <main className="page-stack">
       <ModuleBanner eyebrow={t("profile.eyebrow")} title={profile.businessName ?? profile.client.organizationName ?? profile.client.name ?? t("profile.unnamedBusiness")} description={t("profile.detailDescription")} visual="evidence" action={<Link href="/business-profile" className="button button-secondary">{t("profile.backToProfiles")}</Link>} />
-      <BusinessProfileEditor profile={profile} canWrite={context.principal.permissions.includes("client:write")} />
+      <BusinessProfileEditor profile={editorProfile} canWrite={context.principal.permissions.includes("client:write")} />
     </main>
   );
 }
