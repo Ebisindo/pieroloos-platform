@@ -4,12 +4,6 @@ import type { BusinessProfileUpdateInput } from "@/lib/validation/business-profi
 import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { assertPermission, type WorkspacePrincipal } from "@/lib/auth/workspace-access";
 
-const profileFields = [
-  "businessName", "businessType", "businessModel",
-  "targetMarket", "revenueModel", "ownership", "fundingStage",
-  "expansionObjectives", "riskConstraints", "strategicNotes", "operationalContext", "objective",
-] as const;
-
 export const businessProfileRepository = {
   async listByWorkspace(principal: WorkspacePrincipal) {
     assertPermission(principal, "client:read");
@@ -25,6 +19,16 @@ export const businessProfileRepository = {
     });
   },
 
+  async findById(id: string, principal: WorkspacePrincipal) {
+    assertPermission(principal, "client:read");
+    return prisma.businessProfile.findFirst({
+      where: { id, client: { workspaceId: principal.workspaceId } },
+      include: {
+        client: { select: { id: true, name: true, organizationName: true, email: true, country: true, updatedAt: true } },
+      },
+    });
+  },
+
   async findByClientId(clientId: string, principal: WorkspacePrincipal) {
     assertPermission(principal, "client:read");
     return prisma.businessProfile.findFirst({
@@ -37,10 +41,7 @@ export const businessProfileRepository = {
     return withAuthorizedWorkspaceTransaction(principal, "client:write", async (transaction) => {
       const existing = await transaction.businessProfile.findFirst({
         where: { id, client: { workspaceId: principal.workspaceId } },
-        select: { data: true, businessName: true, businessType: true, businessObjective: true,
-          businessModel: true, targetMarket: true, revenueModel: true, ownershipContext: true,
-          fundingStage: true, expansionObjectives: true, constraints: true, strategicNotes: true,
-          operationalContext: true },
+        select: { id: true, data: true },
       });
       if (!existing) throw new Error("BUSINESS_PROFILE_NOT_FOUND");
 
@@ -52,23 +53,26 @@ export const businessProfileRepository = {
         Object.entries({ ...currentJson, ...data }).filter(([, value]) => value !== undefined),
       ) as Prisma.InputJsonObject;
 
-      const scalarData: Record<string, string> = {};
-      const jsonOnlyFields = new Set(["ownership", "objective", "riskConstraints", "fundingStage"]);
-      for (const field of profileFields) {
-        const value = data[field];
-        if (value !== undefined && !jsonOnlyFields.has(field)) scalarData[field] = value;
-      }
+      const updateData: Prisma.BusinessProfileUpdateInput = {
+        data: mergedJson,
+        version: { increment: 1 },
+        ...(data.businessName !== undefined ? { businessName: data.businessName } : {}),
+        ...(data.businessType !== undefined ? { businessType: data.businessType } : {}),
+        ...(data.objective !== undefined ? { businessObjective: data.objective } : {}),
+        ...(data.businessModel !== undefined ? { businessModel: data.businessModel } : {}),
+        ...(data.targetMarket !== undefined ? { targetMarket: data.targetMarket } : {}),
+        ...(data.revenueModel !== undefined ? { revenueModel: data.revenueModel } : {}),
+        ...(data.ownership !== undefined ? { ownershipContext: data.ownership } : {}),
+        ...(data.fundingStage !== undefined ? { fundingStage: data.fundingStage } : {}),
+        ...(data.expansionObjectives !== undefined ? { expansionObjectives: data.expansionObjectives } : {}),
+        ...(data.riskConstraints !== undefined ? { constraints: data.riskConstraints } : {}),
+        ...(data.strategicNotes !== undefined ? { strategicNotes: data.strategicNotes } : {}),
+        ...(data.operationalContext !== undefined ? { operationalContext: data.operationalContext } : {}),
+      };
 
       const profile = await transaction.businessProfile.update({
         where: { id },
-        data: {
-          ...scalarData,
-          ...(data.ownership !== undefined ? { ownershipContext: data.ownership } : {}),
-          ...(data.objective !== undefined ? { businessObjective: data.objective } : {}),
-          ...(data.riskConstraints !== undefined ? { constraints: data.riskConstraints } : {}),
-          data: mergedJson,
-          version: { increment: 1 },
-        },
+        data: updateData,
       });
       await transaction.activity.create({
         data: {
