@@ -108,7 +108,7 @@ jobs:
         run: echo "PIEROLO_E2E_AUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Create disposable shadow database
-        run: psql "${DATABASE_URL_CI%%\\?*}" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE pieroloos_e2e_shadow;'
+        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE pieroloos_e2e_shadow;'
 
       - name: Migrate isolated E2E database
         run: npm run db:deploy -- ci
