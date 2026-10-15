@@ -1097,6 +1097,11 @@ const pt = {
   "apiError.failPortalVisibility": "Não foi possível atualizar a visibilidade do portal do cliente.",
   "apiError.failRemoveMember": "Não foi possível remover o membro da organização.",
   "apiError.failUpdateRole": "Não foi possível atualizar a função do membro da organização.",
+  "ui.banner.intakeEyebrow": "CADASTRO DE CLIENTES",
+  "ui.banner.formationDescription": "Transforme o contexto empresarial revisado e as comparações de jurisdições em um plano por etapas, com evidências, dependências e pontos de revisão humana.",
+  "ui.banner.engagementsDescription": "Mantenha os serviços profissionais, responsáveis e próximas etapas visíveis desde o cadastro até a entrega e o encerramento.",
+  "ui.banner.reportsDescription": "Crie resultados estruturados a partir dos registros empresariais e evidências disponíveis. A confiabilidade depende das fontes e da revisão.",
+  "ui.banner.complianceDescription": "Acompanhe obrigações do espaço de trabalho, conecte evidências e destaque pontos de revisão. Os indicadores apoiam a supervisão profissional e não constituem conclusões jurídicas.",
 } satisfies MessageCatalog;
 
 export default pt;

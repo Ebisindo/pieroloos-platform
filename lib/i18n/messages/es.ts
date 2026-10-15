@@ -1097,6 +1097,11 @@ const es = {
   "apiError.failPortalVisibility": "No se pudo actualizar la visibilidad del portal del cliente.",
   "apiError.failRemoveMember": "No se pudo eliminar la membresía de la organización.",
   "apiError.failUpdateRole": "No se pudo actualizar el rol de la membresía de la organización.",
+  "ui.banner.intakeEyebrow": "ADMISIÓN DE CLIENTES",
+  "ui.banner.formationDescription": "Convierta el contexto empresarial revisado y las comparaciones de jurisdicciones en un plan por etapas con evidencias, dependencias y puntos de revisión humana.",
+  "ui.banner.engagementsDescription": "Mantenga visibles los encargos de servicios profesionales, responsables y próximos pasos desde la admisión hasta la entrega y el cierre.",
+  "ui.banner.reportsDescription": "Genere resultados estructurados a partir de registros empresariales y evidencias disponibles. La fiabilidad depende de las fuentes y la revisión.",
+  "ui.banner.complianceDescription": "Realice seguimiento de obligaciones del espacio de trabajo, vincule evidencias y destaque puntos de revisión. Los indicadores apoyan la supervisión profesional, no constituyen conclusiones jurídicas.",
 } satisfies MessageCatalog;
 
 export default es;

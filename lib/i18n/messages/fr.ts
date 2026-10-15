@@ -1097,6 +1097,11 @@ const fr = {
   "apiError.failPortalVisibility": "Impossible de mettre à jour la visibilité du portail client.",
   "apiError.failRemoveMember": "Impossible de retirer le membre de l'organisation.",
   "apiError.failUpdateRole": "Impossible de modifier le rôle du membre de l'organisation.",
+  "ui.banner.intakeEyebrow": "SAISIE CLIENT",
+  "ui.banner.formationDescription": "Transformez le contexte d’entreprise examiné et les comparaisons de juridictions en un plan par étapes, avec preuves, dépendances et points de contrôle humain.",
+  "ui.banner.engagementsDescription": "Suivez les missions de services professionnels, les responsables et les prochaines étapes, de la saisie à la livraison et à la clôture.",
+  "ui.banner.reportsDescription": "Créez des documents structurés à partir des dossiers et preuves disponibles. La fiabilité d’un rapport dépend de ses sources et de sa revue.",
+  "ui.banner.complianceDescription": "Suivez les obligations de l’espace de travail, reliez les preuves et mettez en évidence les points de revue. Les indicateurs facilitent la supervision professionnelle sans constituer une conclusion juridique.",
 } satisfies MessageCatalog;
 
 export default fr;

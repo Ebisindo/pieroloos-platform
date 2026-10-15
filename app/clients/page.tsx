@@ -1,5 +1,6 @@
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { ClientPortalAccessManager } from "@/components/portal/ClientPortalAccessManager";
+import { ModuleBanner } from "@/components/ui/ModuleBanner";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import {
   listWorkspaceClientPortalInteractions,
@@ -27,13 +28,12 @@ export default async function ClientsPage() {
   })));
   return (
     <main className="page-stack">
-      <header>
-        <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">{t("app.clients.eyebrow")}</p>
-        <h1 className="mt-2 text-3xl font-semibold text-white">{t("app.clients.portalTitle")}</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-          {t("app.clients.portalDescription")}
-        </p>
-      </header>
+      <ModuleBanner
+        eyebrow={t("app.clients.eyebrow")}
+        title={t("app.clients.portalTitle")}
+        description={t("app.clients.portalDescription")}
+        visual="evidence"
+      />
       <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4 text-sm leading-6 text-amber-100">
         {t("app.clients.portalBoundary")}
       </div>

@@ -1,7 +1,7 @@
-import { JurisdictionCard } from "@/components/jurisdiction/JurisdictionCard";
 import { JurisdictionLensWorkflow } from "@/components/jurisdiction/JurisdictionLensWorkflow";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { TrustBoundaryNotice } from "@/components/evidence/TrustBoundaryNotice";
+import { ModuleBanner } from "@/components/ui/ModuleBanner";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { jurisdictionRepository } from "@/lib/db/jurisdiction-repository";
 import { prisma } from "@/lib/db/prisma";
@@ -48,13 +48,13 @@ export default async function JurisdictionsPage() {
   }));
 
   return (
-    <div className="space-y-8">
-      <header>
-        <p className="text-xs uppercase tracking-[0.24em] text-cyan-300/70">{t("app.jurisdiction.eyebrow")}</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">{t("app.jurisdiction.title")}</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">{t("app.jurisdiction.description")}</p>
-      </header>
-
+    <div className="page-stack">
+      <ModuleBanner
+        eyebrow={t("app.jurisdiction.eyebrow")}
+        title={t("app.jurisdiction.title")}
+        description={t("app.jurisdiction.description")}
+        visual="jurisdiction"
+      />
       <TrustBoundaryNotice heading={t("app.jurisdiction.trustHeading")} />
 
       {!workspaceId ? (

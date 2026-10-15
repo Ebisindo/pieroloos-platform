@@ -1,5 +1,6 @@
 import { FormationPlanWorkflow } from "@/components/formation/FormationPlanWorkflow";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
+import { ModuleBanner } from "@/components/ui/ModuleBanner";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { prisma } from "@/lib/db/prisma";
 import { listDocuments } from "@/lib/services/document-storage-service";
@@ -146,14 +147,15 @@ export default async function FormationPage() {
 
   return (
     <div className="page-stack">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">{t("navigation.formation")}</p>
-          <h1>{t("module.formationRoadmap")}</h1>
-          <p>{t("app.formation.pageDescription")}</p>
-        </div>
+      <ModuleBanner
+        eyebrow={t("navigation.formation")}
+        title={t("module.formationRoadmap")}
+        description={t("ui.banner.formationDescription")}
+        visual="flow"
+      />
+      <div className="flex justify-end">
         <span className="status-badge status-info">{context.activeWorkspace.name}</span>
-      </header>
+      </div>
       <FormationPlanWorkflow
         plans={plans}
         candidates={candidates}
