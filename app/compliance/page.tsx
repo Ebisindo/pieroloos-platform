@@ -2,6 +2,7 @@ import { ComplianceControlCenter } from "@/components/compliance/ComplianceContr
 import { ComplianceWorkflow } from "@/components/compliance/ComplianceWorkflow";
 import { EscalationBanner } from "@/components/control-plane/EscalationBanner";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
+import { ModuleBanner } from "@/components/ui/ModuleBanner";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { buildComplianceControlSnapshot } from "@/lib/domain/compliance-control";
 import { prisma } from "@/lib/db/prisma";
@@ -58,31 +59,33 @@ export default async function CompliancePage() {
     },
     orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
   });
-  const [clients, documents, memberships] = await Promise.all([prisma.client.findMany({
-    where: { workspaceId: context.principal.workspaceId },
-    select: { id: true, name: true, organizationName: true, firstName: true, lastName: true },
-    orderBy: { createdAt: "desc" },
-  }), listDocuments(context.principal, { requireClient: true }), prisma.membership.findMany({
-    where: { organizationId: context.principal.organizationId },
-    select: { userId: true, user: { select: { name: true, email: true } } },
-    orderBy: { user: { email: "asc" } },
-  })]);
   const snapshot = buildComplianceControlSnapshot(obligations);
+  const [clients, documents, memberships] = await Promise.all([
+    prisma.client.findMany({
+      where: { workspaceId: context.principal.workspaceId },
+      select: { id: true, name: true, organizationName: true, firstName: true, lastName: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+    listDocuments(context.principal),
+    prisma.membership.findMany({
+      where: { organizationId: context.principal.organizationId },
+      select: { userId: true, user: { select: { name: true, email: true } } },
+      orderBy: { user: { email: "asc" } },
+    }),
+  ]);
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
+      <ModuleBanner
+        eyebrow={t("module.compliance")}
+        title={t("module.compliance")}
+        description={t("ui.banner.complianceDescription")}
+        visual="compliance"
+      />
       <div className="rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.04] p-4 text-sm text-slate-300">
         {t("app.compliance.activeWorkspace", { name: context.activeWorkspace.name })}
       </div>
-      {obligations
-        .filter((obligation) => obligation.escalationLevel > 0)
-        .map((obligation) => (
-          <EscalationBanner
-            key={obligation.id}
-            level={obligation.escalationLevel}
-            message={obligation.title}
-          />
-        ))}
+      <EscalationBanner />
       <ComplianceControlCenter snapshot={snapshot} />
       <ComplianceWorkflow
         obligations={obligations.map((obligation) => ({
