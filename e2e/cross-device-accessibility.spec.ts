@@ -102,7 +102,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     await expect(page).toHaveURL(/\/business-profile$/);
     await expect(page.getByRole("heading", { name: "Business Profiles" })).toBeVisible();
 
-    await page.getByRole("link", { name: "Open profile" }).first().click();
+    await page.getByRole("link", { name: /Primary E2E Consulting/ }).click();
     const objective = page.getByLabel("Business objective");
     await expect(objective).toHaveValue("Initial objective from CI seed");
     await objective.fill("Updated objective from authenticated E2E");
