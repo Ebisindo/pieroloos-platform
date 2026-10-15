@@ -58,7 +58,6 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
       setToStatus(getNextStatuses(result.data.status)[0] ?? "");
       setTransitionNote("");
       setMessage(t("engagements.statusChanged"));
-      router.refresh();
     } catch (err) {
       setError(true); setMessage(err instanceof Error ? err.message : t("engagements.transitionFailed"));
     } finally { setSaving(false); }
