@@ -21,15 +21,7 @@ export default async function EngagementDetailPage({ params }: PageContext) {
     ...engagement,
     createdAt: engagement.createdAt.toISOString(),
     updatedAt: engagement.updatedAt.toISOString(),
-    activities: engagement.activities.map((activity) => ({
-      ...activity,
-      createdAt: activity.createdAt.toISOString(),
-    })),
+    activities: engagement.activities.map((activity) => ({ ...activity, createdAt: activity.createdAt.toISOString() })),
   };
-  return (
-    <main className="page-stack">
-      <ModuleBanner eyebrow={t("engagements.eyebrow")} title={t("engagements.detail")} description={t("engagements.managerDescription")} visual="flow" />
-      <EngagementDetailEditor initialEngagement={initialEngagement} canWrite={context.principal.permissions.includes("engagement:write")} />
-    </main>
-  );
+  return <main className="page-stack"><ModuleBanner eyebrow={t("engagements.eyebrow")} title={t("engagements.detail")} description={t("engagements.managerDescription")} visual="flow" /><EngagementDetailEditor initialEngagement={initialEngagement} canWrite={context.principal.permissions.includes("engagement:write")} /></main>;
 }
