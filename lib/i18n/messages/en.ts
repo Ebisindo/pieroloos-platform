@@ -1095,6 +1095,11 @@ const en = {
   "apiError.failPortalVisibility": "Unable to update client portal visibility.",
   "apiError.failRemoveMember": "Unable to remove organization membership.",
   "apiError.failUpdateRole": "Unable to update organization membership role.",
+  "ui.banner.intakeEyebrow": "CLIENT INTAKE",
+  "ui.banner.formationDescription": "Turn reviewed business context and jurisdiction comparisons into a staged plan with evidence, dependencies and human-review gates.",
+  "ui.banner.engagementsDescription": "Keep professional-service work, ownership and next steps visible from intake through delivery and closure.",
+  "ui.banner.reportsDescription": "Create structured outputs from available business records and evidence. A report is only as reliable as its source data and review.",
+  "ui.banner.complianceDescription": "Track workspace-scoped obligations, connect evidence, and surface review gates. Status indicators support professional oversight; they are not legal determinations.",
 } as const;
 
 export default en;
