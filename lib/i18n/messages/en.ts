@@ -1210,6 +1210,7 @@ const en = {
   "accessibility.routes": "Routes tested",
   "accessibility.viewportMatrix": "Viewport widths tested",
   "accessibility.automatedStatus": "Automated verification status",
+  "engagements.editTitle": "Edit engagement",
 } as const;
 
 export default en;
