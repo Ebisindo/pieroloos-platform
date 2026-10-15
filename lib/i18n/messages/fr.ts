@@ -1212,6 +1212,7 @@ const fr = {
   "accessibility.routes": "Routes testées",
   "accessibility.viewportMatrix": "Largeurs d’écran testées",
   "accessibility.automatedStatus": "État de la vérification automatisée",
+  "engagements.editTitle": "Modifier le mandat",
 } satisfies MessageCatalog;
 
 export default fr;
