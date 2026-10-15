@@ -13,7 +13,7 @@ export const reportRepository = {
   async listWorkspaceReports(principal: WorkspacePrincipal) {
     assertPermission(principal, "reports:read");
     return prisma.report.findMany({
-      where: { workspaceId: principal.workspaceId, organizationId: principal.organizationId },
+      where: { workspaceId: principal.workspaceId },
       orderBy: { createdAt: "desc" },
       take: 100,
       select: {
