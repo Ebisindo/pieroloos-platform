@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import type { MessageKey } from "@/lib/i18n/messages";
@@ -67,11 +67,6 @@ export function BusinessProfileEditor({ profile: initialProfile, canWrite }: { p
   const [values, setValues] = useState(initialValues(initialProfile));
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    setProfile(initialProfile);
-    setValues(initialValues(initialProfile));
-  }, [initialProfile]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
