@@ -5,9 +5,9 @@ import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-worksp
 import { assertPermission, type WorkspacePrincipal } from "@/lib/auth/workspace-access";
 
 const profileFields = [
-  "businessName", "businessType", "businessObjective", "businessModel",
-  "targetMarket", "revenueModel", "ownershipContext", "fundingStage",
-  "expansionObjectives", "constraints", "strategicNotes", "operationalContext",
+  "businessName", "businessType", "businessModel",
+  "targetMarket", "revenueModel", "ownership", "fundingStage",
+  "expansionObjectives", "riskConstraints", "strategicNotes", "operationalContext", "objective",
 ] as const;
 
 export const businessProfileRepository = {
@@ -53,15 +53,19 @@ export const businessProfileRepository = {
       ) as Prisma.InputJsonObject;
 
       const scalarData: Record<string, string> = {};
+      const jsonOnlyFields = new Set(["ownership", "objective", "riskConstraints", "fundingStage"]);
       for (const field of profileFields) {
         const value = data[field];
-        if (value !== undefined) scalarData[field] = value;
+        if (value !== undefined && !jsonOnlyFields.has(field)) scalarData[field] = value;
       }
 
       const profile = await transaction.businessProfile.update({
         where: { id },
         data: {
           ...scalarData,
+          ...(data.ownership !== undefined ? { ownershipContext: data.ownership } : {}),
+          ...(data.objective !== undefined ? { businessObjective: data.objective } : {}),
+          ...(data.riskConstraints !== undefined ? { constraints: data.riskConstraints } : {}),
           data: mergedJson,
           version: { increment: 1 },
         },
