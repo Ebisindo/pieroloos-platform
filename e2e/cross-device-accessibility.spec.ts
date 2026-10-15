@@ -7,6 +7,49 @@ const widths = [320, 360, 390, 430, 480, 560, 760, 768, 1000, 1024, 1280, 1440, 
 const publicRoutes = ["/", "/partners"];
 const protectedRoutes = ["/business-profile", "/reports", "/engagements", "/command-center"];
 
+async function expectNoHorizontalOverflow(page: import("@playwright/test").Page, route: string, width: number) {
+  const dimensions = await page.evaluate(() => ({
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+  }));
+  expect(
+    dimensions.documentWidth,
+    `${route} has horizontal overflow at ${width}px: ${JSON.stringify(dimensions)}`,
+  ).toBeLessThanOrEqual(dimensions.viewportWidth + 1);
+}
+
+async function expectNoSeriousAxeViolations(page: import("@playwright/test").Page, route: string) {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  const blockers = results.violations
+    .filter((item) => item.impact === "critical" || item.impact === "serious")
+    .map((item) => ({
+      id: item.id,
+      impact: item.impact,
+      help: item.help,
+      targets: item.nodes.flatMap((node) => node.target),
+    }));
+  expect(blockers, `Critical/serious axe findings on ${route}`).toEqual([]);
+}
+
+async function captureAuthenticatedViewportMatrix(
+  page: import("@playwright/test").Page,
+  route: string,
+  slug: string,
+) {
+  await mkdir(join(process.cwd(), "test-results", "responsive"), { recursive: true });
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectNoHorizontalOverflow(page, route, width);
+    await page.screenshot({
+      path: join(process.cwd(), "test-results", "responsive", `authenticated-${slug}-${width}.png`),
+      fullPage: true,
+    });
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+}
+
 test.describe("cross-device responsive smoke matrix", () => {
   for (const route of publicRoutes) {
     test(`${route} renders without horizontal overflow across viewport matrix`, async ({ page }) => {
@@ -104,8 +147,12 @@ test.describe("cross-device responsive smoke matrix", () => {
     await expect(page).toHaveURL(/\/business-profile$/);
     await expect(page.getByRole("heading", { name: "Business Profiles" })).toBeVisible();
 
+    await captureAuthenticatedViewportMatrix(page, "/business-profile", "profiles-list");
+    await expectNoSeriousAxeViolations(page, "/business-profile");
     await page.getByRole("link", { name: /Primary E2E Consulting/ }).click();
     const objective = page.getByLabel("Business objective");
+    await captureAuthenticatedViewportMatrix(page, "/business-profile/[id]", "profile-detail");
+    await expectNoSeriousAxeViolations(page, "/business-profile/[id]");
     await expect(objective).toHaveValue("Initial objective from CI seed");
     await objective.fill("Updated objective from authenticated E2E");
     await page.getByRole("button", { name: "Save profile" }).click();
@@ -114,6 +161,8 @@ test.describe("cross-device responsive smoke matrix", () => {
     await expect(page.getByLabel("Business objective")).toHaveValue("Updated objective from authenticated E2E");
 
     await page.goto("/reports", { waitUntil: "domcontentloaded" });
+    await captureAuthenticatedViewportMatrix(page, "/reports", "reports");
+    await expectNoSeriousAxeViolations(page, "/reports");
     const reportClient = page.getByLabel("Client record");
     await expect(reportClient.locator("option")).toContainText("E2E Primary Client");
     const reportOptions = await reportClient.locator("option").allTextContents();
@@ -122,6 +171,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.getByRole("button", { name: "Generate client summary" }).click();
     await expect(page.getByText("Report generated and saved.", { exact: true })).toBeVisible();
     await expect(page.getByText("Updated objective from authenticated E2E", { exact: false })).toBeVisible();
+    await expectNoSeriousAxeViolations(page, "/reports (generated summary)");
 
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("link", { name: "Download / print HTML" }).click();
@@ -130,6 +180,8 @@ test.describe("cross-device responsive smoke matrix", () => {
 
     await page.goto("/engagements", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Engagements" })).toBeVisible();
+    await captureAuthenticatedViewportMatrix(page, "/engagements", "engagements-list");
+    await expectNoSeriousAxeViolations(page, "/engagements");
     await expect(page.getByText("Foreign Private Client", { exact: true })).toHaveCount(0);
     await page.getByText("New engagement", { exact: true }).click();
     await page.getByLabel("Client", { exact: true }).selectOption({ label: "E2E Primary Client" });
@@ -140,6 +192,8 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.getByRole("link", { name: "Open engagement" }).first().click();
 
     await expect(page.getByRole("heading", { name: "Edit engagement" })).toBeVisible();
+    await captureAuthenticatedViewportMatrix(page, "/engagements/[id]", "engagement-detail");
+    await expectNoSeriousAxeViolations(page, "/engagements/[id]");
     await page.getByLabel("Service", { exact: true }).fill("Authenticated Playwright engagement updated");
     await page.getByRole("button", { name: "Save details" }).click();
     await expect(page.getByText("Engagement details saved.", { exact: true })).toBeVisible();
