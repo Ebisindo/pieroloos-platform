@@ -40,7 +40,10 @@ const fieldConfig: Array<{ key: string; label: MessageKey; multiline?: boolean }
 ];
 
 function initialValues(profile: Profile) {
-  const source = profile.data && typeof profile.data === "object" ? profile.data : {};
+  const source: Record<string, unknown> =
+    profile.data && typeof profile.data === "object" && !Array.isArray(profile.data)
+      ? profile.data as Record<string, unknown>
+      : {};
   return {
     businessName: profile.businessName ?? (typeof source.businessName === "string" ? source.businessName : ""),
     businessType: profile.businessType ?? (typeof source.businessType === "string" ? source.businessType : ""),
