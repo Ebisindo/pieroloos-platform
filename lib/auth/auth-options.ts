@@ -39,6 +39,7 @@ function isDisposableCiDatabase(value: string | undefined): boolean {
 }
 
 export const e2eTestAuthConfigured = Boolean(
+  process.env.CI === "true" &&
   process.env.PIEROLO_E2E_AUTH_ENABLED === "true" &&
   process.env.DATABASE_ENV === "ci" &&
   e2eAuthSecret && e2eAuthSecret.length >= 32 &&
