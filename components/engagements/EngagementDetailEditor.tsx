@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { getNextStatuses, type EngagementStatus } from "@/lib/domain/engagement";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 
@@ -16,7 +15,6 @@ type Engagement = {
 
 export function EngagementDetailEditor({ initialEngagement, canWrite }: { initialEngagement: Engagement; canWrite: boolean }) {
   const { t } = useLocale();
-  const router = useRouter();
   const [engagement, setEngagement] = useState(initialEngagement);
   const [service, setService] = useState(initialEngagement.service);
   const [nextAction, setNextAction] = useState(initialEngagement.nextAction ?? "");
@@ -40,7 +38,6 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
       if (!response.ok || !result.data) throw new Error(result.error ?? t("engagements.saveFailed"));
       setEngagement(result.data);
       setMessage(t("engagements.detailsSaved"));
-      router.refresh();
     } catch (err) {
       setError(true); setMessage(err instanceof Error ? err.message : t("engagements.saveFailed"));
     } finally { setSaving(false); }
