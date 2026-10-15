@@ -472,3 +472,12 @@ select.form-input { appearance:auto; }
   .compliance-pulse-row { grid-template-columns: 28px minmax(80px,.8fr) minmax(45px,1fr); gap: 7px; }
   .compliance-pulse-number { width: 27px; height: 27px; }
 }
+
+.visual-preview-brand-panel { padding: 22px; }
+.visual-preview-brand-panel h2 { margin-top: 22px; font-family: var(--font-display); font-size: 17px; color: var(--color-text); }
+.visual-preview-brand-panel p { margin-top: 8px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; max-width: 55ch; }
+@media (max-width: 760px) {
+  .visual-preview-brand-panel { padding: 18px; }
+  .module-banner-actions { display: grid; grid-template-columns: minmax(0,1fr); }
+  .module-banner-actions > a { width: 100%; }
+}
