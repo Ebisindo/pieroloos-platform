@@ -15,6 +15,7 @@ import type { MessageKey } from "@/lib/i18n/messages";
 const navigationKeys = {
   "/command-center": "navigation.businessFormation",
   "/clients": "navigation.clients",
+  "/business-profile": "navigation.businessProfile",
   "/jurisdictions": "navigation.jurisdictionLens",
   "/expansion": "navigation.marketExpansion",
   "/cross-border": "navigation.crossBorder",
