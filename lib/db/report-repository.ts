@@ -57,7 +57,7 @@ export const reportRepository = {
           complianceObligations: {
             orderBy: { updatedAt: "desc" },
             take: 100,
-            select: { id: true, title: true, status: true, dueAt: true, requiresEvidence: true },
+            select: { id: true, title: true, status: true, dueAt: true, requiresEvidence: true, professionalReviewRequired: true, professionalReviewCompleted: true },
           },
         },
       });
@@ -123,6 +123,8 @@ export const reportRepository = {
             `Recorded status: ${item.status}`,
             `Due date: ${item.dueAt?.toISOString() ?? "Not recorded"}`,
             `Evidence required: ${item.requiresEvidence ? "Yes" : "No / not specified"}`,
+            `Professional review required: ${item.professionalReviewRequired ? "Yes" : "No / not recorded"}`,
+            `Professional review completed: ${item.professionalReviewCompleted ? "Yes" : "No / not recorded"}`,
           ].join(" | ")).join("\n") : "No compliance obligation records are associated with this client. This does not establish that no obligations apply.",
         },
         {
