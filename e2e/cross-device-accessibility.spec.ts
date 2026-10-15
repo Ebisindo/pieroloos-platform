@@ -146,6 +146,24 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.getByRole("button", { name: "Sign in to isolated CI workspace" }).click();
     await expect(page).toHaveURL(/\/business-profile$/);
     await expect(page.getByRole("heading", { name: "Business Profiles" })).toBeVisible();
+    await expect(page.getByText("Foreign Private Business", { exact: true })).toHaveCount(0);
+
+    const foreignProfileResponse = await page.request.get("/api/business-profile/pieroloos-e2e-foreign-profile");
+    const foreignReportResponse = await page.request.get("/api/reports/pieroloos-e2e-foreign-report");
+    const foreignEngagementResponse = await page.request.get("/api/engagements/pieroloos-e2e-foreign-engagement");
+    expect(foreignProfileResponse.status()).toBe(404);
+    expect(foreignReportResponse.status()).toBe(404);
+    expect(foreignEngagementResponse.status()).toBe(404);
+
+    const reportsListResponse = await page.request.get("/api/reports");
+    expect(reportsListResponse.ok()).toBeTruthy();
+    const reportsListBody = await reportsListResponse.json() as { data?: { reports?: Array<{ id: string; title: string }> } };
+    expect(reportsListBody.data?.reports?.some((item) => item.id === "pieroloos-e2e-foreign-report" || item.title === "Foreign Private Report")).toBe(false);
+
+    const engagementListResponse = await page.request.get("/api/engagements");
+    expect(engagementListResponse.ok()).toBeTruthy();
+    const engagementListBody = await engagementListResponse.json() as { data?: Array<{ id: string; service: string }> };
+    expect(engagementListBody.data?.some((item) => item.id === "pieroloos-e2e-foreign-engagement" || item.service === "Foreign Private Engagement")).toBe(false);
 
     await captureAuthenticatedViewportMatrix(page, "/business-profile", "profiles-list");
     await expectNoSeriousAxeViolations(page, "/business-profile");
