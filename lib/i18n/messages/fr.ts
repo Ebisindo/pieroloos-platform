@@ -32,6 +32,7 @@ const fr = {
   "navigation.protectedClient": "Accès client protégé",
   "navigation.protectedWorkspace": "Espace de travail protégé",
   "navigation.businessFormation": "Création d’entreprise",
+  "navigation.businessProfile": "Profil d’entreprise",
   "navigation.clients": "Clients",
   "navigation.jurisdictionLens": "Analyse des juridictions",
   "navigation.marketExpansion": "Expansion de marché",
