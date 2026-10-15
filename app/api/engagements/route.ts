@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   if (statusValue && !ENGAGEMENT_STATUSES.includes(statusValue as EngagementStatus)) {
     return NextResponse.json({ error: "Invalid engagement status filter." }, { status: 422 });
   }
-  const query = (url.searchParams.get("q") ?? "").slice(0, 120);
+  const query = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
   try {
     const engagements = await engagementRepository.listByWorkspace(context.principal, {
       status: statusValue as EngagementStatus | undefined,
