@@ -1212,6 +1212,7 @@ const es = {
   "accessibility.routes": "Rutas probadas",
   "accessibility.viewportMatrix": "Anchos de pantalla probados",
   "accessibility.automatedStatus": "Estado de verificación automatizada",
+  "engagements.editTitle": "Editar encargo",
 } satisfies MessageCatalog;
 
 export default es;
