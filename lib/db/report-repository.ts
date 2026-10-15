@@ -13,7 +13,7 @@ export const reportRepository = {
   async listWorkspaceReports(principal: WorkspacePrincipal) {
     assertPermission(principal, "reports:read");
     return prisma.report.findMany({
-      where: { workspaceId: principal.workspaceId },
+      where: { workspaceId: principal.workspaceId, organizationId: principal.organizationId },
       orderBy: { createdAt: "desc" },
       take: 100,
       select: {
@@ -37,7 +37,7 @@ export const reportRepository = {
   async generateClientSummary(clientId: string, principal: WorkspacePrincipal): Promise<{ id: string; title: string; createdAt: Date; document: ReportDocument }> {
     return withAuthorizedWorkspaceTransaction(principal, "reports:write", async (tx) => {
       const client = await tx.client.findFirst({
-        where: { id: clientId, workspaceId: principal.workspaceId },
+        where: { id: clientId, workspaceId: principal.workspaceId, organizationId: principal.organizationId },
         select: {
           id: true, name: true, organizationName: true, email: true, phone: true,
           country: true, proposedBusiness: true, createdAt: true, updatedAt: true,
