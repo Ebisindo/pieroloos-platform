@@ -74,6 +74,7 @@ test.describe("cross-device responsive smoke matrix", () => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto(route, { waitUntil: "domcontentloaded" });
         await expect(page.locator("body")).toBeVisible();
+        await expect(page.locator("main"), `${route} should expose one primary main landmark`).toHaveCount(1);
         const overflow = await page.evaluate(() => ({
           documentWidth: document.documentElement.scrollWidth,
           viewportWidth: document.documentElement.clientWidth,
