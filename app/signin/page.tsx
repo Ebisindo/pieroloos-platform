@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   authConfigured,
+  e2eTestAuthConfigured,
   githubConfigured,
   localDevelopmentConfigured,
   oidcConfigured,
@@ -48,6 +49,16 @@ export default async function SignInPage({
           passwordLabel={t("signin.local.password")}
           submitLabel={t("signin.local.submit")}
           errorMessage={t("signin.local.error")}
+        />
+      )}
+      {e2eTestAuthConfigured && (
+        <LocalDevelopmentSignIn
+          providerId="pierolo-e2e-ci"
+          callbackUrl={callbackUrl}
+          emailLabel={t("signin.e2e.email")}
+          passwordLabel={t("signin.e2e.password")}
+          submitLabel={t("signin.e2e.submit")}
+          errorMessage={t("signin.e2e.error")}
         />
       )}
     </section>
