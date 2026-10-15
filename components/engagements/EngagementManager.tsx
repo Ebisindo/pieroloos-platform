@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/components/i18n/LocaleProvider";
@@ -30,6 +30,7 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
   const { t } = useLocale();
   const router = useRouter();
   const [engagements, setEngagements] = useState(initialEngagements);
+  useEffect(() => setEngagements(initialEngagements), [initialEngagements]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [clientId, setClientId] = useState("");
