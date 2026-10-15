@@ -22,7 +22,7 @@ export const businessProfileRepository = {
   async findById(id: string, principal: WorkspacePrincipal) {
     assertPermission(principal, "client:read");
     return prisma.businessProfile.findFirst({
-      where: { id, client: { workspaceId: principal.workspaceId } },
+      where: { id, client: { workspaceId: principal.workspaceId, organizationId: principal.organizationId } },
       include: {
         client: { select: { id: true, name: true, organizationName: true, email: true, country: true, updatedAt: true } },
       },
@@ -32,7 +32,7 @@ export const businessProfileRepository = {
   async findByClientId(clientId: string, principal: WorkspacePrincipal) {
     assertPermission(principal, "client:read");
     return prisma.businessProfile.findFirst({
-      where: { clientId, client: { workspaceId: principal.workspaceId } },
+      where: { clientId, client: { workspaceId: principal.workspaceId, organizationId: principal.organizationId } },
       include: { client: true },
     });
   },
@@ -40,7 +40,7 @@ export const businessProfileRepository = {
   async update(id: string, data: BusinessProfileUpdateInput, principal: WorkspacePrincipal) {
     return withAuthorizedWorkspaceTransaction(principal, "client:write", async (transaction) => {
       const existing = await transaction.businessProfile.findFirst({
-        where: { id, client: { workspaceId: principal.workspaceId } },
+        where: { id, client: { workspaceId: principal.workspaceId, organizationId: principal.organizationId } },
         select: { id: true, data: true },
       });
       if (!existing) throw new Error("BUSINESS_PROFILE_NOT_FOUND");
