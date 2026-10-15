@@ -28,7 +28,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     });
   }
 
-  test("public routes have a main landmark and skip navigation", async ({ page }) => {
+  test("public routes have a main landmark and a visible primary link", async ({ page }) => {
     for (const route of publicRoutes) {
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.goto(route, { waitUntil: "domcontentloaded" });
