@@ -69,7 +69,7 @@ export const AUTH_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 export function getAuthConfigProblems(): string[] {
   const problems: string[] = [];
   if (!authSecretConfigured) problems.push("NEXTAUTH_SECRET is not set.");
-  if (!oidcConfigured && !githubConfigured && !localDevelopmentConfigured) {
+  if (!oidcConfigured && !githubConfigured && !localDevelopmentConfigured && !e2eTestAuthConfigured) {
     const localOption = process.env.NODE_ENV === "development"
       ? ", or set LOCAL_AUTH_ENABLED=true, LOCAL_AUTH_EMAIL and LOCAL_AUTH_PASSWORD for local development"
       : "";
