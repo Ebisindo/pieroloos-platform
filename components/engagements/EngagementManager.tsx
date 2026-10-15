@@ -2,7 +2,6 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 
 type ClientOption = { id: string; name: string | null; organizationName: string | null; proposedBusiness: string | null };
@@ -28,7 +27,6 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
   canWrite: boolean;
 }) {
   const { t } = useLocale();
-  const router = useRouter();
   const [createdEngagements, setCreatedEngagements] = useState<Engagement[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
@@ -62,7 +60,6 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
       setCreatedEngagements((current) => [result.data!, ...current.filter((item) => item.id !== result.data!.id)]);
       setClientId(""); setService(""); setNextAction(""); setNotes("");
       setMessage(t("engagements.created"));
-      router.refresh();
     } catch (err) {
       setError(true); setMessage(err instanceof Error ? err.message : t("engagements.createFailed"));
     } finally { setSaving(false); }
