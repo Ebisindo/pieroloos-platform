@@ -19,16 +19,16 @@ These widths are browser-emulated CSS viewports, **not** evidence that physical 
 
 ## Route coverage
 
-The suite covers public routes `/` and `/partners`, plus signed-out access gates for `/business-profile`, `/reports`, `/engagements` and `/command-center`. Signed-in workflow tests need an isolated non-production database and a documented test identity. Do not enable authentication bypasses in public preview or production. Until that identity is wired into CI, internal workspace views are not considered authenticated E2E-verified.
+The suite covers public routes `/` and `/partners`, plus signed-out access gates for `/business-profile`, `/reports`, `/engagements` and `/command-center`. The feature branch now provisions a disposable PostgreSQL CI database and a reserved `@integration.invalid` test identity; the test-only credentials provider is guarded by `CI=true`, `DATABASE_ENV=ci`, a loopback-only URL and database, and a per-run random secret. This path is not enabled in preview or production. Authenticated journeys are implemented and the CI run is being validated; do not mark them verified until the latest run is green.
 
 ## Automated checks
 
 - Unexpected horizontal overflow at each viewport.
 - Accessible-name and landmark checks through axe on representative public routes.
-- Screenshot artifacts for selected widths.
+- Screenshot artifacts for selected widths; authenticated workspace views are also being captured at 320, 390, 768 and 1280 CSS pixels.
 - Main landmark, document language, and navigable links.
 - Signed-out routes must render an access state rather than disclose workspace records.
-- Primary navigation link visibility is smoke-tested on public routes. A Playwright check also reaches and activates the workspace shell skip link by keyboard while signed out; authenticated and physical-device behavior still requires manual verification.
+- Primary navigation link visibility is smoke-tested on public routes. The workspace shell skip link has a keyboard check for visibility, activation and focus reaching `#main-content`. Manual verification is still required on authenticated sessions and physical devices.
 - Reduced-motion support, touch targets, zoom/text wrapping, and loading/empty/error states also require component assertions or manual review; do not imply that axe alone verifies these.
 
 ## Severity and remediation policy
@@ -55,7 +55,7 @@ The following work is not marked complete by CI emulation. Complete it before cl
 
 ## Current automated evidence
 
-Latest completed CI run before the current skip-link test change: [CI run #38772274100](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38772274100), head `ec18a5be96eaec97c57d20ce6fc17262e17e3fb9`. Quality and E2E jobs passed. Artifact `playwright-results` contains 12 responsive screenshots and the Playwright HTML report. The additional keyboard skip-link test was committed afterward; its CI run must pass before merge.
+Verified baseline runs: [CI #38772915640](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38772915640) passed the public/signed-out suite and keyboard skip-link coverage; [CI #38796280517](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38796280517) passed the PostgreSQL workspace-isolation integration test. Subsequent commits added isolated auth, authenticated workspace journeys, additional screenshots and axe scans of signed-in workflows. The latest CI result must pass after those additions before they are considered verified. Review the artifact produced by that final successful run.
 
 ## Release statement
 
