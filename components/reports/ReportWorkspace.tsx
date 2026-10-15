@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 
 type ClientOption = { id: string; name: string | null; organizationName: string | null; proposedBusiness: string | null };
@@ -20,7 +19,6 @@ export function ReportWorkspace({ initialReports, clients, canWrite }: {
   canWrite: boolean;
 }) {
   const { t } = useLocale();
-  const router = useRouter();
   const [generatedReports, setGeneratedReports] = useState<SavedReport[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedReportId, setSelectedReportId] = useState(initialReports[0]?.id ?? "");
@@ -57,7 +55,6 @@ export function ReportWorkspace({ initialReports, clients, canWrite }: {
       setSelectedReportId(generated.id);
       setSelectedClientId("");
       setMessage(t("reports.generated"));
-      router.refresh();
     } catch (err) {
       setError(true); setMessage(err instanceof Error ? err.message : t("reports.generateFailed"));
     } finally { setSaving(false); }
