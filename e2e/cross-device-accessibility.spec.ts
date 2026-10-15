@@ -53,6 +53,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/#main-content$/);
     await expect(page.locator("#main-content")).toBeVisible();
+    await expect(page.locator("#main-content")).toBeFocused();
   });
 
   test("axe reports no serious or critical findings on representative public routes", async ({ page }) => {
