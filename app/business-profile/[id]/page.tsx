@@ -20,7 +20,7 @@ export default async function BusinessProfileDetailPage({ params }: PageContext)
   const profile = await businessProfileRepository.findById(id, context.principal);
   if (!profile) notFound();
 
-  const editorProfile = { ...profile, data: profile.data && typeof profile.data === "object" && !Array.isArray(profile.data) ? profile.data as Record<string, unknown> : null };
+  const editorProfile = { ...profile, data: profile.data && typeof profile.data === "object" && !Array.isArray(profile.data) ? profile.data as unknown as Record<string, unknown> : null };
 
   return (
     <main className="page-stack">
