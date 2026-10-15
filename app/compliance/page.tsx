@@ -85,7 +85,15 @@ export default async function CompliancePage() {
       <div className="rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.04] p-4 text-sm text-slate-300">
         {t("app.compliance.activeWorkspace", { name: context.activeWorkspace.name })}
       </div>
-      <EscalationBanner />
+      {obligations
+        .filter((obligation) => obligation.escalationLevel > 0)
+        .map((obligation) => (
+          <EscalationBanner
+            key={obligation.id}
+            level={obligation.escalationLevel}
+            message={obligation.title}
+          />
+        ))}
       <ComplianceControlCenter snapshot={snapshot} />
       <ComplianceWorkflow
         obligations={obligations.map((obligation) => ({
