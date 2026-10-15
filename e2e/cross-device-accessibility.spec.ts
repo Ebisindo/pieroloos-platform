@@ -83,4 +83,69 @@ test.describe("cross-device responsive smoke matrix", () => {
       }
     }
   });
+
+  test("authenticated Business Profile, Reports, and Engagements workflows persist and remain workspace-scoped", async ({ page }) => {
+    test.skip(
+      !process.env.PIEROLO_E2E_AUTH_SECRET || !process.env.PIEROLO_E2E_TEST_EMAIL,
+      "Requires the isolated CI-only test identity and disposable PostgreSQL database.",
+    );
+    test.setTimeout(90_000);
+
+    const testEmail = process.env.PIEROLO_E2E_TEST_EMAIL!;
+    const testSecret = process.env.PIEROLO_E2E_AUTH_SECRET!;
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/signin?callbackUrl=/business-profile", { waitUntil: "domcontentloaded" });
+    await page.getByLabel("Isolated CI test account email").fill(testEmail);
+    await page.getByLabel("Temporary CI test secret").fill(testSecret);
+    await page.getByRole("button", { name: "Sign in to isolated CI workspace" }).click();
+    await expect(page).toHaveURL(/\/business-profile$/);
+    await expect(page.getByRole("heading", { name: "Business Profiles" })).toBeVisible();
+
+    await page.getByRole("link", { name: "Open profile" }).first().click();
+    const objective = page.getByLabel("Business objective");
+    await expect(objective).toHaveValue("Initial objective from CI seed");
+    await objective.fill("Updated objective from authenticated E2E");
+    await page.getByRole("button", { name: "Save profile" }).click();
+    await expect(page.getByRole("status")).toContainText("Saved as version 2.");
+    await page.reload();
+    await expect(page.getByLabel("Business objective")).toHaveValue("Updated objective from authenticated E2E");
+
+    await page.goto("/reports", { waitUntil: "domcontentloaded" });
+    const reportClient = page.getByLabel("Client record");
+    await expect(reportClient.locator("option")).toContainText("E2E Primary Client");
+    const reportOptions = await reportClient.locator("option").allTextContents();
+    expect(reportOptions).not.toContain("Foreign Private Client");
+    await reportClient.selectOption({ label: "E2E Primary Client" });
+    await page.getByRole("button", { name: "Generate client summary" }).click();
+    await expect(page.getByRole("status")).toContainText("Report generated and saved.");
+    await expect(page.getByText("Updated objective from authenticated E2E", { exact: false })).toBeVisible();
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("link", { name: "Download / print HTML" }).click();
+    const reportDownload = await downloadPromise;
+    expect(reportDownload.suggestedFilename()).toMatch(/^pieroloos-report-.+\.html$/);
+
+    await page.goto("/engagements", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Engagements" })).toBeVisible();
+    await expect(page.getByText("Foreign Private Client", { exact: true })).toHaveCount(0);
+    await page.getByText("New engagement", { exact: true }).click();
+    await page.getByLabel("Client", { exact: true }).selectOption({ label: "E2E Primary Client" });
+    await page.getByLabel("Service", { exact: true }).fill("Authenticated Playwright engagement");
+    await page.getByLabel("Next action", { exact: true }).fill("Request reviewed formation documents");
+    await page.getByRole("button", { name: "Create engagement" }).click();
+    await expect(page.getByRole("status")).toContainText("Engagement created.");
+    await page.getByRole("link", { name: "Open engagement" }).first().click();
+
+    await expect(page.getByRole("heading", { name: "Edit engagement" })).toBeVisible();
+    await page.getByLabel("Service", { exact: true }).fill("Authenticated Playwright engagement updated");
+    await page.getByRole("button", { name: "Save details" }).click();
+    await expect(page.getByText("Engagement details saved.", { exact: true })).toBeVisible();
+
+    await page.getByLabel("Next status", { exact: true }).selectOption("INTAKE");
+    await page.getByRole("button", { name: "Apply status change" }).click();
+    await expect(page.getByText("Engagement status updated.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Status changed to INTAKE", { exact: true })).toBeVisible();
+  });
+
 });
