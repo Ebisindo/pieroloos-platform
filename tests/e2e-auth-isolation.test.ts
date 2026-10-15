@@ -49,7 +49,7 @@ describe("isolated E2E authentication safety guard", () => {
   it("enables the test credentials provider only with the guarded CI settings", async () => {
     const auth = await loadAuthOptions(safeEnvironment);
     expect(auth.e2eTestAuthConfigured).toBe(true);
-    expect(auth.authOptions.providers.some((provider) => provider.id === "pierolo-e2e-ci")).toBe(true);
+    expect(auth.authOptions.providers.map((provider) => provider.id)).toContain("pierolo-e2e-ci");
   });
 
   it("refuses test credentials when the CI marker is absent", async () => {
