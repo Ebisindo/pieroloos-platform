@@ -2,59 +2,56 @@
 
 ## Purpose and limits
 
-This is the repeatable verification plan for the PieroloOS responsive application. Automated browser checks can detect a useful subset of accessibility and layout regressions. They do **not** establish conformance certification, and they do not replace manual keyboard, screen-reader, real mobile device, tablet, zoom, or assistive-technology verification.
+This is the repeatable verification plan for the PieroloOS responsive application. Automated browser checks detect a subset of accessibility and layout regressions; they do **not** establish WCAG certification, and do not replace manual keyboard, screen-reader, real phone/tablet, zoom, or assistive-technology verification.
 
 ## Tools and versions
 
-- Playwright using the version pinned in `package-lock.json`.
-- `@axe-core/playwright` using the version pinned in `package-lock.json`.
+- Playwright and `@axe-core/playwright`, pinned through `package-lock.json`.
 - Chromium in the existing GitHub Actions E2E job.
-- GitHub Actions artifacts for Playwright reports, screenshots and test-results.
-- Run locally with `npm run test:e2e`; run lint, typecheck, unit tests and production build for the full change.
+- GitHub Actions artifacts for Playwright test results, reports and screenshots.
+- Run locally with `npm run test:e2e`; run lint, typecheck, unit tests, database integrity tests and production build for the full change.
 
 ## Viewport matrix
 
-The automated smoke matrix targets CSS viewport widths of 320, 360, 390, 430, 480, 560, 760, 768, 1000, 1024, 1280, 1440 and 1920 pixels. A 900 CSS-pixel height is the default automated height; narrow and content-heavy pages should also be checked at 667 and 1024 pixel heights during manual verification.
+The automated smoke matrix targets CSS viewport widths of 320, 360, 390, 430, 480, 560, 760, 768, 1000, 1024, 1280, 1440 and 1920 pixels. The default automated height is 900 pixels. Content-heavy pages should also be checked at 667 and 1024 pixel heights during manual verification.
 
-All widths are tests of Chromium's emulated viewport, **not** evidence of testing a physical device or a specific operating system.
+These widths are browser-emulated CSS viewports, **not** evidence that physical devices or a particular OS have been tested.
 
 ## Route coverage
 
-The suite should cover public routes `/` and `/partners`, and signed-out state / access gates for `/business-profile`, `/reports`, `/engagements` and `/command-center`. Signed-in workflow tests must use an isolated non-production test database and a documented test identity; do not enable authentication bypasses in public preview or production. Until such an identity is wired into CI, internal workspace views are not considered authenticated E2E-verified.
+The suite covers public routes `/` and `/partners`, plus signed-out access gates for `/business-profile`, `/reports`, `/engagements` and `/command-center`. Signed-in workflow tests need an isolated non-production database and a documented test identity. Do not enable authentication bypasses in public preview or production. Until that identity is wired into CI, internal workspace views are not considered authenticated E2E-verified.
 
 ## Automated checks
 
-- No unexpected horizontal overflow at the viewport matrix, allowing intentional horizontal overflow only for elements that are explicitly keyboard accessible and documented.
-- Accessible-name and landmark checks through axe on representative public and access-gate routes.
-- Capture screenshot artifacts on tested viewports to support review.
-- Keyboard focus visibility and skip-link existence.
-- Route load / access-gate resilience.
-- Reduced-motion media query support via source/behavior assertions where possible.
-- Touch targets: controls should generally meet at least 24 by 24 CSS px with spacing, and primary mobile controls should target 44 by 44 CSS px.
-- Text should wrap at narrow widths and retain usable content when browser text zoom is increased.
-- Test loading, empty, success and failure states in component/API tests where reliable.
+- Unexpected horizontal overflow at each viewport.
+- Accessible-name and landmark checks through axe on representative public routes.
+- Screenshot artifacts for selected widths.
+- Main landmark, document language, and navigable links.
+- Signed-out routes must render an access state rather than disclose workspace records.
+- Keyboard focus and skip-link checks where selectors are stable.
+- Reduced-motion support, touch targets, zoom/text wrapping, and loading/empty/error states also require component assertions or manual review; do not imply that axe alone verifies these.
 
 ## Severity and remediation policy
 
-- **Critical / serious axe findings:** block merge until fixed or explicitly adjudicated with a documented, scoped exception and owner.
-- **Moderate / minor findings:** record and triage; fix when practical before release, never suppress merely to obtain a green job.
-- **Overflow:** unexpected overflow is a regression. If discovered, attach a screenshot, identify route/viewport and block merge when content or controls become inaccessible.
-- Record browser, viewport, route, finding, impact, owner/status and any accepted limitation when a finding is observed. CI output is the evidence record for automated runs; link the run and artifact when available.
+- **Critical / serious axe findings:** block merge until fixed or explicitly adjudicated with a documented scoped exception and owner.
+- **Moderate / minor findings:** record and triage; do not suppress merely to obtain a green job.
+- **Overflow:** unexpected overflow is a regression. Attach the route, viewport and screenshot; block merge when content or controls become inaccessible.
+- Record browser, viewport, route, finding, impact, owner/status and accepted limitations when observed. Link to the CI run and artifact for automated findings.
 
 ## Manual and physical-device checklist — PENDING
 
 The following work is not marked complete by CI emulation. Complete it before claiming formal cross-device accessibility verification:
 
-- [ ] Physical Android phone at 320–430 CSS px equivalent, portrait and landscape.
-- [ ] Physical tablet in portrait and landscape.
-- [ ] Desktop keyboard-only navigation, with visible focus and logical focus order.
-- [ ] Screen reader on at least one supported desktop/browser combination and one mobile combination.
+- [ ] Physical Android phone, portrait and landscape.
+- [ ] Physical tablet, portrait and landscape.
+- [ ] Desktop keyboard-only navigation, visible focus and logical focus order.
+- [ ] Screen reader on at least one supported desktop/browser setup and one mobile setup.
 - [ ] Browser zoom at 200% and 400% reflow, plus increased text-only sizing where supported.
-- [ ] Forced-colors/high-contrast setting and reduced-motion preference.
-- [ ] Form labels, required state, errors, confirmation announcements, menus/dialog focus management and skip-link behavior.
-- [ ] Report download opened, read and printed on desktop and mobile.
-- [ ] Record date, device/OS, browser, assistive technology, tester, issues and evidence.
+- [ ] Forced-colors/high-contrast and reduced-motion preferences.
+- [ ] Form labels, required state, error summaries, confirmation announcements, menu focus, and skip-link behavior.
+- [ ] Report export opened, read and printed on desktop and mobile.
+- [ ] Record date, device/OS, browser, assistive technology, tester, findings and evidence.
 
 ## Release statement
 
-Until artifacts from the automated suite and a completed manual checklist are reviewed, the status is **automated checks only / physical-device verification pending**. Do not describe the application as WCAG-certified.
+Until automated artifacts are reviewed and the manual checklist is completed, status is **automated checks only / physical-device verification pending**. Do not describe the application as WCAG-certified.
