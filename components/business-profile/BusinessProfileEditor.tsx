@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import type { MessageKey } from "@/lib/i18n/messages";
 
@@ -62,7 +61,6 @@ function initialValues(profile: Profile) {
 
 export function BusinessProfileEditor({ profile: initialProfile, canWrite }: { profile: Profile; canWrite: boolean }) {
   const { t } = useLocale();
-  const router = useRouter();
   const [profile, setProfile] = useState(initialProfile);
   const [values, setValues] = useState(initialValues(initialProfile));
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -85,7 +83,6 @@ export function BusinessProfileEditor({ profile: initialProfile, canWrite }: { p
       setValues(initialValues(result.data));
       setState("saved");
       setMessage(t("profile.savedVersion", { version: result.data.version }));
-      router.refresh();
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : t("profile.saveFailed"));
