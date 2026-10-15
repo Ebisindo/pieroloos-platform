@@ -27,6 +27,31 @@ export const engagementRepository = {
     });
   },
 
+  async listByWorkspace(principal: WorkspacePrincipal, filters?: { status?: EngagementStatus; query?: string }) {
+    assertPermission(principal, "engagement:read");
+    const query = filters?.query?.trim();
+    return prisma.engagement.findMany({
+      where: {
+        workspaceId: principal.workspaceId,
+        ...(filters?.status ? { status: filters.status } : {}),
+        ...(query ? {
+          OR: [
+            { service: { contains: query, mode: "insensitive" } },
+            { nextAction: { contains: query, mode: "insensitive" } },
+            { client: { name: { contains: query, mode: "insensitive" } } },
+            { client: { organizationName: { contains: query, mode: "insensitive" } } },
+          ],
+        } : {}),
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      include: {
+        client: { select: { id: true, name: true, organizationName: true, email: true } },
+        activities: { orderBy: { createdAt: "desc" }, take: 5 },
+      },
+    });
+  },
+
   async create(
     data: { clientId: string; service: string; nextAction?: string; notes?: string },
     principal: WorkspacePrincipal,
