@@ -10,9 +10,10 @@ export async function GET() {
   if (!context.principal) return NextResponse.json({ error: "Select an active workspace." }, { status: 409 });
   if (!context.principal.permissions.includes("reports:read")) return NextResponse.json({ error: "Report read permission required." }, { status: 403 });
   try {
+    const canWrite = context.principal.permissions.includes("reports:write");
     const [reports, clients] = await Promise.all([
       reportRepository.listWorkspaceReports(context.principal),
-      reportRepository.listReportClients(context.principal),
+      canWrite ? reportRepository.listReportClients(context.principal) : Promise.resolve([]),
     ]);
     return NextResponse.json({
       data: {
