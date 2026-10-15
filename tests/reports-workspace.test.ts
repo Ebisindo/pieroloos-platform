@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 import { GET as listReports, POST as generateReport } from "@/app/api/reports/route";
+import ReportsPage from "@/app/reports/page";
 import { GET as getReport } from "@/app/api/reports/[id]/route";
 
 const {
@@ -18,6 +19,9 @@ const {
 }));
 
 vi.mock("@/lib/auth/workspace-context", () => ({ getWorkspaceContext: getWorkspaceContextMock }));
+vi.mock("@/lib/i18n/request", () => ({
+  getRequestTranslator: async () => (key: string) => key,
+}));
 vi.mock("@/lib/db/report-repository", () => ({
   reportRepository: {
     listWorkspaceReports: listWorkspaceReportsMock,
@@ -90,6 +94,22 @@ describe("workspace Reports endpoints", () => {
     const valid = await generateReport(collectionRequest({ clientId: "client-a" }));
     expect(valid.status).toBe(201);
     expect(generateClientSummaryMock).toHaveBeenCalledWith("client-a", principal);
+  });
+
+  it("does not load the server-rendered report client selector for read-only report members", async () => {
+    const readOnlyPrincipal = { ...principal, permissions: ["reports:read"] as WorkspacePrincipal["permissions"] };
+    getWorkspaceContextMock.mockResolvedValue({
+      userId: principal.userId,
+      principal: readOnlyPrincipal,
+      activeWorkspace: { id: principal.workspaceId, organizationId: principal.organizationId, role: "owner" },
+    });
+    listWorkspaceReportsMock.mockReset().mockResolvedValue([]);
+    listReportClientsMock.mockReset().mockResolvedValue([]);
+
+    await ReportsPage();
+
+    expect(listWorkspaceReportsMock).toHaveBeenCalledWith(readOnlyPrincipal);
+    expect(listReportClientsMock).not.toHaveBeenCalled();
   });
 
   it("does not query the client selector for read-only report members without write permission", async () => {
