@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 
@@ -21,17 +21,14 @@ export function ReportWorkspace({ initialReports, clients, canWrite }: {
 }) {
   const { t } = useLocale();
   const router = useRouter();
-  const [reports, setReports] = useState(initialReports);
-  useEffect(() => {
-    setReports(initialReports);
-    setSelectedReportId((current) => initialReports.some((report) => report.id === current) ? current : (initialReports[0]?.id ?? ""));
-  }, [initialReports]);
+  const [generatedReports, setGeneratedReports] = useState<SavedReport[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedReportId, setSelectedReportId] = useState(initialReports[0]?.id ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
 
+  const reports = useMemo(() => [...generatedReports, ...initialReports.filter((report) => !generatedReports.some((generated) => generated.id === report.id))], [generatedReports, initialReports]);
   const selectedReport = useMemo(() => reports.find((report) => report.id === selectedReportId) ?? null, [reports, selectedReportId]);
 
   async function generate(event: FormEvent<HTMLFormElement>) {
@@ -56,7 +53,7 @@ export function ReportWorkspace({ initialReports, clients, canWrite }: {
         document: result.data.document,
         client: clients.find((client) => client.id === selectedClientId) ?? null,
       };
-      setReports((current) => [generated, ...current]);
+      setGeneratedReports((current) => [generated, ...current.filter((report) => report.id !== generated.id)]);
       setSelectedReportId(generated.id);
       setSelectedClientId("");
       setMessage(t("reports.generated"));
