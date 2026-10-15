@@ -28,7 +28,7 @@ The suite covers public routes `/` and `/partners`, plus signed-out access gates
 - Screenshot artifacts for selected widths.
 - Main landmark, document language, and navigable links.
 - Signed-out routes must render an access state rather than disclose workspace records.
-- Primary navigation link visibility is smoke-tested on public routes. The automated suite does not yet exercise the authenticated workspace skip link; verify focus reveal, activation and target focus manually and add a dedicated automated check when stable.
+- Primary navigation link visibility is smoke-tested on public routes. A Playwright check also reaches and activates the workspace shell skip link by keyboard while signed out; authenticated and physical-device behavior still requires manual verification.
 - Reduced-motion support, touch targets, zoom/text wrapping, and loading/empty/error states also require component assertions or manual review; do not imply that axe alone verifies these.
 
 ## Severity and remediation policy
@@ -45,7 +45,7 @@ The following work is not marked complete by CI emulation. Complete it before cl
 - [ ] Physical Android phone, portrait and landscape.
 - [ ] Physical tablet, portrait and landscape.
 - [ ] Desktop keyboard-only navigation, visible focus and logical focus order.
-- [ ] In authenticated workspace routes, tab to the skip link, verify it becomes visible, activate it, and confirm focus/reading position reaches `#main-content`.
+- [ ] On authenticated workspace routes, verify the skip link becomes visible on keyboard focus, activates correctly, and places users at `#main-content`.
 - [ ] Screen reader on at least one supported desktop/browser setup and one mobile setup.
 - [ ] Browser zoom at 200% and 400% reflow, plus increased text-only sizing where supported.
 - [ ] Forced-colors/high-contrast and reduced-motion preferences.
@@ -55,7 +55,7 @@ The following work is not marked complete by CI emulation. Complete it before cl
 
 ## Current automated evidence
 
-Latest recorded run for PR #19: [CI run #38759698961](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38759698961), head `75fbc72fe53daa3ffc1c3e41b0ec784ae0138b42`. Quality and E2E jobs passed. The Playwright artifact contains the public-route responsive screenshots and HTML report. After the test assertion clarification committed on the feature branch, rerun CI before merge; the earlier run does not validate that subsequent commit.
+Latest completed CI run before the current skip-link test change: [CI run #38772274100](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38772274100), head `ec18a5be96eaec97c57d20ce6fc17262e17e3fb9`. Quality and E2E jobs passed. Artifact `playwright-results` contains 12 responsive screenshots and the Playwright HTML report. The additional keyboard skip-link test was committed afterward; its CI run must pass before merge.
 
 ## Release statement
 
