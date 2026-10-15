@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/components/i18n/LocaleProvider";
@@ -29,8 +29,7 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
 }) {
   const { t } = useLocale();
   const router = useRouter();
-  const [engagements, setEngagements] = useState(initialEngagements);
-  useEffect(() => setEngagements(initialEngagements), [initialEngagements]);
+  const [createdEngagements, setCreatedEngagements] = useState<Engagement[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [clientId, setClientId] = useState("");
@@ -43,11 +42,11 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
 
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return engagements.filter((item) =>
+    return [...createdEngagements, ...initialEngagements.filter((item) => !createdEngagements.some((created) => created.id === item.id))].filter((item) =>
       (!status || item.status === status) &&
       (!term || [item.service, item.nextAction ?? "", item.client?.name ?? "", item.client?.organizationName ?? ""].some((value) => value.toLowerCase().includes(term))),
     );
-  }, [engagements, query, status]);
+  }, [createdEngagements, initialEngagements, query, status]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,7 +59,7 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
       });
       const result = await response.json() as { error?: string; data?: Engagement };
       if (!response.ok || !result.data) throw new Error(result.error ?? t("engagements.createFailed"));
-      setEngagements((current) => [result.data!, ...current]);
+      setCreatedEngagements((current) => [result.data!, ...current.filter((item) => item.id !== result.data!.id)]);
       setClientId(""); setService(""); setNextAction(""); setNotes("");
       setMessage(t("engagements.created"));
       router.refresh();
@@ -93,7 +92,7 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
         </details>
       ) : null}
       <div aria-live="polite" role={error ? "alert" : "status"} className="text-sm text-slate-200">{message}</div>
-      {visible.length === 0 ? <div className="rounded-2xl border border-dashed border-white/15 p-7 text-sm leading-6 text-slate-300">{engagements.length === 0 ? t("engagements.noEngagements") : t("engagements.noResults")}</div> : (
+      {visible.length === 0 ? <div className="rounded-2xl border border-dashed border-white/15 p-7 text-sm leading-6 text-slate-300">{initialEngagements.length === 0 && createdEngagements.length === 0 ? t("engagements.noEngagements") : t("engagements.noResults")}</div> : (
         <div className="grid gap-4 lg:grid-cols-2">
           {visible.map((item) => (
             <article key={item.id} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.035] p-5">
