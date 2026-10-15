@@ -1212,6 +1212,7 @@ const pt = {
   "accessibility.routes": "Rotas testadas",
   "accessibility.viewportMatrix": "Larguras de ecrã testadas",
   "accessibility.automatedStatus": "Estado da verificação automatizada",
+  "engagements.editTitle": "Editar mandato",
 } satisfies MessageCatalog;
 
 export default pt;
