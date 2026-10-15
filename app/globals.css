@@ -481,3 +481,22 @@ select.form-input { appearance:auto; }
   .module-banner-actions { display: grid; grid-template-columns: minmax(0,1fr); }
   .module-banner-actions > a { width: 100%; }
 }
+
+/* Operational banners: final cross-device guardrails. */
+.module-banner-art { width: 100%; min-width: 0; }
+.module-banner .operational-illustration,
+.module-banner .jurisdiction-illustration,
+.module-banner .compliance-pulse { min-width: 0; }
+.module-banner .operational-illustration { min-height: 0; }
+.module-banner .operational-flow-nodes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 560px) {
+  .module-banner .operational-flow-nodes { grid-template-columns: minmax(0, 1fr); }
+  .module-banner .operational-illustration-foot { flex-wrap: wrap; }
+  .module-banner .jurisdiction-illustration-row { grid-template-columns: minmax(0, 1fr); }
+  .module-banner .jurisdiction-illustration-row > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .module-banner .compliance-pulse-row { grid-template-columns: 30px minmax(0, 1fr); }
+  .module-banner .compliance-pulse-track { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .module-banner *, .module-banner *::before, .module-banner *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
