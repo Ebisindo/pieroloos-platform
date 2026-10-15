@@ -9,7 +9,7 @@ function requireValue(name) {
 }
 
 function assertDisposableCiTarget() {
-  if (process.env.DATABASE_ENV !== "ci" || process.env.PIEROLO_E2E_AUTH_ENABLED !== "true") {
+  if (process.env.CI !== "true" || process.env.DATABASE_ENV !== "ci" || process.env.PIEROLO_E2E_AUTH_ENABLED !== "true") {
     throw new Error("E2E seeding is permitted only when DATABASE_ENV=ci and PIEROLO_E2E_AUTH_ENABLED=true.");
   }
   const databaseUrl = requireValue("DATABASE_URL");
