@@ -1149,7 +1149,7 @@ const pt = {
   "engagements.chooseClient": "Escolher cliente",
   "engagements.service": "Serviço",
   "engagements.nextAction": "Próxima ação",
-  "engagements.notes": "Notas",
+  "engagements.notes": "Observações",
   "engagements.create": "Criar mandato",
   "engagements.creating": "A criar…",
   "engagements.created": "Mandato criado.",
