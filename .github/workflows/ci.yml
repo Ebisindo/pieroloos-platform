@@ -94,10 +94,13 @@ jobs:
       - name: Browser tests
         run: npm run test:e2e
 
-      - name: Upload Playwright report on failure
-        if: failure()
+      - name: Upload Playwright reports and responsive screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-results
-          path: test-results
+          path: |
+            test-results
+            playwright-report
           if-no-files-found: ignore
+          retention-days: 14
