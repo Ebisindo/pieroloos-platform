@@ -32,6 +32,7 @@ const pt = {
   "navigation.protectedClient": "Acesso protegido do cliente",
   "navigation.protectedWorkspace": "Espaço de trabalho protegido",
   "navigation.businessFormation": "Formação de empresas",
+  "navigation.businessProfile": "Perfil empresarial",
   "navigation.clients": "Clientes",
   "navigation.jurisdictionLens": "Análise de jurisdições",
   "navigation.marketExpansion": "Expansão de mercado",
