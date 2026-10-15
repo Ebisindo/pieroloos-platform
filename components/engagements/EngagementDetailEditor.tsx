@@ -18,14 +18,6 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
   const { t } = useLocale();
   const router = useRouter();
   const [engagement, setEngagement] = useState(initialEngagement);
-
-  useEffect(() => {
-    setEngagement(initialEngagement);
-    setService(initialEngagement.service);
-    setNextAction(initialEngagement.nextAction ?? "");
-    setNotes(initialEngagement.notes ?? "");
-    setToStatus(getNextStatuses(initialEngagement.status)[0] ?? "");
-  }, [initialEngagement]);
   const [service, setService] = useState(initialEngagement.service);
   const [nextAction, setNextAction] = useState(initialEngagement.nextAction ?? "");
   const [notes, setNotes] = useState(initialEngagement.notes ?? "");
@@ -35,6 +27,13 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
 
+  useEffect(() => {
+    setEngagement(initialEngagement);
+    setService(initialEngagement.service);
+    setNextAction(initialEngagement.nextAction ?? "");
+    setNotes(initialEngagement.notes ?? "");
+    setToStatus(getNextStatuses(initialEngagement.status)[0] ?? "");
+  }, [initialEngagement]);
   async function saveDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canWrite || saving) return;
