@@ -8,7 +8,7 @@ import type { MessageKey } from "@/lib/i18n/messages";
 type Profile = {
   id: string;
   version: number;
-  data: Record<string, unknown> | null;
+  data: unknown;
   businessName: string | null;
   businessType: string | null;
   businessObjective: string | null;
