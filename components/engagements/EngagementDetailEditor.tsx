@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getNextStatuses, type EngagementStatus } from "@/lib/domain/engagement";
@@ -27,13 +27,6 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
 
-  useEffect(() => {
-    setEngagement(initialEngagement);
-    setService(initialEngagement.service);
-    setNextAction(initialEngagement.nextAction ?? "");
-    setNotes(initialEngagement.notes ?? "");
-    setToStatus(getNextStatuses(initialEngagement.status)[0] ?? "");
-  }, [initialEngagement]);
   async function saveDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canWrite || saving) return;
