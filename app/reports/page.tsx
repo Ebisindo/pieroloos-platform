@@ -28,15 +28,16 @@ export default async function ReportsPage() {
   if (!context.activeWorkspace || !context.principal) return <WorkspaceAccessState title={t("app.clients.workspaceRequired")} description={t("app.clients.workspaceDescription")} />;
   if (!context.principal.permissions.includes("reports:read")) return <WorkspaceAccessState title={t("app.clients.accessRequired")} description={t("app.clients.accessDescription")} href="/command-center" action={t("navigation.businessFormation")} />;
 
+  const canWrite = context.principal.permissions.includes("reports:write");
   const [reports, clients] = await Promise.all([
     reportRepository.listWorkspaceReports(context.principal),
-    reportRepository.listReportClients(context.principal),
+    canWrite ? reportRepository.listReportClients(context.principal) : Promise.resolve([]),
   ]);
   const initialReports = reports.map((report) => ({ ...report, document: parseDocument(report.content) }));
   return (
     <main className="page-stack">
       <ModuleBanner eyebrow={t("app.reports.eyebrow")} title={t("app.reports.title")} description={t("reports.managerDescription")} visual="evidence" />
-      <ReportWorkspace initialReports={initialReports} clients={clients} canWrite={context.principal.permissions.includes("reports:write")} />
+      <ReportWorkspace initialReports={initialReports} clients={clients} canWrite={canWrite} />
     </main>
   );
 }
