@@ -107,7 +107,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     await expect(objective).toHaveValue("Initial objective from CI seed");
     await objective.fill("Updated objective from authenticated E2E");
     await page.getByRole("button", { name: "Save profile" }).click();
-    await expect(page.getByRole("status")).toContainText("Saved as version 2.");
+    await expect(page.getByText("Saved as version 2.", { exact: true })).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Business objective")).toHaveValue("Updated objective from authenticated E2E");
 
@@ -118,7 +118,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     expect(reportOptions).not.toContain("Foreign Private Client");
     await reportClient.selectOption({ label: "E2E Primary Client" });
     await page.getByRole("button", { name: "Generate client summary" }).click();
-    await expect(page.getByRole("status")).toContainText("Report generated and saved.");
+    await expect(page.getByText("Report generated and saved.", { exact: true })).toBeVisible();
     await expect(page.getByText("Updated objective from authenticated E2E", { exact: false })).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
@@ -134,7 +134,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.getByLabel("Service", { exact: true }).fill("Authenticated Playwright engagement");
     await page.getByLabel("Next action", { exact: true }).fill("Request reviewed formation documents");
     await page.getByRole("button", { name: "Create engagement" }).click();
-    await expect(page.getByRole("status")).toContainText("Engagement created.");
+    await expect(page.getByText("Engagement created.", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Open engagement" }).first().click();
 
     await expect(page.getByRole("heading", { name: "Edit engagement" })).toBeVisible();
