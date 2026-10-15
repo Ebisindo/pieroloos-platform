@@ -25,7 +25,7 @@ export const reportRepository = {
   },
 
   async listReportClients(principal: WorkspacePrincipal) {
-    assertPermission(principal, "reports:read");
+    assertPermission(principal, "reports:write");
     return prisma.client.findMany({
       where: { workspaceId: principal.workspaceId },
       orderBy: { updatedAt: "desc" },
