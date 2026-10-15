@@ -27,6 +27,16 @@ export const engagementRepository = {
     });
   },
 
+  async listClientsForWorkspace(principal: WorkspacePrincipal) {
+    assertPermission(principal, "client:read");
+    return prisma.client.findMany({
+      where: { workspaceId: principal.workspaceId },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: { id: true, name: true, organizationName: true, proposedBusiness: true, email: true },
+    });
+  },
+
   async listByWorkspace(principal: WorkspacePrincipal, filters?: { status?: EngagementStatus; query?: string }) {
     assertPermission(principal, "engagement:read");
     const query = filters?.query?.trim();
