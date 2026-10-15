@@ -24,6 +24,7 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
     setService(initialEngagement.service);
     setNextAction(initialEngagement.nextAction ?? "");
     setNotes(initialEngagement.notes ?? "");
+    setToStatus(getNextStatuses(initialEngagement.status)[0] ?? "");
   }, [initialEngagement]);
   const [service, setService] = useState(initialEngagement.service);
   const [nextAction, setNextAction] = useState(initialEngagement.nextAction ?? "");
