@@ -31,6 +31,7 @@ const en = {
   "navigation.protectedWorkspace": "Protected workspace",
   "navigation.businessFormation": "Business Formation",
   "navigation.clients": "Clients",
+  "navigation.businessProfile": "Business Profile",
   "navigation.jurisdictionLens": "Jurisdiction Lens",
   "navigation.marketExpansion": "Market Expansion",
   "navigation.crossBorder": "Cross-border Preparation",
