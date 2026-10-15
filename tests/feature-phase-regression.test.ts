@@ -38,6 +38,8 @@ describe("next product phase validation contracts", () => {
     expect(canTransition("DRAFT", "ACTIVE")).toBe(false);
     expect(getNextStatuses("COMPLETED")).toEqual([]);
     expect(getNextStatuses("ON_HOLD")).toContain("ACTIVE");
+    expect(engagementTransitionSchema.safeParse({ toStatus: "INTAKE" }).success).toBe(true);
+    expect(engagementTransitionSchema.safeParse({ toStatus: "ACTIVE", status: "ACTIVE" }).success).toBe(false);
   });
 
   it("keeps complete locale catalogs with aligned interpolation placeholders", () => {
