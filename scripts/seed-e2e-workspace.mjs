@@ -181,7 +181,7 @@ async function main() {
   await prisma.businessProfile.upsert({
     where: { clientId: foreignClient.id },
     update: { businessName: "Foreign Private Business", businessObjective: "Must not be visible cross-tenant" },
-    create: { clientId: foreignClient.id, businessName: "Foreign Private Business", businessObjective: "Must not be visible cross-tenant" },
+    create: { id: "pieroloos-e2e-foreign-profile", clientId: foreignClient.id, businessName: "Foreign Private Business", businessObjective: "Must not be visible cross-tenant" },
   });
   await prisma.report.upsert({
     where: { id: "pieroloos-e2e-foreign-report" },
