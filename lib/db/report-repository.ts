@@ -64,6 +64,11 @@ export const reportRepository = {
       if (!client) throw new Error("REPORT_CLIENT_NOT_FOUND");
 
       const profile = client.businessProfile;
+      const profileJson = profile?.data && typeof profile.data === "object" && !Array.isArray(profile.data)
+        ? profile.data as Record<string, unknown>
+        : {};
+      const profileText = (scalar: string | null | undefined, key: string) =>
+        text(scalar ?? (typeof profileJson[key] === "string" ? profileJson[key] as string : undefined));
       const sections: ReportSection[] = [
         {
           id: "client-overview",
@@ -82,18 +87,18 @@ export const reportRepository = {
           id: "business-profile",
           title: "Business profile",
           content: profile ? [
-            `Business name: ${text(profile.businessName ?? client.proposedBusiness)}`,
-            `Business type: ${text(profile.businessType)}`,
-            `Objective: ${text(profile.businessObjective)}`,
-            `Business model: ${text(profile.businessModel)}`,
-            `Target market: ${text(profile.targetMarket)}`,
-            `Revenue model: ${text(profile.revenueModel)}`,
-            `Ownership context: ${text(profile.ownershipContext)}`,
-            `Funding stage: ${text(profile.fundingStage)}`,
-            `Expansion objectives: ${text(profile.expansionObjectives)}`,
-            `Risks and constraints: ${text(profile.constraints)}`,
-            `Strategic notes: ${text(profile.strategicNotes)}`,
-            `Operational context: ${text(profile.operationalContext)}`,
+            `Business name: ${text(profile.businessName ?? (typeof profileJson.businessName === "string" ? profileJson.businessName : undefined) ?? client.proposedBusiness)}`,
+            `Business type: ${profileText(profile.businessType, "businessType")}`,
+            `Objective: ${profileText(profile.businessObjective, "objective")}`,
+            `Business model: ${profileText(profile.businessModel, "businessModel")}`,
+            `Target market: ${profileText(profile.targetMarket, "targetMarket")}`,
+            `Revenue model: ${profileText(profile.revenueModel, "revenueModel")}`,
+            `Ownership context: ${profileText(profile.ownershipContext, "ownership")}`,
+            `Funding stage: ${profileText(profile.fundingStage, "fundingStage")}`,
+            `Expansion objectives: ${profileText(profile.expansionObjectives, "expansionObjectives")}`,
+            `Risks and constraints: ${profileText(profile.constraints, "riskConstraints")}`,
+            `Strategic notes: ${profileText(profile.strategicNotes, "strategicNotes")}`,
+            `Operational context: ${profileText(profile.operationalContext, "operationalContext")}`,
             `Profile version: ${profile.version}`,
             `Profile last updated: ${profile.updatedAt.toISOString()}`,
             "Data classification: profile information is not independently verified by report generation.",
