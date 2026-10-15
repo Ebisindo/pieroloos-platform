@@ -16,7 +16,7 @@ export default async function EngagementsPage() {
 
   const [engagements, allClients] = await Promise.all([
     engagementRepository.listByWorkspace(context.principal),
-    context.principal.permissions.includes("client:read") ? clientRepository.listByWorkspace(context.principal) : Promise.resolve([]),
+    context.principal.permissions.includes("client:read") ? engagementRepository.listClientsForWorkspace(context.principal) : Promise.resolve([]),
   ]);
   const clients = allClients.map((client) => ({
     id: client.id,
