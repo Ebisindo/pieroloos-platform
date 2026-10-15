@@ -158,14 +158,15 @@ export const authOptions: AuthOptions = {
       : []),
     ...(e2eTestAuthConfigured
       ? [
-          CredentialsProvider({
+          {
             id: "pierolo-e2e-ci",
             name: "Isolated CI test identity",
+            type: "credentials" as const,
             credentials: {
               email: { label: "CI test account email", type: "email" },
               password: { label: "Ephemeral CI test secret", type: "password" },
             },
-            async authorize(credentials) {
+            async authorize(credentials: Record<string, string> | undefined) {
               const email = credentials?.email?.trim().toLowerCase();
               if (!email || email !== e2eTestEmail || credentials?.password !== e2eAuthSecret) {
                 return null;
@@ -177,7 +178,7 @@ export const authOptions: AuthOptions = {
               if (!testUser || testUser.memberships.length === 0) return null;
               return { id: testUser.id, email: testUser.email, name: testUser.name };
             },
-          }),
+          },
         ]
       : []),
     ...(githubConfigured
