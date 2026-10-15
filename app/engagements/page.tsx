@@ -1,10 +1,8 @@
-import { notFound } from "next/navigation";
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { EngagementManager } from "@/components/engagements/EngagementManager";
 import { ModuleBanner } from "@/components/ui/ModuleBanner";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { engagementRepository } from "@/lib/db/engagement-repository";
-import { clientRepository } from "@/lib/db/client-repository";
 import { getRequestTranslator } from "@/lib/i18n/request";
 
 export default async function EngagementsPage() {
