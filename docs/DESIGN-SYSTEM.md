@@ -45,3 +45,25 @@ Shell
 → GlassPanel
 → MetricCard / StatusBadge / EmptyState
 → Domain-specific components
+
+
+## Responsive banner and illustration system
+
+The reusable responsive banner component is `components/ui/ModuleBanner.tsx`. It can render an optional local visual while retaining normal semantic page structure. The illustration library currently includes:
+
+- `components/illustrations/OperationalFlowIllustration.tsx` — evidence-to-execution pathway.
+- `components/illustrations/EvidenceNetworkIllustration.tsx` — source, evidence, review and decision relationship.
+- `components/illustrations/JurisdictionCompareIllustration.tsx` — illustrative criteria comparison; explicitly not legal/tax advice.
+- `components/illustrations/CompliancePulseIllustration.tsx` — obligation/evidence/deadline relationship; illustrative only.
+
+A private workspace preview route is available at `/command-center/visual-preview`. It shows the banner and illustration components using the existing shell and design tokens. Values are clearly marked illustrative, not live workspace telemetry.
+
+### Responsive behaviour
+
+The banner uses responsive grid columns and moves the visual under the text on narrower viewports. Compact phone widths collapse workflow nodes into a single column and stack call-to-action buttons. Existing reduced-motion rules remain authoritative; these illustrations use no essential motion.
+
+### Review targets
+
+Viewport widths: 320, 360, 390, 430, 768, 1024, 1280, 1440 and 1920 CSS pixels.
+
+Check horizontal overflow, text and button wrapping, keyboard focus, touch use, contrast, semantic headings, reduced motion and empty/loading/error states. Unit/source checks do not replace browser screenshot, accessibility or real-device review. Record browser checks as not tested until run.
