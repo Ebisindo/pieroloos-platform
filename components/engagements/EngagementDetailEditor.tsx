@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getNextStatuses, type EngagementStatus } from "@/lib/domain/engagement";
@@ -18,6 +18,13 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
   const { t } = useLocale();
   const router = useRouter();
   const [engagement, setEngagement] = useState(initialEngagement);
+
+  useEffect(() => {
+    setEngagement(initialEngagement);
+    setService(initialEngagement.service);
+    setNextAction(initialEngagement.nextAction ?? "");
+    setNotes(initialEngagement.notes ?? "");
+  }, [initialEngagement]);
   const [service, setService] = useState(initialEngagement.service);
   const [nextAction, setNextAction] = useState(initialEngagement.nextAction ?? "");
   const [notes, setNotes] = useState(initialEngagement.notes ?? "");
