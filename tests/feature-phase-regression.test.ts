@@ -83,6 +83,8 @@ describe("workspace workflow security seams", () => {
     for (const width of [320, 360, 390, 430, 480, 560, 760, 768, 1000, 1024, 1280, 1440, 1920]) {
       expect(testFile).toContain(String(width));
     }
-    expect(source("docs/ACCESSIBILITY-CROSS-DEVICE-VERIFICATION.md")).toContain("physical-device and assistive-technology verification pending");
+    const accessibilityDoc = source("docs/ACCESSIBILITY-CROSS-DEVICE-VERIFICATION.md");
+    expect(accessibilityDoc).toContain("verification pending");
+    expect(accessibilityDoc).toContain("WCAG-certified");
   });
 });
