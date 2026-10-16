@@ -1013,6 +1013,7 @@ model ComplianceRuleVersion {
   createdAt           DateTime                  @default(now())
 
   rule ComplianceRule @relation(fields: [ruleId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User @relation("ComplianceRuleVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   reviewer User? @relation("ComplianceRuleVersionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
   deadlineSnapshots ComplianceDeadlineSnapshot[]
