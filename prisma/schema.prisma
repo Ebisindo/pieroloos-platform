@@ -980,6 +980,8 @@ model ComplianceObligation {
   jurisdictionId              String?
   sourceRuleId                String?
   sourceRuleVersionId         String?
+  // Stable scoped idempotency key for rule-generated obligations; manual entries remain null.
+  generationKey               String?
   title                       String
   description                 String?
   type                        String
@@ -1008,6 +1010,7 @@ model ComplianceObligation {
   documents     Document[]
 
   @@unique([id, workspaceId])
+  @@unique([workspaceId, generationKey], map: "ComplianceObligation_workspace_generationKey_key")
   @@index([organizationId, workspaceId, status])
   @@index([workspaceId, dueAt])
   @@index([clientId])
