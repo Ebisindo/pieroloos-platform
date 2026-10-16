@@ -22,8 +22,12 @@ export const updateComplianceStatusSchema = z.object({
     "NOT_STARTED","IN_PROGRESS","AWAITING_EVIDENCE","IN_REVIEW",
     "COMPLIANT","OVERDUE","BLOCKED","WAIVED","NOT_APPLICABLE",
   ]),
+  expectedStatus: z.enum([
+    "NOT_STARTED","IN_PROGRESS","AWAITING_EVIDENCE","IN_REVIEW","COMPLETE","COMPLETED",
+    "COMPLIANT","OVERDUE","BLOCKED","WAIVED","NOT_APPLICABLE",
+  ]).optional(),
   note: z.string().max(4000).optional(),
-});
+}).strict();
 
 export const approveComplianceReviewSchema = z.object({
   note: z.string().trim().max(4000).optional(),
