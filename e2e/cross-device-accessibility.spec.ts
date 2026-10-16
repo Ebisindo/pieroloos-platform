@@ -83,6 +83,12 @@ test.describe("cross-device responsive smoke matrix", () => {
     });
   }
 
+  test("language selector keeps an accessible name without exposing its label visually", async ({ page }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("label.sr-only[for] + select.language-select")).toHaveCount(1);
+    await expect(page.locator("select.language-select")).toHaveAccessibleName("Select language");
+  });
+
   test("public routes have a main landmark and a visible primary link", async ({ page }) => {
     for (const route of publicRoutes) {
       await page.setViewportSize({ width: 1280, height: 900 });
