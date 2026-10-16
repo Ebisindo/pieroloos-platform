@@ -59,6 +59,9 @@ const version = {
   requiresEvidence: true,
   professionalReviewRequired: true,
   reviewState: "VERIFIED",
+  reviewedByUserId: "reviewer-7",
+  reviewedAt: new Date("2026-10-01T12:00:00.000Z"),
+  reviewNote: "Reviewed against the official registry source.",
 };
 
 const payload = () => ({
@@ -151,6 +154,15 @@ describe("reviewed compliance rule obligation generation", () => {
         sourceRuleVersionId: "version-1",
         assessmentState: "APPLICABLE",
         dueAt: new Date("2026-10-31T00:00:00.000Z"),
+        assessmentFacts: expect.objectContaining({
+          sourceReview: expect.objectContaining({
+            state: "VERIFIED",
+            reviewerUserId: "reviewer-7",
+            reviewedAt: "2026-10-01T12:00:00.000Z",
+            evidenceClass: "E3",
+          }),
+          confidenceState: "PRIMARY_OR_CROSS_VERIFIED",
+        }),
       }),
     });
     expect(complianceActivityCreateMock).toHaveBeenCalled();
