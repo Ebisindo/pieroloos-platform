@@ -432,8 +432,6 @@ model Workspace {
   documents                  Document[]
   documentAccessEvents       DocumentAccessEvent[]
   complianceEvidence         ComplianceEvidence[]
-  complianceRuleVersions    ComplianceRuleVersion[]
-  complianceDeadlineSnapshots ComplianceDeadlineSnapshot[]
   reports                    Report[]
   activities                 Activity[]
   tasks                      Task[]
