@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useLocale } from "@/components/i18n/LocaleProvider";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 type ClientOption = { id: string; name: string | null; organizationName: string | null; proposedBusiness: string | null };
 type Activity = { id: string; type: string; title: string; summary: string | null; description: string | null; createdAt: string | Date };
@@ -26,7 +27,7 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
   clients: ClientOption[];
   canWrite: boolean;
 }) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [createdEngagements, setCreatedEngagements] = useState<Engagement[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
@@ -71,7 +72,7 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
         <h2 id="engagement-filter-heading" className="mb-4 text-lg font-semibold text-white">{t("engagements.filters")}</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block space-y-2"><span className="text-sm font-medium text-slate-200">{t("engagements.search")}</span><input value={query} onChange={(event) => setQuery(event.target.value)} type="search" className="min-h-11 w-full rounded-xl border border-white/15 bg-slate-950/70 px-4 py-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300" /></label>
-          <label className="block space-y-2"><span className="text-sm font-medium text-slate-200">{t("engagements.statusFilter")}</span><select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 w-full rounded-xl border border-white/15 bg-slate-950/70 px-4 py-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"><option value="">{t("engagements.allStatuses")}</option>{statuses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></label>
+          <label className="block space-y-2"><span className="text-sm font-medium text-slate-200">{t("engagements.statusFilter")}</span><select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 w-full rounded-xl border border-white/15 bg-slate-950/70 px-4 py-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"><option value="">{t("engagements.allStatuses")}</option>{statuses.map((item) => <option key={item} value={item}>{t(`engagements.status.${item}` as MessageKey)}</option>)}</select></label>
         </div>
       </section>
       {canWrite ? (
@@ -93,7 +94,7 @@ export function EngagementManager({ initialEngagements, clients, canWrite }: {
         <div className="grid gap-4 lg:grid-cols-2">
           {visible.map((item) => (
             <article key={item.id} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3"><span className="rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-1 text-xs font-medium text-cyan-100">{item.status.replaceAll("_", " ")}</span><span className="text-xs text-slate-400">{t("engagements.updatedAt", { date: new Date(item.updatedAt).toLocaleDateString() })}</span></div>
+              <div className="flex flex-wrap items-start justify-between gap-3"><span className="rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-1 text-xs font-medium text-cyan-100">{t(`engagements.status.${item.status}` as MessageKey)}</span><span className="text-xs text-slate-400">{t("engagements.updatedAt", { date: new Date(item.updatedAt).toLocaleDateString(locale) })}</span></div>
               <h3 className="mt-4 break-words text-lg font-semibold text-white">{item.service}</h3>
               <p className="mt-1 break-words text-sm text-slate-300">{item.client?.organizationName ?? item.client?.name ?? t("engagements.clientUnavailable")}</p>
               <p className="mt-3 break-words text-sm leading-6 text-slate-300">{item.nextAction ?? t("engagements.noNextAction")}</p>
