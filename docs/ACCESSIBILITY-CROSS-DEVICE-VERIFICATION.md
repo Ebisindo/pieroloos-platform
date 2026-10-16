@@ -55,19 +55,19 @@ The following work is not marked complete by CI emulation. Complete it before cl
 
 ## Current automated evidence
 
-Latest verified automated run: [CI #38854474640](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38854474640), code head `bd15b6f9621a35cef67657d37a28a07557630d21`, completed successfully on 16 October 2026. Both `quality` and `e2e` passed:
-- PostgreSQL 16 migration/validation and database-integrity checks.
+Latest verified automated run for the current PR head: [CI #38863928160](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38863928160), code head `46320a370464bd82a1008e93d1b1a2694fcde5c5`, completed successfully on 16 October 2026. Both `quality` and `e2e` passed:
+- PostgreSQL 16 migration/validation and database-integrity tests.
 - ESLint, TypeScript, unit tests and production builds.
-- Authenticated Business Profile save/reload, Reports generate/preview/HTML export, Engagement create/edit/lifecycle/activity, and cross-workspace resource/list denial.
-- Playwright report `report.json`: 40 tests total, 40 expected, 0 unexpected, 0 flaky, 0 skipped.
-- Responsive overflow checks and keyboard skip-link activation/focus check.
-- en/fr/es/pt locale catalogs: 1,217 unique keys each, with no missing/extra/duplicate keys.
+- Authenticated Business Profile save/reload, Reports generation/preview/HTML export, Engagement create/edit/lifecycle/activity, and cross-workspace resource/list denial.
+- Playwright report: 40 total, 40 expected, 0 unexpected, 0 flaky, 0 skipped.
+- Responsive overflow checks and keyboard skip-link activation/focus.
+- Locale catalogs en/fr/es/pt: 1,217 unique keys each, with no missing/extra/duplicate keys.
 
-The latest `playwright-results` artifact (ID `12027080653`, expires 30 October 2026) was downloaded and reviewed. It contains 24 authenticated screenshots for Business Profile list/detail, Reports before/after generation, and Engagement list/detail at 320, 390, 768 and 1280 CSS pixels, plus public-route screenshots and the embedded Playwright HTML report. The 320px views show the earlier visible “Select language” toolbar label is no longer present; content cards/forms stack vertically and the tested route/width matrix recorded no horizontal overflow.
+The latest `playwright-results` artifact (ID `12030219260`, expires 30 October 2026) was downloaded and reviewed. It contains 24 authenticated screenshots for Business Profile list/detail, Reports before/after generation, and Engagement list/detail at 320, 390, 768 and 1280 CSS pixels, plus public-route screenshots and the embedded Playwright report. At 320px the former visible “Select language” toolbar label is no longer present; content cards/forms stack vertically and the tested route/width matrix recorded no horizontal overflow.
 
-The six authenticated axe result attachments cover `/business-profile`, `/business-profile/[id]`, `/reports`, the generated report view, `/engagements`, and `/engagements/[id]`; each has an empty `violations` array for the configured WCAG 2.1 A/AA automated rules. The public-route axe scans also passed for English, French, Portuguese and Spanish. Results are bounded to the automated rules and states tested; they do not certify WCAG conformance.
+The six authenticated axe result attachments cover `/business-profile`, `/business-profile/[id]`, `/reports`, the generated report view, `/engagements`, and `/engagements/[id]`; each has an empty `violations` array for the configured WCAG 2.1 A/AA automated rules. The public-route axe scans passed in English, French, Portuguese and Spanish. This is evidence for the tested states and automated rules only; it is not WCAG certification.
 
-The downloaded report HTML assertions passed: export includes the updated profile objective and professional-review caveat and does not contain a raw `<script>` tag. This verifies test assertions, not real-device opening, reading or printing of the exported report.
+The generated HTML report assertions passed: the download includes the updated profile objective and professional-review caveat and does not contain a raw `<script>` tag. These are automated content/security checks, not real-device open/read/print verification.
 
 ## Release statement
 
