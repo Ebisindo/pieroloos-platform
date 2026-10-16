@@ -140,6 +140,20 @@ enum MarketEntryStatus {
   COMPLETED
 }
 
+enum BusinessIntentProposalStatus {
+  PROPOSED
+  REVIEW_REQUESTED
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum BusinessIntentReviewDecision {
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
 enum MarketEntryReviewStatus {
   PENDING
   APPROVED
@@ -331,6 +345,9 @@ model User {
   platformSuperAdmin        PlatformSuperAdmin?
   platformPermissionsGranted PlatformAdministratorPermission[] @relation("PlatformPermissionGrantor")
   platformAuditEvents       PlatformAuditEvent[] @relation("PlatformAuditActor")
+  businessIntentProposalsCreated BusinessIntentProposal[] @relation("BusinessIntentProposalCreator")
+  businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
+  businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
 }
 
 model PlatformAdministrator {
@@ -433,6 +450,7 @@ model Workspace {
   clientPortalInteractions    ClientPortalInteraction[]
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
+  businessIntentProposals    BusinessIntentProposal[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
@@ -464,6 +482,7 @@ model Client {
   engagements           Engagement[]
   documents             Document[]
   reports               Report[]
+  businessIntentProposals BusinessIntentProposal[]
   crossBorderDossiers   CrossBorderDossier[]
   portalAccessGrants    ClientPortalGrant[]
   portalEvents          ClientPortalAuditEvent[]
@@ -977,6 +996,51 @@ model ComplianceObligation {
   @@index([organizationId, workspaceId, status])
   @@index([workspaceId, dueAt])
   @@index([clientId])
+}
+
+model BusinessIntentProposal {
+  id                 String                       @id @default(cuid())
+  organizationId     String
+  workspaceId        String
+  clientId           String?
+  createdByUserId    String
+  reviewedByUserId   String?
+  status             BusinessIntentProposalStatus @default(PROPOSED)
+  version            Int                          @default(1)
+  inputDigest        String
+  proposal           Json
+  evidenceReferences Json?
+  provider           String?
+  providerModel      String?
+  reviewNote         String?
+  reviewedAt         DateTime?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  workspace Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  client    Client?   @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  creator   User      @relation("BusinessIntentProposalCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  reviewer  User?     @relation("BusinessIntentProposalReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([id, workspaceId], map: "BusinessIntentProposal_id_workspace_key")
+  @@index([organizationId, workspaceId, status, createdAt], map: "BusinessIntentProposal_tenant_status_created_idx")
+  @@index([clientId, createdAt], map: "BusinessIntentProposal_client_created_idx")
+  reviews BusinessIntentProposalReview[]
+}
+
+model BusinessIntentProposalReview {
+  id             String                       @id @default(cuid())
+  proposalId     String
+  workspaceId    String
+  reviewerUserId String
+  decision       BusinessIntentReviewDecision
+  note           String
+  occurredAt     DateTime                     @default(now())
+
+  proposal BusinessIntentProposal @relation(fields: [proposalId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  reviewer User                   @relation("BusinessIntentProposalReviewActor", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, proposalId, occurredAt], map: "BusinessIntentProposalReview_workspace_proposal_time_idx")
 }
 
 model MarketEntryPlan {
