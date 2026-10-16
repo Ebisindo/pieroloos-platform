@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const nullableDateSchema = z.preprocess((value) => value === null ? null : value, z.coerce.date().nullable());
+
 const applicabilitySchema = z.object({
   businessTypes: z.array(z.string().trim().min(1).max(120)).max(50).optional(),
   formationCompleted: z.boolean().optional(),
@@ -17,9 +19,9 @@ const ruleContentShape = {
   sourceUrl: z.string().url().max(2000).refine((value) => value.startsWith("https://"), {
     message: "Compliance rule sources must use HTTPS.",
   }),
-  publicationDate: z.coerce.date().nullable().optional(),
+  publicationDate: nullableDateSchema.optional(),
   effectiveFrom: z.coerce.date(),
-  effectiveThrough: z.coerce.date().nullable().optional(),
+  effectiveThrough: nullableDateSchema.optional(),
   applicability: applicabilitySchema,
   relativeDueDays: z.number().int().min(0).max(36500).nullable().optional(),
   requiresEvidence: z.boolean().default(false),
