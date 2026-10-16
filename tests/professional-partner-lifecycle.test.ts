@@ -291,7 +291,7 @@ describe("professional partner grant lifecycle and privilege boundaries", () => 
     };
     // The request digest depends on effective expiry. Exercise the conflict branch with a reused key and different terms.
     grantFindFirstMock.mockResolvedValueOnce({ ...original, requestDigest: "digest-from-another-request" });
-    const response = await createGrant(routeRequest({ ...matchingBody, purpose: "TAX_REVIEW" }, "/api/professional-partner-grants"));
+    const response = await createGrant(routeRequest(matchingBody, "/api/professional-partner-grants"));
     expect(response.status).toBe(409);
     expect(grantCreateMock).not.toHaveBeenCalled();
   });
