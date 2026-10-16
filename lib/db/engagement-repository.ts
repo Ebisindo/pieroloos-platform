@@ -113,12 +113,6 @@ export const engagementRepository = {
       });
       if (update.count !== 1) throw new Error("ENGAGEMENT_CHANGED_CONCURRENTLY");
 
-      const updated = await tx.engagement.findFirst({
-        where: { id: current.id, workspaceId: principal.workspaceId },
-        include: engagementInclude,
-      });
-      if (!updated) throw new Error("ENGAGEMENT_NOT_FOUND");
-
       await tx.activity.create({
         data: {
           engagementId: id,
@@ -130,6 +124,11 @@ export const engagementRepository = {
         },
       });
 
+      const updated = await tx.engagement.findFirst({
+        where: { id: current.id, workspaceId: principal.workspaceId },
+        include: engagementInclude,
+      });
+      if (!updated) throw new Error("ENGAGEMENT_NOT_FOUND");
       return updated;
     });
   },
@@ -154,12 +153,6 @@ export const engagementRepository = {
       });
       if (update.count !== 1) throw new Error("ENGAGEMENT_CHANGED_CONCURRENTLY");
 
-      const updated = await tx.engagement.findFirst({
-        where: { id, workspaceId: principal.workspaceId },
-        include: engagementInclude,
-      });
-      if (!updated) throw new Error("ENGAGEMENT_NOT_FOUND");
-
       await tx.activity.create({
         data: {
           engagementId: id,
@@ -170,6 +163,12 @@ export const engagementRepository = {
           description: note,
         },
       });
+
+      const updated = await tx.engagement.findFirst({
+        where: { id, workspaceId: principal.workspaceId },
+        include: engagementInclude,
+      });
+      if (!updated) throw new Error("ENGAGEMENT_NOT_FOUND");
       return updated;
     });
   },
