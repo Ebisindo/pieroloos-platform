@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   const { clientId } = await params;
   const parsed = partnerEvidenceAttachSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid evidence attachment request.", issues: parsed.error.flatten() }, { status: 422 });
-  if (parsed.data.sourceReference && /^https?:/i.test(parsed.data.sourceReference)) {
+  if (parsed.data.sourceReference && /^[a-z][a-z0-9+.-]*:/i.test(parsed.data.sourceReference)) {
     try {
       const source = new URL(parsed.data.sourceReference);
       if (source.protocol !== "https:" || source.username || source.password) {
