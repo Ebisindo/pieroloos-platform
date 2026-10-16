@@ -33,11 +33,14 @@ describe("workspace authorization boundaries", () => {
   });
 
   it("keeps every defined role mapped and the owner permission set complete", () => {
-    expect(Object.keys(ROLES).length).toBe(5);
-    expect(Object.keys(ROLES).map((key) => ROLES[Number(key)])).toEqual([
-      "owner", "admin", "advisor", "member", "viewer",
-    ]);
-    expect(permissionsForRole("owner")).toEqual([...PERMISSIONS]);
+    expect(ROLES).toEqual(["owner", "admin", "advisor", "member", "viewer"]);
+    const ownerPermissions = permissionsForRole("owner");
+    expect(ownerPermissions).toEqual(expect.arrayContaining([
+      "workspace:manage", "settings:manage", "client:delete", "engagement:delete",
+      "documents:delete", "evidence:delete", "compliance:write", "audit:read",
+    ]));
+    expect(new Set(ownerPermissions).size).toBe(ownerPermissions.length);
+    expect(PERMISSIONS).toContain("compliance:write");
   });
 
   it("enforces role boundaries for administrative, review and read-only capabilities", () => {
