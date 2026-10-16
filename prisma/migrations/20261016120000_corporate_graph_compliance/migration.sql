@@ -8,9 +8,9 @@ CREATE TABLE "CorporateComplianceRule" ("id" TEXT NOT NULL,"jurisdictionCode" TE
 CREATE INDEX "CorporateGraphNode_organizationId_workspaceId_idx" ON "CorporateGraphNode"("organizationId","workspaceId");
 CREATE INDEX "CorporateGraphNode_clientId_workspaceId_idx" ON "CorporateGraphNode"("clientId","workspaceId");
 CREATE INDEX "CorporateGraphNode_jurisdictionCode_entityType_idx" ON "CorporateGraphNode"("jurisdictionCode","entityType");
-CREATE UNIQUE INDEX "CorporateGraphEdge_organizationId_workspaceId_fromNodeId_toNodeId_relation_key" ON "CorporateGraphEdge"("organizationId","workspaceId","fromNodeId","toNodeId","relation");
+CREATE UNIQUE INDEX "CorporateGraphEdge_organizationId_workspaceId_fromNodeId_to_key" ON "CorporateGraphEdge"("organizationId","workspaceId","fromNodeId","toNodeId","relation");
 CREATE INDEX "CorporateGraphEdge_organizationId_workspaceId_fromNodeId_idx" ON "CorporateGraphEdge"("organizationId","workspaceId","fromNodeId");
 CREATE INDEX "CorporateGraphEdge_organizationId_workspaceId_toNodeId_idx" ON "CorporateGraphEdge"("organizationId","workspaceId","toNodeId");
-CREATE UNIQUE INDEX "CorporateComplianceRule_jurisdictionCode_entityType_ruleKey_version_key" ON "CorporateComplianceRule"("jurisdictionCode","entityType","ruleKey","version");
-CREATE INDEX "CorporateComplianceRule_jurisdictionCode_entityType_active_reviewStatus_idx" ON "CorporateComplianceRule"("jurisdictionCode","entityType","active","reviewStatus");
+CREATE UNIQUE INDEX "CorporateComplianceRule_jurisdictionCode_entityType_ruleKey_key" ON "CorporateComplianceRule"("jurisdictionCode","entityType","ruleKey","version");
+CREATE INDEX "CorporateComplianceRule_jurisdictionCode_entityType_active__idx" ON "CorporateComplianceRule"("jurisdictionCode","entityType","active","reviewStatus");
 CREATE INDEX "CorporateComplianceRule_sourceRetrievedAt_idx" ON "CorporateComplianceRule"("sourceRetrievedAt");
