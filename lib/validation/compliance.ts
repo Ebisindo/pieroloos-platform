@@ -32,9 +32,15 @@ export const approveComplianceReviewSchema = z.object({
 export const addComplianceEvidenceSchema = z.object({
   documentId: z.string().min(1),
   evidenceClass: z.enum(["E0","E1","E2","E3","E4"]),
+  factKey: z.enum(["BUSINESS_TYPE", "FORMATION_COMPLETED", "TRIGGER_DATE"]).optional(),
+  factValue: z.string().trim().min(1).max(500).optional(),
   note: z.string().max(4000).optional(),
   sourceReference: z.string().trim().max(2000).optional(),
   validThrough: z.coerce.date().optional().nullable(),
+}).strict().superRefine((value, context) => {
+  if ((value.factKey && !value.factValue) || (!value.factKey && value.factValue)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["factValue"], message: "Structured fact assertions require both factKey and factValue." });
+  }
 });
 
 export const reviewComplianceEvidenceSchema = z.object({
