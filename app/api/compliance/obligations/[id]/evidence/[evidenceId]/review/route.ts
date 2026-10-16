@@ -32,7 +32,12 @@ export async function PATCH(
   });
   if (!obligation) return NextResponse.json({ error: "Compliance obligation not found." }, { status: 404 });
   const existing = await prisma.complianceEvidence.findFirst({
-    where: { id: evidenceId, obligationId: obligation.id, workspaceId: principal.workspaceId },
+    where: {
+      id: evidenceId,
+      obligationId: obligation.id,
+      workspaceId: principal.workspaceId,
+      document: { workspaceId: principal.workspaceId, status: "AVAILABLE", scanStatus: "CLEAN", deletedAt: null },
+    },
     select: { id: true, reviewStatus: true },
   });
   if (!existing) return NextResponse.json({ error: "Evidence record not found." }, { status: 404 });
@@ -53,10 +58,12 @@ export async function PATCH(
           obligationId: currentObligation.id,
           workspaceId: principal.workspaceId,
           reviewStatus: existing.reviewStatus,
+          document: { workspaceId: principal.workspaceId, status: "AVAILABLE", scanStatus: "CLEAN", deletedAt: null },
         },
         select: { id: true, reviewStatus: true },
       });
       if (!currentEvidence) return null;
+      if (currentEvidence.reviewStatus === "REVOKED") throw new Error("COMPLIANCE_EVIDENCE_REVOKED");
 
       const updated = await transaction.complianceEvidence.updateMany({
         where: {
@@ -97,6 +104,9 @@ export async function PATCH(
     if (!result) return NextResponse.json({ error: "Evidence or obligation changed concurrently. Refresh and retry." }, { status: 409 });
     return NextResponse.json({ data: result });
   } catch (error) {
+    if (error instanceof Error && error.message === "COMPLIANCE_EVIDENCE_REVOKED") {
+      return NextResponse.json({ error: "Revoked evidence is immutable. Attach a replacement evidence record if the claim has been corrected." }, { status: 409 });
+    }
     if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
       return NextResponse.json({ error: "Workspace authorization changed. Refresh and try again." }, { status: 409 });
     }
