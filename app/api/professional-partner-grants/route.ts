@@ -5,6 +5,7 @@ import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { createProfessionalPartnerGrantSchema } from "@/lib/validation/professional-partner";
+import { prisma } from "@/lib/db/prisma";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_GRANT_DAYS = 90;
