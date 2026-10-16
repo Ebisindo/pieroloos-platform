@@ -503,7 +503,13 @@ select.form-input { appearance:auto; }
 
 /* Preserve legibility in operating-system forced-colors/high-contrast modes. */
 @media (forced-colors: active) {
-  .app-backdrop {
+  .app-backdrop,
+  .module-banner-decoration,
+  .operational-illustration-orbit,
+  .operational-illustration-orbit-b,
+  .ambient-orbit,
+  .star-field,
+  .boot-orbit {
     display: none !important;
   }
 
