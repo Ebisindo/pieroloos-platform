@@ -86,7 +86,7 @@ export function ReportWorkspace({ initialReports, clients, canWrite }: {
                   <button type="button" onClick={() => setSelectedReportId(report.id)} aria-pressed={selectedReportId === report.id} className={`min-h-11 w-full rounded-xl border p-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 ${selectedReportId === report.id ? "border-cyan-300/40 bg-cyan-300/[0.08]" : "border-white/10 hover:bg-white/[0.04]"}`}>
                     <span className="block break-words text-sm font-semibold text-white">{report.title}</span>
                     <span className="mt-1 block text-xs leading-5 text-slate-400">{report.client?.organizationName ?? report.client?.name ?? t("reports.clientUnknown")}</span>
-                    <span className="mt-1 block text-xs text-slate-500">{new Date(report.createdAt).toLocaleString(locale)}</span>
+                    <span className="mt-1 block text-xs text-slate-400">{new Date(report.createdAt).toLocaleString(locale)}</span>
                   </button>
                 </li>
               ))}
