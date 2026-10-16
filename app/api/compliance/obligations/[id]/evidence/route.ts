@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
-import { prisma } from "@/lib/db/prisma";
 import { addComplianceEvidenceSchema } from "@/lib/validation/compliance";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -17,31 +16,20 @@ export async function POST(request: Request, routeContext: RouteContext) {
   if (!context.principal.permissions.includes("documents:write")) {
     return NextResponse.json({ error: "Document write permission required." }, { status: 403 });
   }
-  const principal = context.principal;
 
-  const { id } = await routeContext.params;
-  const parsed = addComplianceEvidenceSchema.safeParse(await request.json());
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+  const parsed = addComplianceEvidenceSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid compliance evidence.", issues: parsed.error.flatten() }, { status: 422 });
   }
-  const obligation = await prisma.complianceObligation.findFirst({
-    where: { id, workspaceId: principal.workspaceId },
-    select: { id: true, clientId: true },
-  });
-  if (!obligation) return NextResponse.json({ error: "Compliance obligation not found." }, { status: 404 });
-  const document = await prisma.document.findFirst({
-    where: {
-      id: parsed.data.documentId,
-      workspaceId: principal.workspaceId,
-      clientId: obligation.clientId,
-      status: "AVAILABLE",
-      scanStatus: "CLEAN",
-      deletedAt: null,
-    },
-    select: { id: true },
-  });
-  if (!document) return NextResponse.json({ error: "Document not found for this client and workspace." }, { status: 404 });
 
+  const principal = context.principal;
+  const { id } = await routeContext.params;
   const validThrough = parsed.data.validThrough
     ? new Date(Date.UTC(
         parsed.data.validThrough.getUTCFullYear(),
@@ -53,27 +41,32 @@ export async function POST(request: Request, routeContext: RouteContext) {
         999,
       ))
     : null;
-  let evidence;
+
   try {
-    evidence = await withAuthorizedWorkspaceTransaction(principal, "documents:write", async (transaction) => {
-      const [currentObligation, currentDocument] = await Promise.all([
-        transaction.complianceObligation.findFirst({
-          where: { id: obligation.id, workspaceId: principal.workspaceId },
-          select: { id: true },
-        }),
-        transaction.document.findFirst({
-          where: {
-            id: document.id,
-            workspaceId: principal.workspaceId,
-            clientId: obligation.clientId,
-            status: "AVAILABLE",
-            scanStatus: "CLEAN",
-            deletedAt: null,
-          },
-          select: { id: true },
-        }),
-      ]);
-      if (!currentObligation || !currentDocument) throw new Error("DOCUMENT_NOT_READY");
+    const evidence = await withAuthorizedWorkspaceTransaction(principal, "documents:write", async (transaction) => {
+      const obligation = await transaction.complianceObligation.findFirst({
+        where: {
+          id,
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+        },
+        select: { id: true, clientId: true },
+      });
+      if (!obligation) throw new Error("COMPLIANCE_OBLIGATION_NOT_FOUND");
+
+      const document = await transaction.document.findFirst({
+        where: {
+          id: parsed.data.documentId,
+          workspaceId: principal.workspaceId,
+          clientId: obligation.clientId,
+          status: "AVAILABLE",
+          scanStatus: "CLEAN",
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!document) throw new Error("COMPLIANCE_EVIDENCE_DOCUMENT_NOT_FOUND");
+
       const created = await transaction.complianceEvidence.create({
         data: {
           obligationId: obligation.id,
@@ -110,15 +103,18 @@ export async function POST(request: Request, routeContext: RouteContext) {
       });
       return created;
     });
+    return NextResponse.json({ data: evidence }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === "DOCUMENT_NOT_READY") {
-      return NextResponse.json({ error: "Only security-scanned documents can be linked as evidence." }, { status: 409 });
-    }
     if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
       return NextResponse.json({ error: "Workspace authorization changed. Refresh and try again." }, { status: 409 });
     }
-    throw error;
+    if (error instanceof Error && error.message === "COMPLIANCE_OBLIGATION_NOT_FOUND") {
+      return NextResponse.json({ error: "Compliance obligation not found." }, { status: 404 });
+    }
+    if (error instanceof Error && error.message === "COMPLIANCE_EVIDENCE_DOCUMENT_NOT_FOUND") {
+      return NextResponse.json({ error: "Document not found for this client and workspace." }, { status: 404 });
+    }
+    console.error("Compliance evidence attachment failed.", error);
+    return NextResponse.json({ error: "Unable to attach compliance evidence." }, { status: 500 });
   }
-
-  return NextResponse.json({ data: evidence }, { status: 201 });
 }
