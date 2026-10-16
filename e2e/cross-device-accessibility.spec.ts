@@ -194,7 +194,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     await captureAuthenticatedViewportMatrix(page, "/reports", "reports");
     await expectNoSeriousAxeViolations(page, "/reports");
     const reportClient = page.getByLabel("Client record");
-    await expect(reportClient.locator("option")).toContainText("E2E Primary Client");
+    await expect(reportClient.locator('option[value="pieroloos-e2e-primary-client"]')).toHaveText("E2E Primary Client");
     const reportOptions = await reportClient.locator("option").allTextContents();
     expect(reportOptions).not.toContain("Foreign Private Client");
     await reportClient.selectOption({ label: "E2E Primary Client" });
