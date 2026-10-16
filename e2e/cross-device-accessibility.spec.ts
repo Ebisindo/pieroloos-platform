@@ -283,6 +283,8 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
     await page.setViewportSize({ width: 320, height: 900 });
     await page.goto("/business-profile", { waitUntil: "domcontentloaded" });
+    const bootLayer = page.locator(".boot-layer");
+    if (await bootLayer.count()) await expect(bootLayer).toHaveClass(/boot-hidden/);
     await expect(page.getByRole("heading", { name: "Business Profiles" })).toBeVisible();
     const skipLink = page.locator("a.skip-link");
     await page.keyboard.press("Tab");
