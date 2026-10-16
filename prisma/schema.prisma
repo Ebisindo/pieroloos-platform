@@ -1399,9 +1399,9 @@ model ProfessionalPartnerIdentity {
   professionalRegistrationRef String?
   status                    ProfessionalPartnerIdentityStatus @default(PENDING_VERIFICATION)
   createdByUserId            String
-  verifiedByUserId           String?
-  verifiedAt                 DateTime?
-  verificationNote           String?
+  reviewedByUserId           String?
+  reviewedAt                 DateTime?
+  reviewNote                 String?
   suspendedByUserId          String?
   suspendedAt                DateTime?
   suspensionReason           String?
@@ -1412,7 +1412,7 @@ model ProfessionalPartnerIdentity {
   workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
   user         User         @relation("ProfessionalPartnerIdentityUser", fields: [userId], references: [id], onDelete: Restrict)
   creator      User         @relation("ProfessionalPartnerIdentityCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  verifier     User?        @relation("ProfessionalPartnerIdentityReviewer", fields: [verifiedByUserId], references: [id], onDelete: Restrict)
+  reviewer     User?        @relation("ProfessionalPartnerIdentityReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
   suspender    User?        @relation("ProfessionalPartnerIdentitySuspender", fields: [suspendedByUserId], references: [id], onDelete: Restrict)
   grants       ProfessionalPartnerGrant[]
   auditEvents  ProfessionalPartnerIdentityAuditEvent[]
