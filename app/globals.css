@@ -106,7 +106,7 @@ a { color: inherit; text-decoration: none; }
 .context-path { display:flex; gap:8px; align-items:center; color:#6f7892; font-size:12px; }
 .context-path strong { color:#d9deeb; font-weight:600; }
 .search-button { border:1px solid var(--line); background:rgba(255,255,255,.025); color:#8d96ad; border-radius:8px; height:34px; padding:0 9px; display:flex; align-items:center; gap:8px; }
-.search-button kbd { border:1px solid var(--line); border-radius:4px; padding:2px 5px; font-size:9px; color:#66708a; }
+.search-button kbd { border:1px solid var(--line); border-radius:4px; padding:2px 5px; font-size:9px; color:#b9c5dc; }
 .security-state { display:flex; align-items:center; gap:6px; color:#7f8aa5; font-size:10px; }
 .security-state svg { color:var(--green); }
 .avatar { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; border:1px solid rgba(214,182,106,.35); background:rgba(214,182,106,.08); color:var(--gold); font-size:9px; font-weight:700; }
