@@ -1164,6 +1164,9 @@ model ComplianceEvidence {
   obligationId     String
   documentId       String
   evidenceClass    String
+  // Optional structured assertion recorded when evidence is attached; it is not trusted until reviewStatus=VERIFIED.
+  factKey          String?
+  factValue        String?
   note             String?
   sourceReference  String?
   validThrough     DateTime?
