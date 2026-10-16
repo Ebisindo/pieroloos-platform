@@ -1,5 +1,3 @@
-# Governance regression coverage for scoped portal grants
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 import { updateClientPortalGrant } from "@/lib/services/client-portal-service";
