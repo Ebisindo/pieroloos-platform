@@ -1701,7 +1701,6 @@ model CorporateGraphNode {
   @@unique([organizationId, workspaceId, id])
   @@index([organizationId, workspaceId])
   @@index([clientId, workspaceId])
-  @@unique([organizationId, workspaceId, id])
   @@index([jurisdictionCode, entityType])
 }
 
