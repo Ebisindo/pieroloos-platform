@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
@@ -156,7 +155,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
     if (error instanceof Error && error.message === "REMINDER_RECIPIENT_NOT_IN_ORGANIZATION") {
       return NextResponse.json({ error: "Reminder recipient is not a member of the active organization." }, { status: 409 });
     }
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && dedupeKey) {
+    if (isUniqueConstraintError(error) && dedupeKey) {
       const existing = await prisma.complianceNotification.findFirst({
         where: {
           organizationId: principal.organizationId,
@@ -169,4 +168,9 @@ export async function POST(request: Request, routeContext: RouteContext) {
     console.error("Compliance reminder scheduling failed.", error);
     return NextResponse.json({ error: "Unable to schedule compliance reminder." }, { status: 500 });
   }
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error &&
+    (error as { code?: unknown }).code === "P2002";
 }
