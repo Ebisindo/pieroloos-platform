@@ -22,14 +22,29 @@ async function expectNoSeriousAxeViolations(page: import("@playwright/test").Pag
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
-  const blockers = results.violations
-    .filter((item) => item.impact === "critical" || item.impact === "serious")
-    .map((item) => ({
-      id: item.id,
-      impact: item.impact,
-      help: item.help,
-      targets: item.nodes.flatMap((node) => node.target),
-    }));
+
+  // Preserve every finding, including moderate/minor items, in the Playwright report for human triage.
+  const findings = results.violations.map((item) => ({
+    id: item.id,
+    impact: item.impact,
+    help: item.help,
+    description: item.description,
+    helpUrl: item.helpUrl,
+    nodes: item.nodes.map((node) => ({
+      target: node.target,
+      summary: node.failureSummary,
+      any: node.any.map((check) => ({ id: check.id, message: check.message })),
+      all: node.all.map((check) => ({ id: check.id, message: check.message })),
+      none: node.none.map((check) => ({ id: check.id, message: check.message })),
+    })),
+  }));
+  const attachmentName = `axe-${route.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.json`;
+  await test.info().attach(attachmentName, {
+    body: Buffer.from(JSON.stringify({ route, violations: findings }, null, 2)),
+    contentType: "application/json",
+  });
+
+  const blockers = findings.filter((item) => item.impact === "critical" || item.impact === "serious");
   expect(blockers, `Critical/serious axe findings on ${route}`).toEqual([]);
 }
 
