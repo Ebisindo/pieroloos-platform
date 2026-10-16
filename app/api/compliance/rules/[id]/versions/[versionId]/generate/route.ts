@@ -11,7 +11,8 @@ const generationSchema = z.object({
   clientId: z.string().trim().min(1).max(120),
   businessType: z.string().trim().min(1).max(120).nullable(),
   formationCompleted: z.boolean().nullable(),
-  baseDate: z.coerce.date().nullable(),
+  // Prevent null from being coerced to the Unix epoch before nullable handling.
+  baseDate: z.preprocess((value) => value === null ? null : value, z.coerce.date().nullable()),
   factEvidence: z.array(z.object({
     key: z.enum(["BUSINESS_TYPE", "FORMATION_COMPLETED", "TRIGGER_DATE"]),
     evidenceId: z.string().trim().min(1).max(120),
