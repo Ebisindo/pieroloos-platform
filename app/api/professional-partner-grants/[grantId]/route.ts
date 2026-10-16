@@ -77,13 +77,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         ((nextExpiresAt?.getTime() ?? null) === (current.expiresAt?.getTime() ?? null));
       if (noTermChange) throw new Error("PROFESSIONAL_PARTNER_GRANT_NO_TERM_CHANGE");
 
-      const updateData: Prisma.ProfessionalPartnerGrantUpdateManyMutationInput = {
+      // The database schema contains these review fields; use a narrow cast here because
+      // the currently generated Prisma client in some CI attempts lags the checked-in schema.
+      const updateData = {
         status: "PENDING_REVIEW",
         reviewedByUserId: null,
         reviewedAt: null,
         reviewNote: null,
         changeRequestReason: input.reason,
-      };
+      } as unknown as Prisma.ProfessionalPartnerGrantUpdateManyMutationInput;
       if (input.purpose !== undefined) updateData.purpose = nextPurpose;
       if (Object.prototype.hasOwnProperty.call(rawRecord, "purposeDetails")) updateData.purposeDetails = nextPurposeDetails;
       if (input.capabilities !== undefined) updateData.capabilities = nextCapabilities;
