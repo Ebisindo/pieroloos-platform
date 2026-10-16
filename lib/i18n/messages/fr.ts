@@ -711,6 +711,7 @@ const fr = {
   "engagements.detail.noNextAction": "Aucune prochaine action n’a été définie.",
   "engagements.detail.context": "Contexte de l’entreprise",
   "engagements.detail.unnamedProfile": "Le profil d’entreprise n’a pas encore de nom.",
+  "engagements.activity.statusChangedTo": "Statut passé à {status}",
   "engagements.activity.empty": "Aucune activité n’a encore été enregistrée.",
   "engagements.status.DRAFT": "Brouillon",
   "engagements.status.INTAKE": "Accueil",
