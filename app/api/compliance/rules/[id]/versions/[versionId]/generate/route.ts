@@ -138,13 +138,21 @@ export async function POST(request: Request, routeContext: RouteContext) {
           obligation: { workspaceId: principal.workspaceId, clientId: client.id, organizationId: principal.organizationId },
           document: { workspaceId: principal.workspaceId, clientId: client.id, status: "AVAILABLE", scanStatus: "CLEAN", deletedAt: null },
         },
-        select: { id: true, evidenceClass: true, documentId: true, validThrough: true },
+        select: { id: true, evidenceClass: true, documentId: true, validThrough: true, factKey: true, factValue: true },
       }) : [];
-      const verifiedIds = new Set(evidenceRows.filter((row) =>
+      const expectedFactValue = (key: "BUSINESS_TYPE" | "FORMATION_COMPLETED" | "TRIGGER_DATE") => {
+        if (key === "BUSINESS_TYPE") return input.businessType;
+        if (key === "FORMATION_COMPLETED") return input.formationCompleted === null ? null : String(input.formationCompleted);
+        return input.baseDate?.toISOString() ?? null;
+      };
+      const verifiedById = new Map(evidenceRows.filter((row) =>
         ["E3", "E4", "E3_PRIMARY", "E4_CROSS_VERIFIED"].includes(row.evidenceClass) &&
         (!row.validThrough || row.validThrough >= now)
-      ).map((row) => row.id));
-      const missingEvidence = input.factEvidence.filter((item) => !verifiedIds.has(item.evidenceId)).map((item) => item.key);
+      ).map((row) => [row.id, row]));
+      const missingEvidence = input.factEvidence.filter((item) => {
+        const evidence = verifiedById.get(item.evidenceId);
+        return !evidence || evidence.factKey !== item.key || evidence.factValue !== expectedFactValue(item.key);
+      }).map((item) => item.key);
       if (missingEvidence.length) {
         return { state: "UNKNOWN" as const, reasons: ["FACT_EVIDENCE_UNVERIFIED"], missingEvidence: [...new Set(missingEvidence)] };
       }
