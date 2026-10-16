@@ -59,6 +59,7 @@ export const complianceRuleVersionDraftSchema = z.object({
 export const complianceRuleReviewSchema = z.object({
   decision: z.enum(["VERIFY", "REJECT"]),
   evidenceClass: z.enum(["E3", "E4"]).optional(),
+  sourceOpenedAndChecked: z.literal(true).optional(),
   reviewNote: z.string().trim().min(8).max(2000),
 }).strict().superRefine((value, context) => {
   if (value.decision === "VERIFY" && !value.evidenceClass) {
@@ -66,6 +67,13 @@ export const complianceRuleReviewSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["evidenceClass"],
       message: "Verification requires an explicit E3 or E4 evidence attestation.",
+    });
+  }
+  if (value.decision === "VERIFY" && value.sourceOpenedAndChecked !== true) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["sourceOpenedAndChecked"],
+      message: "Reviewer must attest that the source was opened and checked.",
     });
   }
 });
