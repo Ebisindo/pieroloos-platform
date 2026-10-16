@@ -19,7 +19,9 @@ export async function POST(request: Request) {
     const client = await tx.client.findFirst({ where:{ id:parsed.data.clientId, organizationId:principal.organizationId, workspaceId:principal.workspaceId },select:{id:true} });
     if (!client) throw new Error("CLIENT_NOT_FOUND");
    }
-   return tx.corporateGraphNode.create({ data:{ organizationId:principal.organizationId,workspaceId:principal.workspaceId,clientId:parsed.data.clientId,name:parsed.data.name,nodeType:parsed.data.nodeType,jurisdictionCode:parsed.data.jurisdictionCode?.toUpperCase(),entityType:parsed.data.entityType,createdByUserId:principal.userId }});
+   const node = await tx.corporateGraphNode.create({ data:{ organizationId:principal.organizationId,workspaceId:principal.workspaceId,clientId:parsed.data.clientId,name:parsed.data.name,nodeType:parsed.data.nodeType,jurisdictionCode:parsed.data.jurisdictionCode?.toUpperCase(),entityType:parsed.data.entityType,createdByUserId:principal.userId }});
+   await tx.corporateGraphAuditEvent.create({ data: { organizationId: principal.organizationId, workspaceId: principal.workspaceId, actorUserId: principal.userId, action: "NODE_CREATED", subjectType: "CorporateGraphNode", subjectId: node.id, details: { name: node.name, nodeType: node.nodeType } } });
+   return node;
   });
   return NextResponse.json({ data:node },{status:201});
  } catch(error) {

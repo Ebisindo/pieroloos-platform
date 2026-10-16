@@ -297,6 +297,7 @@ model Organization {
   memberships           Membership[]
   workspaces            Workspace[]
   corporateGraphNodes   CorporateGraphNode[]
+  corporateGraphAuditEvents CorporateGraphAuditEvent[]
   clients               Client[]
   jurisdictions         Jurisdiction[]
   complianceObligations ComplianceObligation[]
@@ -332,6 +333,7 @@ model User {
   platformSuperAdmin        PlatformSuperAdmin?
   platformPermissionsGranted PlatformAdministratorPermission[] @relation("PlatformPermissionGrantor")
   platformAuditEvents       PlatformAuditEvent[] @relation("PlatformAuditActor")
+  corporateGraphAuditEvents  CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
 }
 
 model PlatformAdministrator {
@@ -435,6 +437,7 @@ model Workspace {
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
   corporateGraphNodes        CorporateGraphNode[]
+  corporateGraphAuditEvents CorporateGraphAuditEvent[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
@@ -1693,6 +1696,8 @@ model CorporateGraphNode {
   createdByUserId    String
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
+  archivedAt         DateTime?
+  archivedByUserId   String?
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
   client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
@@ -1701,6 +1706,7 @@ model CorporateGraphNode {
   @@index([organizationId, workspaceId])
   @@index([clientId, workspaceId])
   @@index([jurisdictionCode, entityType])
+  @@index([organizationId, workspaceId, archivedAt])
 }
 
 model CorporateGraphEdge {
@@ -1714,11 +1720,14 @@ model CorporateGraphEdge {
   notes            String?
   createdByUserId  String
   createdAt        DateTime                   @default(now())
+  archivedAt       DateTime?
+  archivedByUserId String?
   fromNode CorporateGraphNode @relation("CorporateGraphFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
   toNode CorporateGraphNode @relation("CorporateGraphTo", fields: [toNodeId], references: [id], onDelete: Cascade)
   @@unique([organizationId, workspaceId, fromNodeId, toNodeId, relation])
   @@index([organizationId, workspaceId, fromNodeId])
   @@index([organizationId, workspaceId, toNodeId])
+  @@index([organizationId, workspaceId, archivedAt])
 }
 
 model CorporateComplianceRule {
@@ -1748,4 +1757,31 @@ model CorporateComplianceRule {
   @@unique([jurisdictionCode, entityType, ruleKey, version])
   @@index([jurisdictionCode, entityType, active, reviewStatus])
   @@index([sourceRetrievedAt])
+}
+
+enum CorporateGraphAuditAction {
+  NODE_CREATED
+  NODE_UPDATED
+  NODE_ARCHIVED
+  EDGE_CREATED
+  EDGE_ARCHIVED
+}
+
+model CorporateGraphAuditEvent {
+  id             String                    @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  actorUserId    String
+  action         CorporateGraphAuditAction
+  subjectType    String
+  subjectId      String
+  details        Json?
+  occurredAt     DateTime                  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  actor        User         @relation("CorporateGraphAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([subjectType, subjectId, occurredAt])
 }

@@ -59,13 +59,14 @@ export async function POST(request: Request) {
           organizationId: principal.organizationId,
           workspaceId: principal.workspaceId,
           id: { in: [parsed.data.fromNodeId, parsed.data.toNodeId] },
+          archivedAt: null,
         },
         select: { id: true },
       });
       if (nodes.length !== 2) throw new Error("GRAPH_NODE_NOT_FOUND");
 
       const existing = await tx.corporateGraphEdge.findMany({
-        where: { organizationId: principal.organizationId, workspaceId: principal.workspaceId },
+        where: { organizationId: principal.organizationId, workspaceId: principal.workspaceId, archivedAt: null },
         select: {
           fromNodeId: true,
           toNodeId: true,
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
       if (ownershipError) throw new Error("OWNERSHIP_TOTAL_EXCEEDED");
       if (wouldCreateOwnershipCycle(existing, parsed.data)) throw new Error("OWNERSHIP_CYCLE");
 
-      return tx.corporateGraphEdge.create({
+      const createdEdge = await tx.corporateGraphEdge.create({
         data: {
           organizationId: principal.organizationId,
           workspaceId: principal.workspaceId,
@@ -103,6 +104,16 @@ export async function POST(request: Request) {
           toNode: { select: { id: true, name: true } },
         },
       });
+      await tx.corporateGraphAuditEvent.create({ data: {
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        actorUserId: principal.userId,
+        action: "EDGE_CREATED",
+        subjectType: "CorporateGraphEdge",
+        subjectId: createdEdge.id,
+        details: { relation: createdEdge.relation, fromNodeId: createdEdge.fromNodeId, toNodeId: createdEdge.toNodeId },
+      } });
+      return createdEdge;
     });
 
     return NextResponse.json({ data: edge }, { status: 201 });

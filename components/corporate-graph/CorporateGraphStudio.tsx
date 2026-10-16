@@ -31,6 +31,16 @@ type EdgeRecord = {
 
 type GraphData = { nodes: NodeRecord[]; edges: EdgeRecord[] };
 type ApiErrorPayload = { error?: string };
+type GraphAuditEvent = {
+  id: string;
+  action: string;
+  subjectType: string;
+  subjectId: string;
+  details: Record<string, unknown> | null;
+  occurredAt: string;
+  actor: { name: string | null };
+};
+type ArchiveRequest = { type: "node" | "edge"; id: string; label: string };
 
 const nodeTypes = [
   "COMPANY",
@@ -69,6 +79,9 @@ export default function CorporateGraphStudio() {
   const [toNodeId, setToNodeId] = useState("");
   const [relation, setRelation] = useState<CorporateGraphRelationType>("OWNS");
   const [ownershipPercent, setOwnershipPercent] = useState("");
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [pendingArchive, setPendingArchive] = useState<ArchiveRequest | null>(null);
+  const [auditEvents, setAuditEvents] = useState<GraphAuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -129,6 +142,33 @@ export default function CorporateGraphStudio() {
     };
   }, []);
 
+  const refreshAudit = useCallback(async () => {
+    try {
+      const response = await fetch("/api/corporate-graph/audit", { cache: "no-store" });
+      const payload = (await response.json()) as { events?: GraphAuditEvent[]; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Unable to load graph activity.");
+      setAuditEvents(Array.isArray(payload.events) ? payload.events : []);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Unable to load graph activity.");
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/corporate-graph/audit", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as { events?: GraphAuditEvent[]; error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Unable to load graph activity.");
+        if (mounted) setAuditEvents(Array.isArray(payload.events) ? payload.events : []);
+      })
+      .catch((cause: unknown) => {
+        if (mounted) setError(cause instanceof Error ? cause.message : "Unable to load graph activity.");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const layout = useMemo(
     () => layoutCorporateGraph(graph.nodes.map((node) => ({ id: node.id }))),
     [graph.nodes],
@@ -143,25 +183,64 @@ export default function CorporateGraphStudio() {
     setBusy(true);
     setError("");
     setMessage("");
+    const editing = editingNodeId !== null;
     try {
-      const response = await fetch("/api/corporate-graph/nodes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          nodeType,
-          jurisdictionCode: jurisdictionCode || undefined,
-          entityType: entityType || undefined,
-        }),
-      });
+      const response = await fetch(
+        editing ? `/api/corporate-graph/nodes/${editingNodeId}` : "/api/corporate-graph/nodes",
+        {
+          method: editing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            nodeType,
+            jurisdictionCode: jurisdictionCode || undefined,
+            entityType: entityType || undefined,
+          }),
+        },
+      );
       const payload = (await response.json()) as ApiErrorPayload;
-      if (!response.ok) throw new Error(payload.error ?? "Unable to create entity.");
+      if (!response.ok) throw new Error(payload.error ?? (editing ? "Unable to update entity." : "Unable to create entity."));
       setName("");
       setJurisdictionCode("");
-      setMessage("Entity added to the workspace graph.");
+      setEntityType("COMPANY");
+      setEditingNodeId(null);
+      setMessage(editing ? "Entity updated." : "Entity added to the workspace graph.");
       await refreshGraph(false);
+      await refreshAudit();
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : "Unable to create entity.");
+      setError(cause instanceof Error ? cause.message : "Unable to save entity.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmArchive() {
+    if (!pendingArchive) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    const item = pendingArchive;
+    try {
+      const response = await fetch(
+        item.type === "node"
+          ? `/api/corporate-graph/nodes/${item.id}`
+          : `/api/corporate-graph/edges/${item.id}`,
+        { method: "DELETE" },
+      );
+      const payload = (await response.json()) as ApiErrorPayload;
+      if (!response.ok) throw new Error(payload.error ?? "Unable to archive graph record.");
+      if (item.type === "node" && editingNodeId === item.id) {
+        setEditingNodeId(null);
+        setName("");
+        setJurisdictionCode("");
+        setEntityType("COMPANY");
+      }
+      setPendingArchive(null);
+      setMessage(item.type === "node" ? "Entity and connected relationships archived." : "Relationship archived.");
+      await refreshGraph(false);
+      await refreshAudit();
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Unable to archive graph record.");
     } finally {
       setBusy(false);
     }
@@ -197,6 +276,7 @@ export default function CorporateGraphStudio() {
       setOwnershipPercent("");
       setMessage("Relationship added to the workspace graph.");
       await refreshGraph(false);
+      await refreshAudit();
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Unable to create relationship.");
     } finally {
@@ -253,12 +333,25 @@ export default function CorporateGraphStudio() {
         </div>
       ) : null}
       {message ? <p className="graph-success" role="status" aria-live="polite">{message}</p> : null}
+      {pendingArchive ? (
+        <section className="graph-error" aria-label="Confirm archive">
+          <p>Archive {pendingArchive.type === "node" ? "entity" : "relationship"} “{pendingArchive.label}”? This preserves its audit history but removes it from the active graph.</p>
+          <div className="graph-form-actions">
+            <button className="button button-primary" type="button" disabled={busy} onClick={() => void confirmArchive()}>
+              Confirm archive
+            </button>
+            <button className="button button-secondary" type="button" disabled={busy} onClick={() => setPendingArchive(null)}>
+              Cancel
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <div className="graph-grid">
         <section className="glass-panel">
           <div className="section-header">
             <div>
-              <h2>Add an entity</h2>
+              <h2>{editingNodeId ? "Edit entity" : "Add an entity"}</h2>
               <p>Create a company, person or related corporate object.</p>
             </div>
           </div>
@@ -304,9 +397,26 @@ export default function CorporateGraphStudio() {
                 onChange={(event) => setEntityType(event.target.value)}
               />
             </label>
-            <button className="button button-primary" disabled={busy || loading}>
-              Add entity
-            </button>
+            <div className="graph-form-actions">
+              <button className="button button-primary" disabled={busy || loading}>
+                {editingNodeId ? "Save changes" : "Add entity"}
+              </button>
+              {editingNodeId ? (
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setEditingNodeId(null);
+                    setName("");
+                    setJurisdictionCode("");
+                    setEntityType("COMPANY");
+                  }}
+                >
+                  Cancel edit
+                </button>
+              ) : null}
+            </div>
           </form>
         </section>
 
@@ -478,6 +588,31 @@ export default function CorporateGraphStudio() {
                     {displayLabel(node.nodeType)}
                     {node.entityType ? ` · ${node.entityType}` : ""}
                   </p>
+                  <div className="graph-form-actions">
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      disabled={busy || loading}
+                      onClick={() => {
+                        const nextNodeType = nodeTypes.find((value) => value === node.nodeType) ?? "OTHER";
+                        setEditingNodeId(node.id);
+                        setName(node.name);
+                        setNodeType(nextNodeType);
+                        setJurisdictionCode(node.jurisdictionCode ?? "");
+                        setEntityType(node.entityType ?? "");
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      disabled={busy || loading}
+                      onClick={() => setPendingArchive({ type: "node", id: node.id, label: node.name })}
+                    >
+                      Archive
+                    </button>
+                  </div>
                 </div>
                 <span className="graph-tag">{node.jurisdictionCode ?? "Jurisdiction pending"}</span>
               </article>
@@ -496,11 +631,52 @@ export default function CorporateGraphStudio() {
                   {" → "}
                   <strong>{edge.toNode.name}</strong>
                   {edge.ownershipPercent !== null ? ` (${edge.ownershipPercent}%)` : ""}
+                  {" "}
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    disabled={busy || loading}
+                    onClick={() => setPendingArchive({
+                      type: "edge",
+                      id: edge.id,
+                      label: `${edge.fromNode.name} ${displayLabel(edge.relation)} ${edge.toNode.name}`,
+                    })}
+                  >
+                    Archive relationship
+                  </button>
                 </li>
               ))}
             </ul>
           </div>
         ) : null}
+      </section>
+      <section className="glass-panel">
+        <div className="section-header">
+          <div>
+            <h2>Recent graph activity</h2>
+            <p>Workspace-scoped audit events for graph changes.</p>
+          </div>
+          <button className="button button-secondary" type="button" disabled={busy} onClick={() => void refreshAudit()}>
+            Refresh activity
+          </button>
+        </div>
+        {auditEvents.length === 0 ? (
+          <p className="graph-empty">No graph audit events are recorded yet.</p>
+        ) : (
+          <ul className="graph-audit-list">
+            {auditEvents.map((event) => (
+              <li key={event.id}>
+                <strong>{displayLabel(event.action)}</strong>
+                {" · "}
+                {event.actor.name ?? "Workspace user"}
+                {" · "}
+                {displayLabel(event.subjectType)}
+                {" · "}
+                <time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString()}</time>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
       <p className="graph-disclaimer">
         PieroloOS is decision-support software. It does not determine legal validity, tax
