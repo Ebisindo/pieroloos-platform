@@ -501,6 +501,39 @@ select.form-input { appearance:auto; }
   .module-banner *, .module-banner *::before, .module-banner *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
 
+/* Preserve legibility in operating-system forced-colors/high-contrast modes. */
+@media (forced-colors: active) {
+  .app-backdrop {
+    display: none !important;
+  }
+
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 3px;
+  }
+
+  .skip-link {
+    color: CanvasText !important;
+    background: Canvas !important;
+    border: 1px solid LinkText;
+  }
+
+  button,
+  .button,
+  input,
+  textarea,
+  select {
+    border-color: ButtonText;
+  }
+
+  input,
+  textarea,
+  select {
+    color: FieldText;
+    background: Field;
+  }
+}
+
 
 /* Compact authenticated toolbar at the narrowest supported widths. */
 @media (max-width: 480px) {
