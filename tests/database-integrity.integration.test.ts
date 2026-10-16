@@ -33,6 +33,27 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
     await prisma.$disconnect();
   });
 
+
+  it("installs append-only triggers for compliance evidence and history", async () => {
+    const triggers = await prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+      SELECT tgname AS name
+      FROM pg_trigger
+      WHERE NOT tgisinternal
+        AND tgname IN (
+          'ComplianceEvidence_claims_immutable',
+          'ComplianceDeadlineSnapshot_immutable',
+          'ComplianceStatusSnapshot_immutable',
+          'ComplianceRuleActivity_immutable'
+        )
+    `);
+    expect(triggers.map((trigger) => trigger.name)).toEqual(expect.arrayContaining([
+      "ComplianceEvidence_claims_immutable",
+      "ComplianceDeadlineSnapshot_immutable",
+      "ComplianceStatusSnapshot_immutable",
+      "ComplianceRuleActivity_immutable",
+    ]));
+  });
+
   it("enforces foreign keys for workspace ownership", async () => {
     await expect(
       prisma.workspace.create({
