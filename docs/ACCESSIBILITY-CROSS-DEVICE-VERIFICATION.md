@@ -71,4 +71,4 @@ Locale catalogs en/fr/es/pt were checked: 1,217 unique keys per catalog, with no
 
 ## Release statement
 
-Until the manual checklist below is completed on actual devices and evidence is recorded, status is **automated checks passed / physical-device and assistive-technology verification pending**. Do not describe the application as WCAG-certified.
+Until the manual checklist below is completed on actual devices and evidence is recorded, status is **automated checks passed / physical-device verification pending**; assistive-technology verification is also pending. Do not describe the application as WCAG-certified.
