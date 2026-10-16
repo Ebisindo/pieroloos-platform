@@ -1,6 +1,9 @@
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { clientRepository } from "@/lib/db/client-repository";
+import { businessProfileRepository } from "@/lib/db/business-profile-repository";
+import { reportRepository } from "@/lib/db/report-repository";
+import { engagementRepository } from "@/lib/db/engagement-repository";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 
 const integrationEnabled = process.env.DATABASE_INTEGRATION_TESTS === "1";
@@ -296,4 +299,149 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       where: { notificationId: notification.id },
     })).resolves.toBe(0);
   });
+
+  it("isolates Business Profile, Reports, and Engagements reads and writes across workspace boundaries", async () => {
+    const suffix = crypto.randomUUID();
+    const firstOrganization = await createOrganization(`release-first-${suffix}`);
+    const secondOrganization = await createOrganization(`release-second-${suffix}`);
+    const ownerWorkspace = await createWorkspace(firstOrganization.id, `release-owner-${suffix}`);
+    const siblingWorkspace = await createWorkspace(firstOrganization.id, `release-sibling-${suffix}`);
+    const foreignWorkspace = await createWorkspace(secondOrganization.id, `release-foreign-${suffix}`);
+
+    const owner = await prisma.user.create({
+      data: { email: `release-owner-${suffix}@integration.invalid` },
+    });
+    await prisma.membership.create({
+      data: { userId: owner.id, organizationId: firstOrganization.id, role: "OWNER" },
+    });
+
+    async function createClient(workspaceId: string, organizationId: string, name: string) {
+      return prisma.client.create({
+        data: { workspaceId, organizationId, name, organizationName: name, proposedBusiness: `${name} consulting` },
+      });
+    }
+
+    const ownClient = await createClient(ownerWorkspace.id, firstOrganization.id, "Own workspace client");
+    const siblingClient = await createClient(siblingWorkspace.id, firstOrganization.id, "Sibling workspace client");
+    const foreignClient = await createClient(foreignWorkspace.id, secondOrganization.id, "Foreign organization client");
+
+    const ownProfile = await prisma.businessProfile.create({
+      data: { clientId: ownClient.id, businessName: "Own profile", businessObjective: "Baseline objective" },
+    });
+    const siblingProfile = await prisma.businessProfile.create({
+      data: { clientId: siblingClient.id, businessName: "Sibling profile", businessObjective: "Private sibling objective" },
+    });
+    const foreignProfile = await prisma.businessProfile.create({
+      data: { clientId: foreignClient.id, businessName: "Foreign profile", businessObjective: "Private foreign objective" },
+    });
+
+    const ownEngagement = await prisma.engagement.create({
+      data: { workspaceId: ownerWorkspace.id, clientId: ownClient.id, service: "Own formation review", status: "DRAFT" },
+    });
+    const siblingEngagement = await prisma.engagement.create({
+      data: { workspaceId: siblingWorkspace.id, clientId: siblingClient.id, service: "Sibling private engagement", status: "DRAFT" },
+    });
+    const foreignEngagement = await prisma.engagement.create({
+      data: { workspaceId: foreignWorkspace.id, clientId: foreignClient.id, service: "Foreign private engagement", status: "DRAFT" },
+    });
+
+    const ownReport = await prisma.report.create({
+      data: {
+        workspaceId: ownerWorkspace.id, clientId: ownClient.id,
+        title: "Own private report", status: "GENERATED", format: "TEST",
+        content: JSON.stringify({ title: "Own private report" }),
+      },
+    });
+    const siblingReport = await prisma.report.create({
+      data: {
+        workspaceId: siblingWorkspace.id, clientId: siblingClient.id,
+        title: "Sibling private report", status: "GENERATED", format: "TEST",
+        content: JSON.stringify({ title: "Sibling private report" }),
+      },
+    });
+    const foreignReport = await prisma.report.create({
+      data: {
+        workspaceId: foreignWorkspace.id, clientId: foreignClient.id,
+        title: "Foreign private report", status: "GENERATED", format: "TEST",
+        content: JSON.stringify({ title: "Foreign private report" }),
+      },
+    });
+
+    const principal: WorkspacePrincipal = {
+      userId: owner.id,
+      organizationId: firstOrganization.id,
+      workspaceId: ownerWorkspace.id,
+      role: "owner",
+      permissions: [
+        "client:read", "client:write",
+        "reports:read", "reports:write",
+        "engagement:read", "engagement:write",
+      ],
+    };
+
+    const profiles = await businessProfileRepository.listByWorkspace(principal);
+    expect(profiles.map((client) => client.businessProfile?.id)).toContain(ownProfile.id);
+    expect(profiles.map((client) => client.id)).toEqual([ownClient.id]);
+    await expect(businessProfileRepository.findById(siblingProfile.id, principal)).resolves.toBeNull();
+    await expect(businessProfileRepository.findById(foreignProfile.id, principal)).resolves.toBeNull();
+    await expect(
+      businessProfileRepository.update(siblingProfile.id, { objective: "Unauthorized overwrite" }, principal),
+    ).rejects.toThrow("BUSINESS_PROFILE_NOT_FOUND");
+    await expect(
+      businessProfileRepository.update(foreignProfile.id, { objective: "Unauthorized overwrite" }, principal),
+    ).rejects.toThrow("BUSINESS_PROFILE_NOT_FOUND");
+
+    const updatedProfile = await businessProfileRepository.update(
+      ownProfile.id, { objective: "Updated own objective" }, principal,
+    );
+    expect(updatedProfile.version).toBe(2);
+    expect(updatedProfile.businessObjective).toBe("Updated own objective");
+
+    const reports = await reportRepository.listWorkspaceReports(principal);
+    expect(reports.map((report) => report.id)).toEqual([ownReport.id]);
+    await expect(reportRepository.findWorkspaceReport(siblingReport.id, principal)).resolves.toBeNull();
+    await expect(reportRepository.findWorkspaceReport(foreignReport.id, principal)).resolves.toBeNull();
+    await expect(reportRepository.generateClientSummary(siblingClient.id, principal)).rejects.toThrow("REPORT_CLIENT_NOT_FOUND");
+    await expect(reportRepository.generateClientSummary(foreignClient.id, principal)).rejects.toThrow("REPORT_CLIENT_NOT_FOUND");
+
+    const generated = await reportRepository.generateClientSummary(ownClient.id, principal);
+    expect(generated.document.sections.some((section) => section.id === "business-profile")).toBe(true);
+    expect(generated.document.sections.some((section) => section.id === "engagements")).toBe(true);
+    expect(generated.document.sections.map((section) => section.content).join("\n")).toContain("Updated own objective");
+    await expect(reportRepository.findWorkspaceReport(generated.id, principal)).resolves.toMatchObject({
+      id: generated.id,
+      title: generated.title,
+    });
+
+    const engagements = await engagementRepository.listByWorkspace(principal);
+    expect(engagements.map((engagement) => engagement.id)).toEqual([ownEngagement.id]);
+    await expect(engagementRepository.findById(siblingEngagement.id, principal)).resolves.toBeNull();
+    await expect(engagementRepository.findById(foreignEngagement.id, principal)).resolves.toBeNull();
+    await expect(
+      engagementRepository.update(siblingEngagement.id, { service: "Unauthorized overwrite" }, principal),
+    ).rejects.toThrow("ENGAGEMENT_NOT_FOUND");
+    await expect(
+      engagementRepository.update(foreignEngagement.id, { service: "Unauthorized overwrite" }, principal),
+    ).rejects.toThrow("ENGAGEMENT_NOT_FOUND");
+    await expect(
+      engagementRepository.transition(siblingEngagement.id, "ACTIVE", "Unauthorized transition", principal),
+    ).rejects.toThrow("ENGAGEMENT_NOT_FOUND");
+    await expect(
+      engagementRepository.create({ clientId: siblingClient.id, service: "Cross-workspace create" }, principal),
+    ).rejects.toThrow("CLIENT_NOT_FOUND");
+
+    await expect(prisma.businessProfile.findUnique({ where: { id: siblingProfile.id } })).resolves.toMatchObject({
+      businessObjective: "Private sibling objective",
+    });
+    await expect(prisma.businessProfile.findUnique({ where: { id: foreignProfile.id } })).resolves.toMatchObject({
+      businessObjective: "Private foreign objective",
+    });
+    await expect(prisma.engagement.findUnique({ where: { id: siblingEngagement.id } })).resolves.toMatchObject({
+      service: "Sibling private engagement", status: "DRAFT",
+    });
+    await expect(prisma.engagement.findUnique({ where: { id: foreignEngagement.id } })).resolves.toMatchObject({
+      service: "Foreign private engagement", status: "DRAFT",
+    });
+  });
+
 });

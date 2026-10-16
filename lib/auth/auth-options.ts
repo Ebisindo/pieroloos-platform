@@ -10,6 +10,43 @@ const githubId = process.env.GITHUB_ID;
 const githubSecret = process.env.GITHUB_SECRET;
 const localAuthEmail = process.env.LOCAL_AUTH_EMAIL?.trim();
 const localAuthPassword = process.env.LOCAL_AUTH_PASSWORD;
+const e2eAuthSecret = process.env.PIEROLO_E2E_AUTH_SECRET;
+const e2eTestEmail = process.env.PIEROLO_E2E_TEST_EMAIL?.trim().toLowerCase();
+
+function isLoopbackHttpUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" &&
+      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+      !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+function isDisposableCiDatabase(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const databaseName = decodeURIComponent(url.pathname.slice(1));
+    return ["postgres:", "postgresql:"].includes(url.protocol) &&
+      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+      /_(ci|test)$/i.test(databaseName);
+  } catch {
+    return false;
+  }
+}
+
+export const e2eTestAuthConfigured = Boolean(
+  process.env.CI === "true" &&
+  process.env.PIEROLO_E2E_AUTH_ENABLED === "true" &&
+  process.env.DATABASE_ENV === "ci" &&
+  e2eAuthSecret && e2eAuthSecret.length >= 32 &&
+  e2eTestEmail?.endsWith("@integration.invalid") &&
+  isLoopbackHttpUrl(process.env.NEXTAUTH_URL) &&
+  isDisposableCiDatabase(process.env.DATABASE_URL),
+);
 
 export const oidcConfigured = Boolean(issuer && clientId && clientSecret);
 export const githubConfigured = Boolean(githubId && githubSecret);
@@ -23,7 +60,8 @@ export const authSecretConfigured = Boolean(process.env.NEXTAUTH_SECRET?.trim())
 export const authConfigured = authSecretConfigured && (
   oidcConfigured ||
   githubConfigured ||
-  localDevelopmentConfigured
+  localDevelopmentConfigured ||
+  e2eTestAuthConfigured
 );
 export const AUTH_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
@@ -31,7 +69,7 @@ export const AUTH_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 export function getAuthConfigProblems(): string[] {
   const problems: string[] = [];
   if (!authSecretConfigured) problems.push("NEXTAUTH_SECRET is not set.");
-  if (!oidcConfigured && !githubConfigured && !localDevelopmentConfigured) {
+  if (!oidcConfigured && !githubConfigured && !localDevelopmentConfigured && !e2eTestAuthConfigured) {
     const localOption = process.env.NODE_ENV === "development"
       ? ", or set LOCAL_AUTH_ENABLED=true, LOCAL_AUTH_EMAIL and LOCAL_AUTH_PASSWORD for local development"
       : "";
@@ -116,6 +154,31 @@ export const authOptions: AuthOptions = {
               };
             },
           }),
+        ]
+      : []),
+    ...(e2eTestAuthConfigured
+      ? [
+          {
+            id: "pierolo-e2e-ci",
+            name: "Isolated CI test identity",
+            type: "credentials" as const,
+            credentials: {
+              email: { label: "CI test account email", type: "email" },
+              password: { label: "Ephemeral CI test secret", type: "password" },
+            },
+            async authorize(credentials: Record<string, string> | undefined) {
+              const email = credentials?.email?.trim().toLowerCase();
+              if (!email || email !== e2eTestEmail || credentials?.password !== e2eAuthSecret) {
+                return null;
+              }
+              const testUser = await prisma.user.findUnique({
+                where: { email },
+                select: { id: true, email: true, name: true, memberships: { select: { id: true }, take: 1 } },
+              });
+              if (!testUser || testUser.memberships.length === 0) return null;
+              return { id: testUser.id, email: testUser.email, name: testUser.name };
+            },
+          },
         ]
       : []),
     ...(githubConfigured

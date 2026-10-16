@@ -64,14 +64,33 @@ jobs:
         run: npm run build
 
   e2e:
-    # Browser tests for the public, signed-out surface in every locale. Authenticated routes need an OIDC test
-    # identity provider, which is not provisioned; see docs/INTERNATIONALIZATION.md.
+    # This job uses only a disposable PostgreSQL database and a loopback-only, ephemeral credentials provider.
+    # The application guard refuses to enable the provider unless DATABASE_ENV=ci and both URLs are loopback.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pieroloos_e2e_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pieroloos_e2e_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
+      DATABASE_ENV: ci
+      DATABASE_URL_CI: postgresql://postgres:postgres@localhost:5432/pieroloos_e2e_ci?schema=public
+      SHADOW_DATABASE_URL_CI: postgresql://postgres:postgres@localhost:5432/pieroloos_e2e_shadow?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pieroloos_e2e_ci?schema=public
       NEXTAUTH_SECRET: ci-only-not-a-deployment-secret
-      # Placeholder so Prisma can load its config; the signed-out public routes under test do not query the database.
-      DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public
+      NEXTAUTH_URL: http://localhost:3100
+      PIEROLO_E2E_AUTH_ENABLED: "true"
+      PIEROLO_E2E_TEST_EMAIL: pieroloos-e2e-owner@integration.invalid
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -85,19 +104,34 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Generate ephemeral CI-only authentication secret
+        run: echo "PIEROLO_E2E_AUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Create disposable shadow database
+        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE pieroloos_e2e_shadow;'
+
+      - name: Migrate isolated E2E database
+        run: npm run db:deploy -- ci
+
+      - name: Seed isolated E2E workspace
+        run: node scripts/seed-e2e-workspace.mjs
+
       - name: Install Playwright browser and system dependencies
         run: npx playwright install --with-deps chromium
 
       - name: Production build
         run: npm run build
 
-      - name: Browser tests
+      - name: Authenticated and responsive browser tests
         run: npm run test:e2e
 
-      - name: Upload Playwright report on failure
-        if: failure()
+      - name: Upload Playwright reports and responsive screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-results
-          path: test-results
+          path: |
+            test-results
+            playwright-report
           if-no-files-found: ignore
+          retention-days: 14

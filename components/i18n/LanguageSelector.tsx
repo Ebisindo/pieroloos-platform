@@ -30,7 +30,7 @@ export function LanguageSelector() {
 
   return (
     <>
-      <label className="visually-hidden" htmlFor={id}>{t("language.select")}</label>
+      <label className="sr-only" htmlFor={id}>{t("language.select")}</label>
       <select
         id={id}
         className="language-select"

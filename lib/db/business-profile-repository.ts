@@ -5,10 +5,34 @@ import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-worksp
 import { assertPermission, type WorkspacePrincipal } from "@/lib/auth/workspace-access";
 
 export const businessProfileRepository = {
+  async listByWorkspace(principal: WorkspacePrincipal) {
+    assertPermission(principal, "client:read");
+    return prisma.client.findMany({
+      where: { workspaceId: principal.workspaceId, businessProfile: { isNot: null } },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true, name: true, organizationName: true, proposedBusiness: true,
+        email: true, country: true, updatedAt: true,
+        businessProfile: true,
+      },
+      take: 200,
+    });
+  },
+
+  async findById(id: string, principal: WorkspacePrincipal) {
+    assertPermission(principal, "client:read");
+    return prisma.businessProfile.findFirst({
+      where: { id, client: { workspaceId: principal.workspaceId, organizationId: principal.organizationId } },
+      include: {
+        client: { select: { id: true, name: true, organizationName: true, email: true, country: true, updatedAt: true } },
+      },
+    });
+  },
+
   async findByClientId(clientId: string, principal: WorkspacePrincipal) {
     assertPermission(principal, "client:read");
     return prisma.businessProfile.findFirst({
-      where: { clientId, client: { workspaceId: principal.workspaceId } },
+      where: { clientId, client: { workspaceId: principal.workspaceId, organizationId: principal.organizationId } },
       include: { client: true },
     });
   },
@@ -16,25 +40,42 @@ export const businessProfileRepository = {
   async update(id: string, data: BusinessProfileUpdateInput, principal: WorkspacePrincipal) {
     return withAuthorizedWorkspaceTransaction(principal, "client:write", async (transaction) => {
       const existing = await transaction.businessProfile.findFirst({
-        where: { id, client: { workspaceId: principal.workspaceId } },
-        select: { data: true },
+        where: { id, client: { workspaceId: principal.workspaceId, organizationId: principal.organizationId } },
+        select: { id: true, data: true },
       });
       if (!existing) throw new Error("BUSINESS_PROFILE_NOT_FOUND");
 
-      const current =
-        existing.data &&
-        typeof existing.data === "object" &&
-        !Array.isArray(existing.data)
+      const currentJson =
+        existing.data && typeof existing.data === "object" && !Array.isArray(existing.data)
           ? (existing.data as Record<string, unknown>)
           : {};
-
-      const merged = Object.fromEntries(
-        Object.entries({ ...current, ...data }).filter(([, value]) => value !== undefined),
+      const mergedJson = Object.fromEntries(
+        Object.entries({ ...currentJson, ...data }).filter(([, value]) => value !== undefined),
       ) as Prisma.InputJsonObject;
+
+      const updateData: Prisma.BusinessProfileUpdateInput = {
+        data: mergedJson,
+        version: { increment: 1 },
+        ...(data.businessName !== undefined ? { businessName: data.businessName } : {}),
+        ...(data.businessType !== undefined ? { businessType: data.businessType } : {}),
+        ...(data.objective !== undefined ? { businessObjective: data.objective } : {}),
+        ...(data.businessModel !== undefined ? { businessModel: data.businessModel } : {}),
+        ...(data.targetMarket !== undefined ? { targetMarket: data.targetMarket } : {}),
+        ...(data.revenueModel !== undefined ? { revenueModel: data.revenueModel } : {}),
+        ...(data.ownership !== undefined ? { ownershipContext: data.ownership } : {}),
+        ...(data.fundingStage !== undefined ? { fundingStage: data.fundingStage } : {}),
+        ...(data.expansionObjectives !== undefined ? { expansionObjectives: data.expansionObjectives } : {}),
+        ...(data.riskConstraints !== undefined ? { constraints: data.riskConstraints } : {}),
+        ...(data.strategicNotes !== undefined ? { strategicNotes: data.strategicNotes } : {}),
+        ...(data.operationalContext !== undefined ? { operationalContext: data.operationalContext } : {}),
+      };
 
       const profile = await transaction.businessProfile.update({
         where: { id },
-        data: { data: merged, version: { increment: 1 } },
+        data: updateData,
+        include: {
+          client: { select: { id: true, name: true, organizationName: true, email: true, country: true, updatedAt: true } },
+        },
       });
       await transaction.activity.create({
         data: {
@@ -42,7 +83,7 @@ export const businessProfileRepository = {
           actorId: principal.userId,
           type: "UPDATED",
           title: "Business profile updated",
-          metadata: { businessProfileId: profile.id },
+          metadata: { businessProfileId: profile.id, version: profile.version },
         },
       });
       return profile;

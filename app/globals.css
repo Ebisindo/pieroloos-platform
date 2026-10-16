@@ -106,7 +106,7 @@ a { color: inherit; text-decoration: none; }
 .context-path { display:flex; gap:8px; align-items:center; color:#6f7892; font-size:12px; }
 .context-path strong { color:#d9deeb; font-weight:600; }
 .search-button { border:1px solid var(--line); background:rgba(255,255,255,.025); color:#8d96ad; border-radius:8px; height:34px; padding:0 9px; display:flex; align-items:center; gap:8px; }
-.search-button kbd { border:1px solid var(--line); border-radius:4px; padding:2px 5px; font-size:9px; color:#66708a; }
+.search-button kbd { border:1px solid var(--line); border-radius:4px; padding:2px 5px; font-size:9px; color:#b9c5dc; }
 .security-state { display:flex; align-items:center; gap:6px; color:#7f8aa5; font-size:10px; }
 .security-state svg { color:var(--green); }
 .avatar { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; border:1px solid rgba(214,182,106,.35); background:rgba(214,182,106,.08); color:var(--gold); font-size:9px; font-weight:700; }
@@ -499,4 +499,61 @@ select.form-input { appearance:auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   .module-banner *, .module-banner *::before, .module-banner *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* Preserve legibility in operating-system forced-colors/high-contrast modes. */
+@media (forced-colors: active) {
+  .app-backdrop,
+  .module-banner-decoration,
+  .operational-illustration-orbit,
+  .operational-illustration-orbit-b,
+  .ambient-orbit,
+  .star-field,
+  .boot-orbit {
+    display: none !important;
+  }
+
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 3px;
+  }
+
+  .skip-link {
+    color: CanvasText !important;
+    background: Canvas !important;
+    border: 1px solid LinkText;
+  }
+
+  button,
+  .button,
+  input,
+  textarea,
+  select {
+    border-color: ButtonText;
+  }
+
+  input,
+  textarea,
+  select {
+    color: FieldText;
+    background: Field;
+  }
+}
+
+
+/* Compact authenticated toolbar at the narrowest supported widths. */
+@media (max-width: 480px) {
+  .topbar { gap: 8px; padding: 0 12px; }
+  .topbar-left, .topbar-actions { gap: 8px; min-width: 0; }
+  .topbar-left { flex: 1 1 auto; }
+  .context-path { min-width: 0; gap: 0; }
+  .context-path > span { display: none; }
+  .context-path strong { white-space: nowrap; }
+  .topbar-actions { flex: 0 1 auto; }
+  .topbar-actions .language-select { width: 120px; max-width: 120px; }
+}
+@media (max-width: 360px) {
+  .topbar-actions .search-button,
+  .topbar-actions .avatar { display: none; }
+  .topbar-actions .language-select { width: 108px; max-width: 108px; }
 }
