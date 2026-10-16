@@ -95,13 +95,13 @@ export default function CorporateGraphStudio() {
       if (signal?.aborted) return;
       setError(cause instanceof Error ? cause.message : "Unable to load the corporate graph.");
     } finally {
-      if (!signal?.aborted && showLoading) setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
-    void refreshGraph(true, controller.signal);
+    void refreshGraph(false, controller.signal);
     return () => controller.abort();
   }, [refreshGraph]);
 
