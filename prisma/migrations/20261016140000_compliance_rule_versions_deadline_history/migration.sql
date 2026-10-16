@@ -101,3 +101,52 @@ BEFORE UPDATE OR DELETE ON "ComplianceDeadlineSnapshot"
 FOR EACH ROW EXECUTE FUNCTION prevent_compliance_deadline_snapshot_mutation();
 
 ALTER TABLE "ComplianceRuleVersion" ADD CONSTRAINT "ComplianceRuleVersion_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE TABLE "ComplianceRuleActivity" (
+  "id" TEXT NOT NULL,
+  "organizationId" TEXT NOT NULL,
+  "workspaceId" TEXT NOT NULL,
+  "ruleId" TEXT NOT NULL,
+  "ruleVersionId" TEXT,
+  "actorUserId" TEXT NOT NULL,
+  "action" TEXT NOT NULL,
+  "note" TEXT,
+  "metadata" JSONB,
+  "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "ComplianceRuleActivity_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "ComplianceRuleActivity_action_check" CHECK (length(btrim("action")) BETWEEN 1 AND 80)
+);
+
+CREATE INDEX "ComplianceRuleActivity_organizationId_workspaceId_occurredAt_idx"
+  ON "ComplianceRuleActivity"("organizationId", "workspaceId", "occurredAt");
+CREATE INDEX "ComplianceRuleActivity_ruleId_occurredAt_idx"
+  ON "ComplianceRuleActivity"("ruleId", "occurredAt");
+CREATE INDEX "ComplianceRuleActivity_ruleVersionId_occurredAt_idx"
+  ON "ComplianceRuleActivity"("ruleVersionId", "occurredAt");
+
+ALTER TABLE "ComplianceRuleActivity"
+  ADD CONSTRAINT "ComplianceRuleActivity_organizationId_fkey"
+  FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ComplianceRuleActivity"
+  ADD CONSTRAINT "ComplianceRuleActivity_workspace_fk"
+  FOREIGN KEY ("organizationId", "workspaceId") REFERENCES "Workspace"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ComplianceRuleActivity"
+  ADD CONSTRAINT "ComplianceRuleActivity_rule_fk"
+  FOREIGN KEY ("ruleId", "workspaceId") REFERENCES "ComplianceRule"("id", "workspaceId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ComplianceRuleActivity"
+  ADD CONSTRAINT "ComplianceRuleActivity_ruleVersion_fk"
+  FOREIGN KEY ("ruleVersionId", "workspaceId") REFERENCES "ComplianceRuleVersion"("id", "workspaceId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ComplianceRuleActivity"
+  ADD CONSTRAINT "ComplianceRuleActivity_actorUserId_fkey"
+  FOREIGN KEY ("actorUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+CREATE OR REPLACE FUNCTION prevent_compliance_rule_activity_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'Compliance rule activity is immutable';
+END;
+$$;
+
+CREATE TRIGGER "ComplianceRuleActivity_immutable"
+BEFORE UPDATE OR DELETE ON "ComplianceRuleActivity"
+FOR EACH ROW EXECUTE FUNCTION prevent_compliance_rule_activity_mutation();
