@@ -1475,7 +1475,7 @@ model ProfessionalPartnerIdentityAuditEvent {
   occurredAt     DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workspace    Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade, map: "ProfessionalPartnerIdentityAuditEvent_organizationId_workspaceI")
+  workspace    Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade, map: "ProfessionalPartnerIdentityAuditEvent_workspace_scope_fkey")
   identity     ProfessionalPartnerIdentity @relation(fields: [identityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict, map: "ProfessionalPartnerIdentityAuditEvent_identityId_organizationId")
   actor        User @relation("ProfessionalPartnerIdentityAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
