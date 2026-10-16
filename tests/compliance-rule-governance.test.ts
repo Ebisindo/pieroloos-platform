@@ -63,20 +63,43 @@ describe("sourced compliance rule version contract", () => {
     })).success).toBe(true);
   });
 
-  it("returns UNKNOWN when the source URL has not yet been independently checked", () => {
-    const result = assessComplianceRuleReadiness(rule({
+  it("preserves null source timestamps instead of coercing them into epoch dates", () => {
+    const parsed = complianceRuleVersionSchema.safeParse(rule({
+      reviewState: "UNREVIEWED",
+      sourceRetrievedAt: null,
+      publicationDate: null,
+      effectiveThrough: null,
+      reviewedByUserId: null,
+      reviewedAt: null,
+      evidenceClass: "E1",
+    }));
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.sourceRetrievedAt).toBeNull();
+      expect(parsed.data.publicationDate).toBeNull();
+      expect(parsed.data.effectiveThrough).toBeNull();
+      expect(parsed.data.reviewedAt).toBeNull();
+    }
+  });
+
+  it("returns UNKNOWN with SOURCE_NOT_RETRIEVED when the source URL has not been independently checked", () => {
+    const unreviewedRule = rule({
       reviewState: "UNREVIEWED",
       sourceRetrievedAt: null,
       reviewedByUserId: null,
       reviewedAt: null,
       evidenceClass: "E1",
-    }), {
+    });
+    const parsed = complianceRuleVersionSchema.safeParse(unreviewedRule);
+    expect(parsed.success).toBe(true);
+    const result = assessComplianceRuleReadiness(unreviewedRule, {
       jurisdictionId: "jurisdiction-1",
       businessType: "COMPANY",
       formationCompleted: true,
       evaluatedAt: now,
     });
     expect(result.state).toBe("UNKNOWN");
+    expect(result.reasons).toContain("RULE_NOT_REVIEWED");
     expect(result.reasons).toContain("SOURCE_NOT_RETRIEVED");
     expect(result.mayGenerateObligation).toBe(false);
   });
