@@ -26,7 +26,7 @@ CREATE TABLE "ComplianceRuleVersion" (
   "obligationType" TEXT NOT NULL,
   "sourceAuthority" TEXT NOT NULL,
   "sourceUrl" TEXT NOT NULL,
-  "sourceRetrievedAt" TIMESTAMP(3) NOT NULL,
+  "sourceRetrievedAt" TIMESTAMP(3),
   "publicationDate" TIMESTAMP(3),
   "effectiveFrom" TIMESTAMP(3) NOT NULL,
   "effectiveThrough" TIMESTAMP(3),
@@ -45,7 +45,7 @@ CREATE TABLE "ComplianceRuleVersion" (
   CONSTRAINT "ComplianceRuleVersion_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "ComplianceRuleVersion_version_positive_check" CHECK ("version" > 0),
   CONSTRAINT "ComplianceRuleVersion_effective_range_check" CHECK ("effectiveThrough" IS NULL OR "effectiveThrough" >= "effectiveFrom"),
-  CONSTRAINT "ComplianceRuleVersion_reviewer_check" CHECK ("reviewState" <> 'VERIFIED' OR ("reviewedByUserId" IS NOT NULL AND "reviewedAt" IS NOT NULL AND "evidenceClass" IN ('E3', 'E4')))
+  CONSTRAINT "ComplianceRuleVersion_reviewer_check" CHECK ("reviewState" <> 'VERIFIED' OR ("reviewedByUserId" IS NOT NULL AND "reviewedAt" IS NOT NULL AND "sourceRetrievedAt" IS NOT NULL AND "evidenceClass" IN ('E3', 'E4')))
 );
 
 CREATE TABLE "ComplianceDeadlineSnapshot" (
