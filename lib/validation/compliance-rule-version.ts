@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const nullableDate = z.union([z.coerce.date(), z.null()]);
+const nullableDate = z.preprocess((value) => value === null ? null : value, z.coerce.date().nullable());
 const applicabilitySchema = z.object({
   businessTypes: z.array(z.string().trim().min(1).max(120)).max(50).optional(),
   formationCompleted: z.boolean().optional(),
