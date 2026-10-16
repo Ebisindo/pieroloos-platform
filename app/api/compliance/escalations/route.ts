@@ -195,12 +195,20 @@ export async function POST(request: Request) {
           obligationId: input.obligationId,
         },
       });
-      if (existing && existing.body === input.reason) {
-        return NextResponse.json({
-          data: existing,
-          alreadyEscalated: true,
-          escalationLevel: requestedLevel(existing.templateParams),
-        }, { status: 200 });
+      if (existing) {
+        const params = existing.templateParams && typeof existing.templateParams === "object" && !Array.isArray(existing.templateParams)
+          ? existing.templateParams as Record<string, unknown>
+          : {};
+        if (existing.body === input.reason &&
+            params.reasonDigest === reasonDigest &&
+            requestTarget(existing.templateParams) === requestedTargetUserId) {
+          return NextResponse.json({
+            data: existing,
+            alreadyEscalated: true,
+            escalationLevel: requestedLevel(existing.templateParams),
+          }, { status: 200 });
+        }
+        return NextResponse.json({ error: "This idempotency key was already used with different escalation details." }, { status: 409 });
       }
       return NextResponse.json({ error: "A concurrent escalation conflicted. Refresh and retry." }, { status: 409 });
     }
