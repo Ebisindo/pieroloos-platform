@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+const nullableDate = z.union([z.coerce.date(), z.null()]);
 const applicabilitySchema = z.object({
   businessTypes: z.array(z.string().trim().min(1).max(120)).max(50).optional(),
   formationCompleted: z.boolean().optional(),
@@ -18,10 +19,12 @@ export const complianceRuleVersionSchema = z.object({
   ]),
   sourceAuthority: z.string().trim().min(2).max(300),
   sourceUrl: z.string().url().max(2000),
-  sourceRetrievedAt: z.coerce.date().nullable(),
-  publicationDate: z.coerce.date().nullable().optional(),
+  // Explicit null union: z.coerce.date().nullable() coerces null to the Unix epoch,
+  // falsely making an un-retrieved source appear to have a retrieval timestamp.
+  sourceRetrievedAt: nullableDate,
+  publicationDate: nullableDate.optional(),
   effectiveFrom: z.coerce.date(),
-  effectiveThrough: z.coerce.date().nullable().optional(),
+  effectiveThrough: nullableDate.optional(),
   evidenceClass: z.enum(["E0", "E1", "E2", "E3", "E4"]),
   applicability: applicabilitySchema,
   relativeDueDays: z.number().int().min(0).max(36500).nullable().optional(),
@@ -29,7 +32,7 @@ export const complianceRuleVersionSchema = z.object({
   professionalReviewRequired: z.literal(true).default(true),
   reviewState: z.enum(["UNREVIEWED", "VERIFIED", "REJECTED", "SUPERSEDED"]),
   reviewedByUserId: z.string().trim().min(1).max(120).nullable().optional(),
-  reviewedAt: z.coerce.date().nullable().optional(),
+  reviewedAt: nullableDate.optional(),
 }).strict().superRefine((rule, context) => {
   if (rule.effectiveThrough && rule.effectiveThrough < rule.effectiveFrom) {
     context.addIssue({
