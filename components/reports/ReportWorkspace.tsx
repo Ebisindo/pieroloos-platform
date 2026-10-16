@@ -18,7 +18,7 @@ export function ReportWorkspace({ initialReports, clients, canWrite }: {
   clients: ClientOption[];
   canWrite: boolean;
 }) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [generatedReports, setGeneratedReports] = useState<SavedReport[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedReportId, setSelectedReportId] = useState(initialReports[0]?.id ?? "");
@@ -86,7 +86,7 @@ export function ReportWorkspace({ initialReports, clients, canWrite }: {
                   <button type="button" onClick={() => setSelectedReportId(report.id)} aria-pressed={selectedReportId === report.id} className={`min-h-11 w-full rounded-xl border p-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 ${selectedReportId === report.id ? "border-cyan-300/40 bg-cyan-300/[0.08]" : "border-white/10 hover:bg-white/[0.04]"}`}>
                     <span className="block break-words text-sm font-semibold text-white">{report.title}</span>
                     <span className="mt-1 block text-xs leading-5 text-slate-400">{report.client?.organizationName ?? report.client?.name ?? t("reports.clientUnknown")}</span>
-                    <span className="mt-1 block text-xs text-slate-500">{new Date(report.createdAt).toLocaleString()}</span>
+                    <span className="mt-1 block text-xs text-slate-500">{new Date(report.createdAt).toLocaleString(locale)}</span>
                   </button>
                 </li>
               ))}
@@ -102,7 +102,7 @@ export function ReportWorkspace({ initialReports, clients, canWrite }: {
           {!selectedReport ? <p className="mt-5 text-sm leading-6 text-slate-300">{t("reports.noReportTitle")}</p> : selectedReport.document ? (
             <article className="mt-5 min-w-0">
               <h3 className="break-words text-xl font-semibold text-white">{selectedReport.document.title}</h3>
-              <p className="mt-2 text-xs text-slate-400">{t("reports.generatedAt", { date: new Date(selectedReport.document.generatedAt).toLocaleString() })}</p>
+              <p className="mt-2 text-xs text-slate-400">{t("reports.generatedAt", { date: new Date(selectedReport.document.generatedAt).toLocaleString(locale) })}</p>
               <p className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-3 text-sm leading-6 text-amber-100">{t("reports.freshness")}</p>
               <div className="mt-4 space-y-4">
                 {selectedReport.document.sections.map((section) => <section key={section.id} className="border-t border-white/10 pt-4"><h4 className="text-base font-semibold text-white">{section.title}</h4><pre className="mt-2 whitespace-pre-wrap break-words font-sans text-sm leading-6 text-slate-300">{section.content}</pre></section>)}
