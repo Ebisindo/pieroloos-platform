@@ -82,6 +82,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
           obligationType: true, sourceUrl: true, sourceAuthority: true, sourceRetrievedAt: true,
           effectiveFrom: true, effectiveThrough: true, evidenceClass: true, applicability: true,
           relativeDueDays: true, requiresEvidence: true, professionalReviewRequired: true, reviewState: true,
+          reviewedByUserId: true, reviewedAt: true, reviewNote: true,
         },
       });
       if (!version) throw new Error("COMPLIANCE_RULE_VERSION_NOT_FOUND");
@@ -178,6 +179,16 @@ export async function POST(request: Request, routeContext: RouteContext) {
         sourceAuthority: version.sourceAuthority,
         sourceUrl: version.sourceUrl,
         sourceRetrievedAt: version.sourceRetrievedAt?.toISOString() ?? null,
+        sourceReview: {
+          state: version.reviewState,
+          reviewerUserId: version.reviewedByUserId,
+          reviewedAt: version.reviewedAt?.toISOString() ?? null,
+          reviewNote: version.reviewNote,
+          evidenceClass: version.evidenceClass,
+        },
+        confidenceState: version.reviewState === "VERIFIED" && ["E3", "E4", "E3_PRIMARY", "E4_CROSS_VERIFIED"].includes(version.evidenceClass)
+          ? "PRIMARY_OR_CROSS_VERIFIED"
+          : "INSUFFICIENT",
         applicability: { jurisdictionId: version.jurisdictionId, businessType: input.businessType, formationCompleted: input.formationCompleted },
         factEvidence: input.factEvidence.map((item) => ({
           key: item.key,
