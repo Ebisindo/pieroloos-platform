@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getAuthenticatedUserId } from "@/lib/auth/professional-partner-session";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { withProfessionalPartnerGrantTransaction, isPartnerGrantDenied } from "@/lib/auth/professional-partner-grant";
 import { partnerEvidenceAttachSchema } from "@/lib/validation/professional-partner";
 
@@ -8,6 +9,7 @@ type RouteContext = { params: Promise<{ clientId: string }> };
 const closedStatuses = new Set<string>(["COMPLETE", "COMPLETED", "COMPLIANT", "WAIVED", "NOT_APPLICABLE"]);
 
 export async function POST(request: Request, { params }: RouteContext) {
+  if (hasInvalidRequestOrigin(request)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   const userId = await getAuthenticatedUserId();
   if (!userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { clientId } = await params;
