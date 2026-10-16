@@ -52,6 +52,7 @@ const statusKeys: Record<string, MessageKey> = {
 const evidenceReviewStatusKeys: Record<string, MessageKey> = {
   VERIFIED: "app.compliance.verified",
   CHANGES_REQUESTED: "app.compliance.changesRequested",
+  REVOKED: "app.compliance.revoked",
 };
 const obligationTypeKeys: Record<string, MessageKey> = {
   FORMATION: "app.compliance.typeFormation",
@@ -225,7 +226,8 @@ export function ComplianceWorkflow({
     }
   }
 
-  async function reviewEvidence(obligation: Obligation, evidenceId: string, reviewStatus: "VERIFIED" | "CHANGES_REQUESTED") {
+  async function reviewEvidence(obligation: Obligation, evidenceId: string, reviewStatus: "VERIFIED" | "CHANGES_REQUESTED" | "REVOKED") {
+    if (reviewStatus === "REVOKED" && !window.confirm(t("app.compliance.revokeEvidenceConfirm"))) return;
     const note = evidenceReviewNotes[evidenceId]?.trim();
     if (!note) {
       setMessage(t("app.compliance.addReviewNote"));
@@ -358,7 +360,7 @@ export function ComplianceWorkflow({
                           ? <span>{t("app.compliance.validThrough", { date: formatDate(new Date(item.validThrough), locale, { dateStyle: "medium" }) })}</span>
                           : <span>{t("app.compliance.validityMissing")}</span>}
                         {item.reviewNote ? <span>{t("app.compliance.reviewNote", { note: item.reviewNote })}</span> : null}
-                        {canReview ? (
+                        {canReview && item.reviewStatus !== "REVOKED" ? (
                           <>
                             <label className="sr-only" htmlFor={`evidence-review-${item.id}`}>{t("app.compliance.reviewNoteLabel")}</label>
                             <input
@@ -374,6 +376,9 @@ export function ComplianceWorkflow({
                             </button>
                             <button className="icon-button" type="button" disabled={busyId === obligation.id} onClick={() => reviewEvidence(obligation, item.id, "CHANGES_REQUESTED")}>
                               {t("app.compliance.requestChanges")}
+                            </button>
+                            <button className="icon-button" type="button" disabled={busyId === obligation.id} onClick={() => reviewEvidence(obligation, item.id, "REVOKED")}>
+                              {t("app.compliance.revokeEvidence")}
                             </button>
                           </>
                         ) : null}
