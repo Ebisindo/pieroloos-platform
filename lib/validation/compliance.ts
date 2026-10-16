@@ -50,7 +50,7 @@ export const addComplianceEvidenceSchema = z.object({
 });
 
 export const reviewComplianceEvidenceSchema = z.object({
-  reviewStatus: z.enum(["VERIFIED", "CHANGES_REQUESTED"]),
+  reviewStatus: z.enum(["VERIFIED", "CHANGES_REQUESTED", "REVOKED"]),
   note: z.string().trim().min(4).max(4000),
 });
 
