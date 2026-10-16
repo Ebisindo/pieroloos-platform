@@ -68,6 +68,7 @@ CREATE TABLE "ComplianceDeadlineSnapshot" (
 
 CREATE UNIQUE INDEX "ComplianceRule_organizationId_workspaceId_ruleKey_key" ON "ComplianceRule"("organizationId", "workspaceId", "ruleKey");
 CREATE UNIQUE INDEX "ComplianceRule_id_workspaceId_key" ON "ComplianceRule"("id", "workspaceId");
+CREATE UNIQUE INDEX "ComplianceRule_id_workspaceId_jurisdictionId_key" ON "ComplianceRule"("id", "workspaceId", "jurisdictionId");
 CREATE INDEX "ComplianceRule_workspaceId_jurisdictionId_active_idx" ON "ComplianceRule"("workspaceId", "jurisdictionId", "active");
 CREATE UNIQUE INDEX "ComplianceRuleVersion_ruleId_version_key" ON "ComplianceRuleVersion"("ruleId", "version");
 CREATE UNIQUE INDEX "ComplianceRuleVersion_id_workspaceId_key" ON "ComplianceRuleVersion"("id", "workspaceId");
@@ -80,13 +81,13 @@ CREATE INDEX "ComplianceDeadlineSnapshot_obligationId_createdAt_idx" ON "Complia
 ALTER TABLE "ComplianceRule" ADD CONSTRAINT "ComplianceRule_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ComplianceRule" ADD CONSTRAINT "ComplianceRule_workspace_fk" FOREIGN KEY ("organizationId", "workspaceId") REFERENCES "Workspace"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ComplianceRule" ADD CONSTRAINT "ComplianceRule_jurisdictionId_fkey" FOREIGN KEY ("jurisdictionId") REFERENCES "Jurisdiction"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "ComplianceRuleVersion" ADD CONSTRAINT "ComplianceRuleVersion_rule_fk" FOREIGN KEY ("ruleId", "workspaceId") REFERENCES "ComplianceRule"("id", "workspaceId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ComplianceRuleVersion" ADD CONSTRAINT "ComplianceRuleVersion_rule_fk" FOREIGN KEY ("ruleId", "workspaceId", "jurisdictionId") REFERENCES "ComplianceRule"("id", "workspaceId", "jurisdictionId") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ComplianceDeadlineSnapshot" ADD CONSTRAINT "ComplianceDeadlineSnapshot_obligation_fk" FOREIGN KEY ("obligationId", "workspaceId") REFERENCES "ComplianceObligation"("id", "workspaceId") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "ComplianceDeadlineSnapshot" ADD CONSTRAINT "ComplianceDeadlineSnapshot_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "ComplianceDeadlineSnapshot" ADD CONSTRAINT "ComplianceDeadlineSnapshot_sourceRuleVersionId_fkey" FOREIGN KEY ("sourceRuleVersionId") REFERENCES "ComplianceRuleVersion"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ComplianceDeadlineSnapshot" ADD CONSTRAINT "ComplianceDeadlineSnapshot_sourceRuleVersionId_fkey" FOREIGN KEY ("sourceRuleVersionId", "workspaceId") REFERENCES "ComplianceRuleVersion"("id", "workspaceId") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "ComplianceDeadlineSnapshot" ADD CONSTRAINT "ComplianceDeadlineSnapshot_actorUserId_fkey" FOREIGN KEY ("actorUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "ComplianceObligation" ADD COLUMN "sourceRuleVersionId" TEXT;
-ALTER TABLE "ComplianceObligation" ADD CONSTRAINT "ComplianceObligation_sourceRuleVersionId_fkey" FOREIGN KEY ("sourceRuleVersionId") REFERENCES "ComplianceRuleVersion"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ComplianceObligation" ADD CONSTRAINT "ComplianceObligation_sourceRuleVersionId_workspaceId_fkey" FOREIGN KEY ("sourceRuleVersionId", "workspaceId") REFERENCES "ComplianceRuleVersion"("id", "workspaceId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- Deadline snapshots are append-only at the database boundary. UPDATE and DELETE are denied to application roles.
 CREATE OR REPLACE FUNCTION prevent_compliance_deadline_snapshot_mutation()
