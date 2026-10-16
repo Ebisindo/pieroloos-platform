@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assessComplianceRuleReadiness } from "@/lib/domain/compliance-rule-governance";
 import { complianceRuleVersionSchema } from "@/lib/validation/compliance-rule-version";
+import { complianceRuleReviewSchema } from "@/lib/validation/compliance-rule-api";
 
 const now = new Date("2026-10-16T12:00:00.000Z");
 
@@ -29,6 +30,21 @@ function rule(overrides: Record<string, unknown> = {}) {
 }
 
 describe("sourced compliance rule version contract", () => {
+  it("requires source-opened attestation and E3/E4 evidence for independent verification", () => {
+    const base = { decision: "VERIFY", evidenceClass: "E3", reviewNote: "Reviewed from primary source." };
+    expect(complianceRuleReviewSchema.safeParse(base).success).toBe(false);
+    expect(complianceRuleReviewSchema.safeParse({ ...base, sourceOpenedAndChecked: true }).success).toBe(true);
+    expect(complianceRuleReviewSchema.safeParse({
+      ...base,
+      evidenceClass: "E2",
+      sourceOpenedAndChecked: true,
+    }).success).toBe(false);
+    expect(complianceRuleReviewSchema.safeParse({
+      decision: "REJECT",
+      reviewNote: "Source could not be validated.",
+    }).success).toBe(true);
+  });
+
   it("requires authority, URL, retrieval timestamp, version and primary/cross-verified review to mark verified", () => {
     expect(complianceRuleVersionSchema.safeParse(rule()).success).toBe(true);
     expect(complianceRuleVersionSchema.safeParse(rule({ reviewedByUserId: null })).success).toBe(false);
