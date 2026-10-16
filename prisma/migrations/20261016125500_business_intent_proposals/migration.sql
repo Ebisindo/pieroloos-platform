@@ -6,6 +6,12 @@ CREATE TYPE "BusinessIntentProposalStatus" AS ENUM (
   'CHANGES_REQUESTED'
 );
 
+CREATE TYPE "BusinessIntentReviewDecision" AS ENUM (
+  'APPROVED',
+  'REJECTED',
+  'CHANGES_REQUESTED'
+);
+
 CREATE TABLE "BusinessIntentProposal" (
   "id" TEXT NOT NULL,
   "organizationId" TEXT NOT NULL,
@@ -57,3 +63,30 @@ ALTER TABLE "BusinessIntentProposal"
   FOREIGN KEY ("reviewedByUserId")
   REFERENCES "User"("id")
   ON DELETE SET NULL ON UPDATE CASCADE;
+
+
+CREATE TABLE "BusinessIntentProposalReview" (
+  "id" TEXT NOT NULL,
+  "proposalId" TEXT NOT NULL,
+  "workspaceId" TEXT NOT NULL,
+  "reviewerUserId" TEXT NOT NULL,
+  "decision" "BusinessIntentReviewDecision" NOT NULL,
+  "note" TEXT NOT NULL,
+  "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "BusinessIntentProposalReview_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX "BusinessIntentProposalReview_workspace_proposal_time_idx"
+  ON "BusinessIntentProposalReview"("workspaceId", "proposalId", "occurredAt");
+
+ALTER TABLE "BusinessIntentProposalReview"
+  ADD CONSTRAINT "BusinessIntentProposalReview_proposalId_workspaceId_fkey"
+  FOREIGN KEY ("proposalId", "workspaceId")
+  REFERENCES "BusinessIntentProposal"("id", "workspaceId")
+  ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "BusinessIntentProposalReview"
+  ADD CONSTRAINT "BusinessIntentProposalReview_reviewerUserId_fkey"
+  FOREIGN KEY ("reviewerUserId")
+  REFERENCES "User"("id")
+  ON DELETE RESTRICT ON UPDATE CASCADE;
