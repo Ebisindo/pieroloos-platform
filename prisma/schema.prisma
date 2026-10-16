@@ -470,6 +470,7 @@ model Client {
   portalAccessGrants    ClientPortalGrant[]
   portalEvents          ClientPortalAuditEvent[]
   portalInteractions    ClientPortalInteraction[]
+  corporateGraphNodes CorporateGraphNode[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
