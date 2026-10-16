@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const edge=await withAuthorizedWorkspaceTransaction(principal,"engagement:write",async tx=>{
    const nodes=await tx.corporateGraphNode.findMany({where:{organizationId:principal.organizationId,workspaceId:principal.workspaceId,id:{in:[parsed.data.fromNodeId,parsed.data.toNodeId]}},select:{id:true}});
    if(nodes.length!==2) throw new Error("GRAPH_NODE_NOT_FOUND");
-   const existing=await tx.corporateGraphEdge.findMany({where:{organizationId:principal.organizationId,workspaceId:principal.workspaceId},select:{fromNodeId:true,toNodeId:true,relation:true},take:1000});
+   const existing=await tx.corporateGraphEdge.findMany({where:{organizationId:principal.organizationId,workspaceId:principal.workspaceId},select:{fromNodeId:true,toNodeId:true,relation:true}});
    if(wouldCreateOwnershipCycle(existing,parsed.data)) throw new Error("OWNERSHIP_CYCLE");
    return tx.corporateGraphEdge.create({data:{organizationId:principal.organizationId,workspaceId:principal.workspaceId,fromNodeId:parsed.data.fromNodeId,toNodeId:parsed.data.toNodeId,relation:parsed.data.relation,ownershipPercent:parsed.data.ownershipPercent===undefined?undefined:new Prisma.Decimal(parsed.data.ownershipPercent),notes:parsed.data.notes,createdByUserId:principal.userId},include:{fromNode:{select:{id:true,name:true}},toNode:{select:{id:true,name:true}}}});
   });
