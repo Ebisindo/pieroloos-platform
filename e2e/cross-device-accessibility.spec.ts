@@ -226,8 +226,14 @@ test.describe("cross-device responsive smoke matrix", () => {
     await captureAuthenticatedViewportMatrix(page, "/engagements", "engagements-list");
     await expectNoSeriousAxeViolations(page, "/engagements");
     await expect(page.getByText("Foreign Private Client", { exact: true })).toHaveCount(0);
-    await page.getByText("New engagement", { exact: true }).click();
-    await page.getByLabel("Client", { exact: true }).selectOption({ label: "E2E Primary Client" });
+    await page.locator("details > summary").filter({ hasText: "New engagement" }).click();
+    const createEngagementButton = page.getByRole("button", { name: "Create engagement" });
+    await expect(createEngagementButton).toBeVisible();
+    const engagementClientSelect = page.locator("select").filter({
+      has: page.locator('option[value="pieroloos-e2e-primary-client"]'),
+    });
+    await expect(engagementClientSelect).toBeVisible();
+    await engagementClientSelect.selectOption("pieroloos-e2e-primary-client");
     await page.getByLabel("Service", { exact: true }).fill("Authenticated Playwright engagement");
     await page.getByLabel("Next action", { exact: true }).fill("Request reviewed formation documents");
     await page.getByRole("button", { name: "Create engagement" }).click();
