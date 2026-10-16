@@ -28,6 +28,28 @@ export async function withProfessionalPartnerGrantTransaction<T>(input: {
 }, operation: PartnerGrantOperation<T>): Promise<T> {
   return prisma.$transaction(async (transaction) => {
     const now = new Date();
+
+    // Lock both the grant and partner identity before checking authorization. Revocation,
+    // amendment and suspension use the same rows, so concurrent lifecycle changes serialize
+    // against this operation rather than slipping between the check and protected query.
+    const locked = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT grant."id"
+      FROM "ProfessionalPartnerGrant" AS grant
+      JOIN "ProfessionalPartnerIdentity" AS identity
+        ON identity."id" = grant."partnerIdentityId"
+       AND identity."organizationId" = grant."organizationId"
+       AND identity."workspaceId" = grant."workspaceId"
+      WHERE grant."clientId" = ${input.clientId}
+        AND grant."status" = 'ACTIVE'
+        AND grant."revokedAt" IS NULL
+        AND (grant."expiresAt" IS NULL OR grant."expiresAt" > ${now})
+        AND grant."capabilities" @> ARRAY[${input.capability}::"ProfessionalPartnerCapability"]
+        AND identity."userId" = ${input.userId}
+        AND identity."status" = 'VERIFIED'
+      FOR UPDATE OF grant, identity
+    `);
+    if (locked.length !== 1) throw new Error("PROFESSIONAL_PARTNER_ACCESS_DENIED");
+
     const grant = await transaction.professionalPartnerGrant.findFirst({
       where: {
         clientId: input.clientId,
