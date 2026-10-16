@@ -1,4 +1,3 @@
-import type { z } from "zod";
 import { complianceRuleVersionSchema, type ComplianceRuleVersionInput } from "@/lib/validation/compliance-rule-version";
 
 export type ComplianceRuleAssessmentState = "APPLICABLE" | "NOT_APPLICABLE" | "UNKNOWN";
@@ -74,7 +73,7 @@ export function assessComplianceRuleReadiness(
       return { state: "UNKNOWN", ruleId: rule.ruleId, ruleVersion: rule.version, reasons: ["MISSING_FORMATION_STATE"], mayGenerateObligation: false };
     }
     if (rule.applicability.formationCompleted !== context.formationCompleted) {
-      return { state: "NOT_APPLICABLE", ruleId: rule.ruleId, version: rule.version, reasons: ["FORMATION_STATE_MISMATCH"], mayGenerateObligation: false } as ComplianceRuleAssessment;
+      return { state: "NOT_APPLICABLE", ruleId: rule.ruleId, ruleVersion: rule.version, reasons: ["FORMATION_STATE_MISMATCH"], mayGenerateObligation: false };
     }
   }
 
@@ -82,5 +81,3 @@ export function assessComplianceRuleReadiness(
   // obligations; a persistent registry, idempotency key and audited generation transaction are required.
   return { state: "APPLICABLE", ruleId: rule.ruleId, ruleVersion: rule.version, reasons: [], mayGenerateObligation: false };
 }
-
-export type { z };
