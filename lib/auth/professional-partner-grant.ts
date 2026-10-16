@@ -53,6 +53,13 @@ export async function withProfessionalPartnerGrantTransaction<T>(input: {
     });
     if (!grant) throw new Error("PROFESSIONAL_PARTNER_ACCESS_DENIED");
 
+    // Partner status is mutually exclusive with tenant staff membership. Recheck it for every action.
+    const membership = await transaction.membership.findUnique({
+      where: { userId_organizationId: { userId: input.userId, organizationId: grant.organizationId } },
+      select: { id: true },
+    });
+    if (membership) throw new Error("PROFESSIONAL_PARTNER_ACCESS_DENIED");
+
     const client = await transaction.client.findFirst({
       where: {
         id: input.clientId,
@@ -74,9 +81,9 @@ export async function withProfessionalPartnerGrantTransaction<T>(input: {
         actorUserId: input.userId,
         action: input.action,
         metadata: {
+          ...input.metadata,
           capability: input.capability,
           resourceId: input.resourceId ?? null,
-          ...input.metadata,
         } as Prisma.InputJsonValue,
       },
     });
