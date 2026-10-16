@@ -1431,6 +1431,7 @@ model ProfessionalPartnerGrant {
   clientId              String
   partnerIdentityId    String
   grantKey             String
+  requestDigest        String
   purpose              ProfessionalPartnerGrantPurpose
   purposeDetails       String?
   capabilities         ProfessionalPartnerCapability[] @default([])
