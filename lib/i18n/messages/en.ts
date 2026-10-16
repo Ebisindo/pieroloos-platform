@@ -35,6 +35,7 @@ const en = {
   "navigation.marketExpansion": "Market Expansion",
   "navigation.crossBorder": "Cross-border Preparation",
   "navigation.formation": "Formation",
+  "navigation.corporateGraph": "Corporate Graph Studio",
   "navigation.compliance": "Compliance",
   "navigation.reports": "Reports",
   "navigation.engagements": "Engagements",
