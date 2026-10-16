@@ -332,6 +332,10 @@ model User {
   platformSuperAdmin        PlatformSuperAdmin?
   platformPermissionsGranted PlatformAdministratorPermission[] @relation("PlatformPermissionGrantor")
   platformAuditEvents       PlatformAuditEvent[] @relation("PlatformAuditActor")
+  complianceRulesCreated   ComplianceRule[] @relation("ComplianceRuleCreatedBy")
+  complianceRuleVersionsCreated ComplianceRuleVersion[] @relation("ComplianceRuleVersionCreatedBy")
+  complianceRulesReviewed  ComplianceRuleVersion[] @relation("ComplianceRuleVersionReviewer")
+  complianceDeadlineSnapshots ComplianceDeadlineSnapshot[] @relation("ComplianceDeadlineSnapshotActor")
 }
 
 model PlatformAdministrator {
@@ -428,6 +432,8 @@ model Workspace {
   documents                  Document[]
   documentAccessEvents       DocumentAccessEvent[]
   complianceEvidence         ComplianceEvidence[]
+  complianceRuleVersions    ComplianceRuleVersion[]
+  complianceDeadlineSnapshots ComplianceDeadlineSnapshot[]
   reports                    Report[]
   activities                 Activity[]
   tasks                      Task[]
@@ -972,6 +978,7 @@ model ComplianceRule {
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workspace    Workspace             @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
   jurisdiction Jurisdiction           @relation(fields: [jurisdictionId], references: [id], onDelete: Restrict)
+  createdBy     User                  @relation("ComplianceRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   versions     ComplianceRuleVersion[]
 
   @@unique([organizationId, workspaceId, ruleKey])
@@ -1008,6 +1015,10 @@ model ComplianceRuleVersion {
   createdAt           DateTime                  @default(now())
 
   rule ComplianceRule @relation(fields: [ruleId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  createdBy User @relation("ComplianceRuleVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  reviewer User? @relation("ComplianceRuleVersionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+  deadlineSnapshots ComplianceDeadlineSnapshot[]
+  obligations ComplianceObligation[]
 
   @@unique([ruleId, version])
   @@unique([id, workspaceId])
@@ -1031,6 +1042,8 @@ model ComplianceDeadlineSnapshot {
 
   obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId], references: [id], onDelete: SetNull)
+  actor User @relation("ComplianceDeadlineSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@unique([obligationId, sequence])
   @@index([workspaceId, createdAt])
@@ -1071,6 +1084,7 @@ model ComplianceObligation {
   reminders     ComplianceReminder[]
   evidence      ComplianceEvidence[]
   deadlineSnapshots ComplianceDeadlineSnapshot[]
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId], references: [id], onDelete: SetNull)
   documents     Document[]
 
   @@unique([id, workspaceId])
