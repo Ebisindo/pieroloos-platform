@@ -174,6 +174,6 @@ describe("compliance evidence governance", () => {
     );
 
     expect(response.status).toBe(409);
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(transactionObligationUpdateManyMock).not.toHaveBeenCalled();
   });
 });
