@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const widths = [320, 360, 390, 430, 480, 560, 760, 768, 1000, 1024, 1280, 1440, 1920];
@@ -229,12 +229,19 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.getByRole("button", { name: "Generate client summary" }).click();
     await expect(page.getByText("Report generated and saved.", { exact: true })).toBeVisible();
     await expect(page.getByText("Updated objective from authenticated E2E", { exact: false })).toBeVisible();
+    await captureAuthenticatedViewportMatrix(page, "/reports (generated summary)", "reports-generated-summary");
     await expectNoSeriousAxeViolations(page, "/reports (generated summary)");
 
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("link", { name: "Download / print HTML" }).click();
     const reportDownload = await downloadPromise;
     expect(reportDownload.suggestedFilename()).toMatch(/^pieroloos-report-.+\.html$/);
+    const downloadedReportPath = await reportDownload.path();
+    expect(downloadedReportPath).not.toBeNull();
+    const downloadedReportHtml = await readFile(downloadedReportPath!, "utf8");
+    expect(downloadedReportHtml).toContain("Updated objective from authenticated E2E");
+    expect(downloadedReportHtml).toContain("professional review");
+    expect(downloadedReportHtml).not.toContain("<script>");
 
     await page.goto("/engagements", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Engagements", exact: true })).toBeVisible();
