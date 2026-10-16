@@ -88,7 +88,7 @@ jobs:
       SHADOW_DATABASE_URL_CI: postgresql://postgres:postgres@localhost:5432/pieroloos_e2e_shadow?schema=public
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pieroloos_e2e_ci?schema=public
       NEXTAUTH_SECRET: ci-only-not-a-deployment-secret
-      NEXTAUTH_URL: http://127.0.0.1:3100
+      NEXTAUTH_URL: http://localhost:3100
       PIEROLO_E2E_AUTH_ENABLED: "true"
       PIEROLO_E2E_TEST_EMAIL: pieroloos-e2e-owner@integration.invalid
     steps:
