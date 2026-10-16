@@ -411,7 +411,7 @@ model PlatformAuditEvent {
   actor User? @relation("PlatformAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([occurredAt])
-  @@index([actorUserId, occurredAt], map: "ProfessionalPartnerIdentityAuditEvent_actorUserId_occurredAt_id")
+  @@index([actorUserId, occurredAt])
   @@index([subjectType, subjectId, occurredAt])
 }
 
@@ -1012,7 +1012,7 @@ model ComplianceObligation {
   documents     Document[]
 
   @@unique([id, workspaceId])
-  @@index([organizationId, workspaceId, status], map: "ProfessionalPartnerIdentity_organizationId_workspaceId_status_i")
+  @@index([organizationId, workspaceId, status])
   @@index([workspaceId, dueAt])
   @@index([clientId])
 }
@@ -1307,7 +1307,7 @@ model OperationalActionAuditEvent {
 
   action OperationalAction @relation(fields: [actionId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, workspaceId, occurredAt], map: "ProfessionalPartnerIdentityAuditEvent_organizationId_workspaceI")
+  @@index([organizationId, workspaceId, occurredAt])
   @@index([actionId, occurredAt])
 }
 
@@ -1420,7 +1420,7 @@ model ProfessionalPartnerIdentity {
 
   @@unique([organizationId, workspaceId, userId], map: "ProfessionalPartnerIdentity_organizationId_workspaceId_userId_k")
   @@unique([id, organizationId, workspaceId])
-  @@index([organizationId, workspaceId, status])
+  @@index([organizationId, workspaceId, status], map: "ProfessionalPartnerIdentity_organizationId_workspaceId_status_i")
   @@index([userId, status])
 }
 
@@ -1479,9 +1479,9 @@ model ProfessionalPartnerIdentityAuditEvent {
   identity     ProfessionalPartnerIdentity @relation(fields: [identityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict, map: "ProfessionalPartnerIdentityAuditEvent_identityId_organizationId")
   actor        User @relation("ProfessionalPartnerIdentityAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, workspaceId, occurredAt], map: "ProfessionalPartnerGrantAuditEvent_organizationId_workspaceId_o")
+  @@index([organizationId, workspaceId, occurredAt], map: "ProfessionalPartnerIdentityAuditEvent_organizationId_workspaceI")
   @@index([identityId, occurredAt])
-  @@index([actorUserId, occurredAt])
+  @@index([actorUserId, occurredAt], map: "ProfessionalPartnerIdentityAuditEvent_actorUserId_occurredAt_id")
 }
 
 model ProfessionalPartnerGrantAuditEvent {
@@ -1504,7 +1504,7 @@ model ProfessionalPartnerGrantAuditEvent {
   partnerIdentity ProfessionalPartnerIdentity @relation("ProfessionalPartnerGrantAuditIdentity", fields: [partnerIdentityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict, map: "ProfessionalPartnerGrantAuditEvent_partnerIdentityId_organizati")
   actor        User @relation("ProfessionalPartnerGrantAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, workspaceId, occurredAt])
+  @@index([organizationId, workspaceId, occurredAt], map: "ProfessionalPartnerGrantAuditEvent_organizationId_workspaceId_o")
   @@index([clientId, occurredAt])
   @@index([grantId, occurredAt])
   @@index([actorUserId, occurredAt])
