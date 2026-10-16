@@ -312,6 +312,7 @@ BEGIN
     OR OLD."clientId" IS DISTINCT FROM NEW."clientId"
     OR OLD."partnerIdentityId" IS DISTINCT FROM NEW."partnerIdentityId"
     OR OLD."grantKey" IS DISTINCT FROM NEW."grantKey"
+    OR OLD."requestDigest" IS DISTINCT FROM NEW."requestDigest"
     OR OLD."grantedByUserId" IS DISTINCT FROM NEW."grantedByUserId"
     OR OLD."createdAt" IS DISTINCT FROM NEW."createdAt"
   THEN
