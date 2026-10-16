@@ -1000,7 +1000,7 @@ model ComplianceRuleVersion {
   obligationType      String
   sourceAuthority     String
   sourceUrl           String
-  sourceRetrievedAt   DateTime
+  sourceRetrievedAt   DateTime?
   publicationDate     DateTime?
   effectiveFrom       DateTime
   effectiveThrough    DateTime?
