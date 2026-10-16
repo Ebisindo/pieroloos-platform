@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
   };
   return {
     getWorkspaceContext: vi.fn(),
+    hasInvalidRequestOrigin: vi.fn(() => false),
     withAuthorizedWorkspaceTransaction: vi.fn(async (_principal: unknown, _permission: unknown, operation: (tx: typeof transaction) => Promise<unknown>) => operation(transaction)),
     notificationFindFirst: vi.fn(),
     transaction,
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/auth/workspace-context", () => ({ getWorkspaceContext: mocks.getWorkspaceContext }));
+vi.mock("@/lib/auth/request-origin", () => ({ hasInvalidRequestOrigin: mocks.hasInvalidRequestOrigin }));
 vi.mock("@/lib/auth/authorized-workspace-transaction", () => ({
   withAuthorizedWorkspaceTransaction: mocks.withAuthorizedWorkspaceTransaction,
 }));
@@ -42,10 +44,10 @@ const obligation = {
   ownerUserId: "user-2",
 };
 
-function request(body: unknown) {
+function request(body: unknown, origin = "http://localhost") {
   return new Request("http://localhost/api/compliance/obligations/obligation-1/reminders", {
     method: "POST",
-    headers: { origin: "http://localhost", "content-type": "application/json" },
+    headers: { origin, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
 }
@@ -58,9 +60,14 @@ function payload() {
   };
 }
 
+function routeContext(id = obligation.id) {
+  return { params: Promise.resolve({ id }) };
+}
+
 describe("compliance reminder scheduling API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.hasInvalidRequestOrigin.mockReturnValue(false);
     mocks.getWorkspaceContext.mockResolvedValue({ userId: principal.userId, principal });
     mocks.transaction.complianceObligation.findFirst.mockResolvedValue(obligation);
     mocks.transaction.membership.findUnique.mockResolvedValue({ userId: "user-2" });
@@ -80,11 +87,20 @@ describe("compliance reminder scheduling API", () => {
     });
     mocks.transaction.complianceReminder.create.mockResolvedValue({ id: "reminder-1" });
     mocks.transaction.complianceActivity.create.mockResolvedValue({ id: "activity-1" });
+    mocks.notificationFindFirst.mockResolvedValue(null);
+  });
+
+  it("rejects invalid request origins before authentication or transaction work", async () => {
+    mocks.hasInvalidRequestOrigin.mockReturnValue(true);
+    const response = await POST(request(payload(), "https://attacker.invalid"), routeContext());
+    expect(response.status).toBe(403);
+    expect(mocks.getWorkspaceContext).not.toHaveBeenCalled();
+    expect(mocks.withAuthorizedWorkspaceTransaction).not.toHaveBeenCalled();
   });
 
   it("rejects unauthenticated requests before opening a transaction", async () => {
     mocks.getWorkspaceContext.mockResolvedValue({ userId: null, principal: null });
-    const response = await POST(request(payload()), { params: Promise.resolve({ id: obligation.id }) });
+    const response = await POST(request(payload()), routeContext());
     expect(response.status).toBe(401);
     expect(mocks.withAuthorizedWorkspaceTransaction).not.toHaveBeenCalled();
   });
@@ -94,29 +110,42 @@ describe("compliance reminder scheduling API", () => {
       userId: principal.userId,
       principal: { ...principal, permissions: ["compliance:read"] },
     });
-    const response = await POST(request(payload()), { params: Promise.resolve({ id: obligation.id }) });
+    const response = await POST(request(payload()), routeContext());
     expect(response.status).toBe(403);
     expect(mocks.withAuthorizedWorkspaceTransaction).not.toHaveBeenCalled();
   });
 
   it("validates the request and rejects reminders scheduled in the past", async () => {
-    const invalid = await POST(request({ channel: "SMS", message: "x", scheduledFor: "not-a-date" }), {
-      params: Promise.resolve({ id: obligation.id }),
-    });
+    const invalid = await POST(request({ channel: "SMS", message: "x", scheduledFor: "not-a-date" }), routeContext());
     expect(invalid.status).toBe(422);
 
     const past = await POST(request({
       scheduledFor: "2020-01-01T00:00:00.000Z",
       channel: "IN_APP",
       message: "Please review this.",
-    }), { params: Promise.resolve({ id: obligation.id }) });
+    }), routeContext());
     expect(past.status).toBe(422);
     expect(mocks.withAuthorizedWorkspaceTransaction).not.toHaveBeenCalled();
   });
 
-  it("queues a workspace-scoped notification and records the reminder and audit activity", async () => {
+  it("does not disclose obligations outside the active workspace", async () => {
+    mocks.transaction.complianceObligation.findFirst.mockResolvedValue(null);
+    const response = await POST(request(payload()), routeContext("obligation-from-another-workspace"));
+    expect(response.status).toBe(404);
+    expect(mocks.transaction.complianceObligation.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "obligation-from-another-workspace",
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+      },
+      select: { id: true, title: true, status: true, ownerUserId: true },
+    });
+    expect(mocks.transaction.complianceNotification.create).not.toHaveBeenCalled();
+  });
+
+  it("queues a workspace-scoped notification and records reminder plus audit activity atomically", async () => {
     const body = payload();
-    const response = await POST(request(body), { params: Promise.resolve({ id: obligation.id }) });
+    const response = await POST(request(body), routeContext());
     const result = await response.json() as { alreadyScheduled: boolean };
 
     expect(response.status).toBe(201);
@@ -149,7 +178,7 @@ describe("compliance reminder scheduling API", () => {
 
   it("returns the existing queued reminder on a repeated request", async () => {
     mocks.transaction.complianceNotification.findUnique.mockResolvedValue({ id: "notification-existing" });
-    const response = await POST(request(payload()), { params: Promise.resolve({ id: obligation.id }) });
+    const response = await POST(request(payload()), routeContext());
     const result = await response.json() as { alreadyScheduled: boolean; data: { id: string } };
 
     expect(response.status).toBe(200);
@@ -160,14 +189,48 @@ describe("compliance reminder scheduling API", () => {
     expect(mocks.transaction.complianceActivity.create).not.toHaveBeenCalled();
   });
 
+  it("returns a retryable conflict on a concurrent serialization failure", async () => {
+    mocks.withAuthorizedWorkspaceTransaction.mockRejectedValueOnce({ code: "P2034" });
+    const response = await POST(request(payload()), routeContext());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Reminder scheduling conflicted with a concurrent change. Retry the request.",
+    });
+  });
+
+  it("returns the existing record after a unique-key race only within the active workspace", async () => {
+    mocks.withAuthorizedWorkspaceTransaction.mockRejectedValueOnce({ code: "P2002" });
+    mocks.notificationFindFirst.mockResolvedValueOnce({ id: "notification-raced" });
+    const response = await POST(request(payload()), routeContext());
+    const result = await response.json() as { alreadyScheduled: boolean; data: { id: string } };
+
+    expect(response.status).toBe(200);
+    expect(result.alreadyScheduled).toBe(true);
+    expect(result.data.id).toBe("notification-raced");
+    expect(mocks.notificationFindFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        dedupeKey: expect.stringContaining("compliance-reminder:"),
+      }),
+    });
+  });
+
+  it("does not return an unrelated record if a unique-key race cannot be resolved in this workspace", async () => {
+    mocks.withAuthorizedWorkspaceTransaction.mockRejectedValueOnce({ code: "P2002" });
+    mocks.notificationFindFirst.mockResolvedValueOnce(null);
+    const response = await POST(request(payload()), routeContext());
+    expect(response.status).toBe(500);
+  });
+
   it("does not schedule reminders for closed obligations or out-of-organization recipients", async () => {
     mocks.transaction.complianceObligation.findFirst.mockResolvedValue({ ...obligation, status: "COMPLIANT" });
-    const closed = await POST(request(payload()), { params: Promise.resolve({ id: obligation.id }) });
+    const closed = await POST(request(payload()), routeContext());
     expect(closed.status).toBe(409);
 
     mocks.transaction.complianceObligation.findFirst.mockResolvedValue(obligation);
     mocks.transaction.membership.findUnique.mockResolvedValue(null);
-    const noRecipient = await POST(request(payload()), { params: Promise.resolve({ id: obligation.id }) });
+    const noRecipient = await POST(request(payload()), routeContext());
     expect(noRecipient.status).toBe(409);
   });
 });
