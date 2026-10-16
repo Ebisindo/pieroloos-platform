@@ -64,7 +64,13 @@ describe("sourced compliance rule version contract", () => {
   });
 
   it("returns UNKNOWN when the source URL has not yet been independently checked", () => {
-    const result = assessComplianceRuleReadiness(rule({ sourceRetrievedAt: null }), {
+    const result = assessComplianceRuleReadiness(rule({
+      reviewState: "UNREVIEWED",
+      sourceRetrievedAt: null,
+      reviewedByUserId: null,
+      reviewedAt: null,
+      evidenceClass: "E1",
+    }), {
       jurisdictionId: "jurisdiction-1",
       businessType: "COMPANY",
       formationCompleted: true,
