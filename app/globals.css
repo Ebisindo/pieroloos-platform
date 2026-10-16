@@ -500,3 +500,21 @@ select.form-input { appearance:auto; }
 @media (prefers-reduced-motion: reduce) {
   .module-banner *, .module-banner *::before, .module-banner *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+
+/* Compact authenticated toolbar at the narrowest supported widths. */
+@media (max-width: 480px) {
+  .topbar { gap: 8px; padding: 0 12px; }
+  .topbar-left, .topbar-actions { gap: 8px; min-width: 0; }
+  .topbar-left { flex: 1 1 auto; }
+  .context-path { min-width: 0; gap: 0; }
+  .context-path > span { display: none; }
+  .context-path strong { white-space: nowrap; }
+  .topbar-actions { flex: 0 1 auto; }
+  .topbar-actions .language-select { width: 120px; max-width: 120px; }
+}
+@media (max-width: 360px) {
+  .topbar-actions .search-button,
+  .topbar-actions .avatar { display: none; }
+  .topbar-actions .language-select { width: 108px; max-width: 108px; }
+}
