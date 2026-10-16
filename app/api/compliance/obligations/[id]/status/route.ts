@@ -66,6 +66,25 @@ export async function PATCH(request: Request, routeContext: { params: Promise<{ 
       });
       if (changed.count !== 1) throw new Error("COMPLIANCE_STATUS_CONFLICT");
 
+      const latestHistory = await transaction.complianceStatusSnapshot.aggregate({
+        where: { obligationId: existing.id, workspaceId: principal.workspaceId },
+        _max: { sequence: true },
+      });
+      await transaction.complianceStatusSnapshot.create({
+        data: {
+          obligationId: existing.id,
+          workspaceId: principal.workspaceId,
+          sequence: (latestHistory._max.sequence ?? 0) + 1,
+          previousStatus: existing.status,
+          currentStatus: parsed.data.status,
+          completedAtBefore: existing.completedAt,
+          completedAtAfter: completedAt,
+          reason: parsed.data.note ?? null,
+          actorUserId: principal.userId,
+          occurredAt: now,
+        },
+      });
+
       await transaction.complianceActivity.create({
         data: {
           obligationId: existing.id,
