@@ -1,7 +1,9 @@
 import { z } from "zod";
 
+const nullableDateSchema = z.preprocess((value) => value === null ? null : value, z.coerce.date().nullable());
+
 export const complianceDeadlineChangeSchema = z.object({
-  dueAt: z.coerce.date().nullable(),
+  dueAt: nullableDateSchema,
   reason: z.string().trim().min(8).max(2000),
   sourceRuleVersionId: z.string().trim().min(1).max(120).nullable().optional(),
   assessmentFacts: z.record(z.string(), z.unknown()).default({}).refine(
