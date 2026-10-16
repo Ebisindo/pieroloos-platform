@@ -99,3 +99,5 @@ $$;
 CREATE TRIGGER "ComplianceDeadlineSnapshot_immutable"
 BEFORE UPDATE OR DELETE ON "ComplianceDeadlineSnapshot"
 FOR EACH ROW EXECUTE FUNCTION prevent_compliance_deadline_snapshot_mutation();
+
+ALTER TABLE "ComplianceRuleVersion" ADD CONSTRAINT "ComplianceRuleVersion_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE;
