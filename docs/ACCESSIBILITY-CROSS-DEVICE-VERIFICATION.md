@@ -55,13 +55,17 @@ The following work is not marked complete by CI emulation. Complete it before cl
 
 ## Current automated evidence
 
-The exact current PR head `3c8b4596b5bf17694a6b2fabab797be2db29454a` passed both GitHub Actions jobs in [CI #38853275312](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38853275312) on 16 October 2026:
+The feature branch's authenticated and responsive release-gate suite passed on code head `5a76aca2e40a95564e1312aefff93505a8f9ec2e` in [CI #38853714889](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38853714889) on 16 October 2026:
 - PostgreSQL migration/validation and database-integrity tests.
 - ESLint, TypeScript, unit tests and production build.
-- Disposable PostgreSQL-backed authenticated browser tests, including Business Profile save/reload persistence; Reports generation and HTML download; Engagement create/edit/lifecycle/activity; and denial of foreign-workspace resource/list access.
-- Public and authenticated axe scans, viewport overflow checks, keyboard skip-link focus behavior, and screenshot/report artifact upload.
+- Authenticated Business Profile save/reload persistence; Reports generation and HTML download; Engagement create/edit/lifecycle/activity; and denial of foreign-workspace resource/list access.
+- Browser suite: 40 passed, 0 failed, 0 flaky, 0 skipped.
+- Public/authenticated axe scans, viewport overflow checks, keyboard skip-link focus behavior, and screenshot/report artifact upload.
+- Downloaded HTML export was inspected by automated assertions: it contains the updated profile objective and professional-review caveat and does not include raw `<script>` tags.
 
-Artifact `playwright-results` (ID `12026320763`, expires 30 October 2026) was downloaded and reviewed. Its 20 authenticated screenshots cover Business Profile list/detail, Reports, and Engagement list/detail at 320, 390, 768 and 1280 CSS pixels, plus public-route screenshots and the Playwright HTML report. The 320px toolbar no longer shows the previously observed stray “Select language” label; the forms and cards stack vertically in the reviewed responsive captures. This is still browser emulation, not real-device verification. Automated axe scans passed their critical/serious gate, and the latest test code attaches full axe findings to the Playwright report for human triage.
+Artifact `playwright-results` (ID `12026207411`, expires 30 October 2026) was downloaded and reviewed. It contains 24 authenticated screenshots covering Business Profile list/detail, Reports before and after generation, and Engagement list/detail at 320, 390, 768 and 1280 CSS pixels, plus public-route screenshots and the Playwright HTML report. The reviewed 320px toolbar no longer shows the stray “Select language” label; forms and cards stack vertically. The generated-report view was also captured at all four widths.
+
+The authenticated axe attachment payloads were extracted from the HTML report: all six tested views (Business Profile list/detail, Reports list/generated summary, Engagement list/detail) report `violations: []`. This finding applies only to axe's automated rules and the tested browser states. It does not replace manual review or establish WCAG conformance. All screenshot evidence remains browser emulation, not real-device verification.
 
 Locale catalogs en/fr/es/pt were checked against one another: 1,217 unique keys per catalog, with no missing, extra or duplicate keys.
 
