@@ -38,12 +38,15 @@ export async function PATCH(request: Request, routeContext: { params: Promise<{ 
           id: true, status: true, completedAt: true, requiresEvidence: true,
           professionalReviewRequired: true, professionalReviewCompleted: true,
           evidence: {
-            where: { reviewStatus: "VERIFIED", OR: [{ validThrough: null }, { validThrough: { gte: now } }] },
-            document: {
-              workspaceId: principal.workspaceId,
-              status: "AVAILABLE",
-              scanStatus: "CLEAN",
-              deletedAt: null,
+            where: {
+              reviewStatus: "VERIFIED",
+              OR: [{ validThrough: null }, { validThrough: { gte: now } }],
+              document: {
+                workspaceId: principal.workspaceId,
+                status: "AVAILABLE",
+                scanStatus: "CLEAN",
+                deletedAt: null,
+              },
             },
             select: { id: true },
           },
