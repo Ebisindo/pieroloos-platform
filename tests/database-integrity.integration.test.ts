@@ -43,7 +43,8 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
           'ComplianceEvidence_claims_immutable',
           'ComplianceDeadlineSnapshot_immutable',
           'ComplianceStatusSnapshot_immutable',
-          'ComplianceRuleActivity_immutable'
+          'ComplianceRuleActivity_immutable',
+          'ComplianceRuleVersion_content_immutable'
         )
     `);
     expect(triggers.map((trigger) => trigger.name)).toEqual(expect.arrayContaining([
@@ -51,6 +52,7 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       "ComplianceDeadlineSnapshot_immutable",
       "ComplianceStatusSnapshot_immutable",
       "ComplianceRuleActivity_immutable",
+      "ComplianceRuleVersion_content_immutable",
     ]));
   });
 
