@@ -74,6 +74,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
           ...(evidenceClass ? { evidenceClass } : {}),
           reviewedByUserId: principal.userId,
           reviewedAt,
+          sourceRetrievedAt: input.decision === "VERIFY" ? reviewedAt : version.sourceRetrievedAt,
           reviewNote: input.reviewNote,
         },
       });
@@ -94,7 +95,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
             reviewState,
             evidenceClass: evidenceClass ?? null,
             sourceUrl: version.sourceUrl,
-            sourceRetrievedAt: version.sourceRetrievedAt.toISOString(),
+            sourceRetrievedAt: input.decision === "VERIFY" ? reviewedAt.toISOString() : version.sourceRetrievedAt?.toISOString() ?? null,
             effectiveFrom: version.effectiveFrom.toISOString(),
             effectiveThrough: version.effectiveThrough?.toISOString() ?? null,
           },
