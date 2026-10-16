@@ -63,3 +63,10 @@ export const reminderSchema = z.object({
   channel: z.enum(["IN_APP","EMAIL"]),
   message: z.string().trim().min(2).max(2000),
 });
+
+export const escalateComplianceObligationSchema = z.object({
+  obligationId: z.string().trim().min(1).max(120),
+  reason: z.string().trim().min(8).max(2000),
+  idempotencyKey: z.string().trim().min(8).max(128),
+  targetUserId: z.string().trim().min(1).max(120).nullable().optional(),
+}).strict();
