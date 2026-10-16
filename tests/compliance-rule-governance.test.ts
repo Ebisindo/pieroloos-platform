@@ -36,6 +36,29 @@ describe("sourced compliance rule version contract", () => {
     expect(complianceRuleVersionSchema.safeParse(rule({ sourceUrl: "not-a-url" })).success).toBe(false);
   });
 
+  it("requires an independent retrieval timestamp for verified status", () => {
+    expect(complianceRuleVersionSchema.safeParse(rule({ sourceRetrievedAt: null })).success).toBe(false);
+    expect(complianceRuleVersionSchema.safeParse(rule({
+      reviewState: "UNREVIEWED",
+      sourceRetrievedAt: null,
+      reviewedByUserId: null,
+      reviewedAt: null,
+      evidenceClass: "E1",
+    })).success).toBe(true);
+  });
+
+  it("returns UNKNOWN when the source URL has not yet been independently checked", () => {
+    const result = assessComplianceRuleReadiness(rule({ sourceRetrievedAt: null }), {
+      jurisdictionId: "jurisdiction-1",
+      businessType: "COMPANY",
+      formationCompleted: true,
+      evaluatedAt: now,
+    });
+    expect(result.state).toBe("UNKNOWN");
+    expect(result.reasons).toContain("SOURCE_NOT_RETRIEVED");
+    expect(result.mayGenerateObligation).toBe(false);
+  });
+
   it("rejects an invalid effective date range and future retrieval timestamp", () => {
     expect(complianceRuleVersionSchema.safeParse(rule({
       effectiveThrough: new Date("2025-12-31T00:00:00.000Z"),
