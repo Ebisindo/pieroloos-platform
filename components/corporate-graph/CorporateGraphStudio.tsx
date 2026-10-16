@@ -1,5 +1,5 @@
  "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 type NodeRecord={id:string;name:string;nodeType:string;jurisdictionCode:string|null;entityType:string|null;clientId:string|null;createdAt:string};
@@ -12,8 +12,7 @@ export default function CorporateGraphStudio(){
  const [name,setName]=useState(""); const [nodeType,setNodeType]=useState("COMPANY"); const [jurisdictionCode,setJurisdictionCode]=useState(""); const [entityType,setEntityType]=useState("COMPANY");
  const [fromNodeId,setFromNodeId]=useState(""); const [toNodeId,setToNodeId]=useState(""); const [relation,setRelation]=useState("OWNS"); const [ownershipPercent,setOwnershipPercent]=useState("");
  const [busy,setBusy]=useState(false); const [error,setError]=useState(""); const [message,setMessage]=useState("");
- const refresh = useCallback(async () => { const response = await fetch("/api/corporate-graph", { cache: "no-store" }); const payload = await response.json() as GraphData & { error?: string }; if (!response.ok) throw new Error(payload.error ?? "Unable to load the corporate graph."); setGraph(payload); }, []);
- useEffect(() => { void refresh().catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load graph.")); }, [refresh]);
+ useEffect(() => { let mounted = true; fetch("/api/corporate-graph", { cache: "no-store" }).then(async response => { const payload = await response.json() as GraphData & { error?: string }; if (!response.ok) throw new Error(payload.error ?? "Unable to load the corporate graph."); if (mounted) setGraph(payload); }).catch((e: unknown) => { if (mounted) setError(e instanceof Error ? e.message : "Unable to load graph."); }); return () => { mounted = false; }; }, []);
  async function createNode(event:FormEvent<HTMLFormElement>){event.preventDefault();setBusy(true);setError("");setMessage("");try{const response=await fetch("/api/corporate-graph/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,nodeType,jurisdictionCode:jurisdictionCode||undefined,entityType:entityType||undefined})});const payload=await response.json() as {error?:string};if(!response.ok)throw new Error(payload.error??"Unable to create entity.");setName("");setJurisdictionCode("");setMessage("Entity added to the workspace graph.");await refresh();}catch(e){setError(e instanceof Error?e.message:"Unable to create entity.");}finally{setBusy(false);}}
  async function createEdge(event:FormEvent<HTMLFormElement>){event.preventDefault();setBusy(true);setError("");setMessage("");try{const response=await fetch("/api/corporate-graph/edges",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fromNodeId,toNodeId,relation,ownershipPercent:ownershipPercent===""?undefined:Number(ownershipPercent)})});const payload=await response.json() as {error?:string};if(!response.ok)throw new Error(payload.error??"Unable to create relationship.");setOwnershipPercent("");setMessage("Relationship added to the workspace graph.");await refresh();}catch(e){setError(e instanceof Error?e.message:"Unable to create relationship.");}finally{setBusy(false);}}
  return <main className="page-stack">
