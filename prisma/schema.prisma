@@ -411,7 +411,7 @@ model PlatformAuditEvent {
   actor User? @relation("PlatformAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([occurredAt])
-  @@index([actorUserId, occurredAt])
+  @@index([actorUserId, occurredAt], map: "ProfessionalPartnerIdentityAuditEvent_actorUserId_occurredAt_id")
   @@index([subjectType, subjectId, occurredAt])
 }
 
@@ -1012,7 +1012,7 @@ model ComplianceObligation {
   documents     Document[]
 
   @@unique([id, workspaceId])
-  @@index([organizationId, workspaceId, status])
+  @@index([organizationId, workspaceId, status], map: "ProfessionalPartnerIdentity_organizationId_workspaceId_status_i")
   @@index([workspaceId, dueAt])
   @@index([clientId])
 }
@@ -1307,7 +1307,7 @@ model OperationalActionAuditEvent {
 
   action OperationalAction @relation(fields: [actionId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, workspaceId, occurredAt])
+  @@index([organizationId, workspaceId, occurredAt], map: "ProfessionalPartnerIdentityAuditEvent_organizationId_workspaceI")
   @@index([actionId, occurredAt])
 }
 
@@ -1418,7 +1418,7 @@ model ProfessionalPartnerIdentity {
   auditEvents  ProfessionalPartnerIdentityAuditEvent[]
   grantAuditEvents ProfessionalPartnerGrantAuditEvent[] @relation("ProfessionalPartnerGrantAuditIdentity")
 
-  @@unique([organizationId, workspaceId, userId])
+  @@unique([organizationId, workspaceId, userId], map: "ProfessionalPartnerIdentity_organizationId_workspaceId_userId_k")
   @@unique([id, organizationId, workspaceId])
   @@index([organizationId, workspaceId, status])
   @@index([userId, status])
@@ -1451,16 +1451,16 @@ model ProfessionalPartnerGrant {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
   client       Client       @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  partnerIdentity ProfessionalPartnerIdentity @relation(fields: [partnerIdentityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict)
+  partnerIdentity ProfessionalPartnerIdentity @relation(fields: [partnerIdentityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict, map: "ProfessionalPartnerGrant_partnerIdentityId_organizationId_works")
   grantor      User @relation("ProfessionalPartnerGrantCreator", fields: [grantedByUserId], references: [id], onDelete: Restrict)
   reviewer     User? @relation("ProfessionalPartnerGrantReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
   revoker      User? @relation("ProfessionalPartnerGrantRevoker", fields: [revokedByUserId], references: [id], onDelete: Restrict)
   auditEvents  ProfessionalPartnerGrantAuditEvent[]
 
-  @@unique([organizationId, workspaceId, grantKey])
-  @@unique([id, organizationId, workspaceId, clientId])
-  @@index([partnerIdentityId, status, expiresAt, revokedAt])
-  @@index([organizationId, workspaceId, clientId, status])
+  @@unique([organizationId, workspaceId, grantKey], map: "ProfessionalPartnerGrant_organizationId_workspaceId_grantKey_ke")
+  @@unique([id, organizationId, workspaceId, clientId], map: "ProfessionalPartnerGrant_id_organizationId_workspaceId_clientId")
+  @@index([partnerIdentityId, status, expiresAt, revokedAt], map: "ProfessionalPartnerGrant_partnerIdentityId_status_expiresAt_rev")
+  @@index([organizationId, workspaceId, clientId, status], map: "ProfessionalPartnerGrant_organizationId_workspaceId_clientId_st")
 }
 
 model ProfessionalPartnerIdentityAuditEvent {
@@ -1475,11 +1475,11 @@ model ProfessionalPartnerIdentityAuditEvent {
   occurredAt     DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workspace    Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
-  identity     ProfessionalPartnerIdentity @relation(fields: [identityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict)
+  workspace    Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade, map: "ProfessionalPartnerIdentityAuditEvent_organizationId_workspaceI")
+  identity     ProfessionalPartnerIdentity @relation(fields: [identityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict, map: "ProfessionalPartnerIdentityAuditEvent_identityId_organizationId")
   actor        User @relation("ProfessionalPartnerIdentityAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, workspaceId, occurredAt])
+  @@index([organizationId, workspaceId, occurredAt], map: "ProfessionalPartnerGrantAuditEvent_organizationId_workspaceId_o")
   @@index([identityId, occurredAt])
   @@index([actorUserId, occurredAt])
 }
@@ -1498,10 +1498,10 @@ model ProfessionalPartnerGrantAuditEvent {
   occurredAt        DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workspace    Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  workspace    Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade, map: "ProfessionalPartnerGrantAuditEvent_organizationId_workspaceId_f")
   client       Client @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  grant        ProfessionalPartnerGrant @relation(fields: [grantId, organizationId, workspaceId, clientId], references: [id, organizationId, workspaceId, clientId], onDelete: Restrict)
-  partnerIdentity ProfessionalPartnerIdentity @relation("ProfessionalPartnerGrantAuditIdentity", fields: [partnerIdentityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict)
+  grant        ProfessionalPartnerGrant @relation(fields: [grantId, organizationId, workspaceId, clientId], references: [id, organizationId, workspaceId, clientId], onDelete: Restrict, map: "ProfessionalPartnerGrantAuditEvent_grantId_organizationId_works")
+  partnerIdentity ProfessionalPartnerIdentity @relation("ProfessionalPartnerGrantAuditIdentity", fields: [partnerIdentityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict, map: "ProfessionalPartnerGrantAuditEvent_partnerIdentityId_organizati")
   actor        User @relation("ProfessionalPartnerGrantAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, workspaceId, occurredAt])
