@@ -6,6 +6,7 @@ export type ComplianceRuleAssessmentReason =
   | "RULE_NOT_REVIEWED"
   | "RULE_REJECTED"
   | "RULE_SUPERSEDED"
+  | "SOURCE_NOT_RETRIEVED"
   | "SOURCE_NOT_YET_EFFECTIVE"
   | "SOURCE_EXPIRED"
   | "JURISDICTION_MISMATCH"
@@ -48,6 +49,7 @@ export function assessComplianceRuleReadiness(
   if (rule.reviewState === "REJECTED") reasons.push("RULE_REJECTED");
   if (rule.reviewState === "SUPERSEDED") reasons.push("RULE_SUPERSEDED");
   if (rule.reviewState !== "VERIFIED") reasons.push("RULE_NOT_REVIEWED");
+  if (!rule.sourceRetrievedAt) reasons.push("SOURCE_NOT_RETRIEVED");
   if (rule.effectiveFrom > evaluatedAt) reasons.push("SOURCE_NOT_YET_EFFECTIVE");
   if (rule.effectiveThrough && rule.effectiveThrough < evaluatedAt) reasons.push("SOURCE_EXPIRED");
 
