@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withProfessionalPartnerGrantTransaction } from "@/lib/auth/professional-partner-grant";
 
-const { prismaTransactionMock, grantFindFirstMock, membershipFindUniqueMock, clientFindFirstMock, auditCreateMock } = vi.hoisted(() => ({
+const { prismaTransactionMock, grantFindFirstMock, membershipFindUniqueMock, clientFindFirstMock, auditCreateMock, grantRowLockMock } = vi.hoisted(() => ({
   prismaTransactionMock: vi.fn(),
   grantFindFirstMock: vi.fn(),
   membershipFindUniqueMock: vi.fn(),
   clientFindFirstMock: vi.fn(),
   auditCreateMock: vi.fn(),
+  grantRowLockMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: { $transaction: prismaTransactionMock } }));
@@ -32,10 +33,12 @@ describe("professional partner grant authorization", () => {
     membershipFindUniqueMock.mockReset().mockResolvedValue(null);
     clientFindFirstMock.mockReset().mockResolvedValue({ id: "client-1" });
     auditCreateMock.mockReset().mockResolvedValue({ id: "audit-1" });
+    grantRowLockMock.mockReset().mockResolvedValue([{ id: "grant-1" }]);
     prismaTransactionMock.mockReset().mockImplementation(async (callback, options) => {
       expect(options).toMatchObject({ isolationLevel: "Serializable" });
       return callback({
         professionalPartnerGrant: { findFirst: grantFindFirstMock },
+        $queryRaw: grantRowLockMock,
         membership: { findUnique: membershipFindUniqueMock },
         client: { findFirst: clientFindFirstMock },
         professionalPartnerGrantAuditEvent: { create: auditCreateMock },
@@ -77,6 +80,41 @@ describe("professional partner grant authorization", () => {
         metadata: expect.objectContaining({ capability: "CLIENT_PROFILE_READ", resourceId: "client-1" }),
       }),
     }));
+  });
+
+
+  it("locks the grant and identity rows before the protected operation so concurrent revocation is serialized", async () => {
+    const operation = vi.fn().mockResolvedValue("protected");
+    const result = await withProfessionalPartnerGrantTransaction({
+      userId: "partner-user",
+      clientId: "client-1",
+      capability: "CLIENT_PROFILE_READ",
+      action: "TEST_LOCK",
+    }, operation);
+
+    expect(result).toBe("protected");
+    expect(grantRowLockMock).toHaveBeenCalledTimes(1);
+    const sql = String(grantRowLockMock.mock.calls[0][0]?.sql ?? "");
+    expect(sql).toContain('FOR UPDATE OF grant, identity');
+    expect(sql).toContain('"revokedAt"');
+    expect(sql).toContain('"expiresAt"');
+    expect(sql).toContain('"capabilities"');
+    expect(operation).toHaveBeenCalledTimes(1);
+  });
+
+  it("denies a grant that becomes stale before row lock acquisition without side effects", async () => {
+    grantRowLockMock.mockResolvedValueOnce([]);
+    const operation = vi.fn();
+    await expect(withProfessionalPartnerGrantTransaction({
+      userId: "partner-user",
+      clientId: "client-1",
+      capability: "CLIENT_PROFILE_READ",
+      action: "TEST_STALE_GRANT",
+    }, operation)).rejects.toThrow("PROFESSIONAL_PARTNER_ACCESS_DENIED");
+
+    expect(grantFindFirstMock).not.toHaveBeenCalled();
+    expect(operation).not.toHaveBeenCalled();
+    expect(auditCreateMock).not.toHaveBeenCalled();
   });
 
   it("denies access if no unexpired, non-revoked grant has the exact required capability", async () => {
