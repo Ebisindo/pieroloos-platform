@@ -98,9 +98,10 @@ describe("compliance evidence governance", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(obligationFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "obligation-1", workspaceId: "workspace-1" },
-    }));
+    expect(obligationFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "obligation-1", organizationId: "org-1", workspaceId: "workspace-1" },
+      select: { id: true },
+    });
     expect(evidenceUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "evidence-1", obligationId: "obligation-1", workspaceId: "workspace-1", reviewStatus: "PENDING" },
       data: expect.objectContaining({
