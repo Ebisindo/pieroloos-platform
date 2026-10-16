@@ -247,7 +247,11 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.getByRole("button", { name: "Save details" }).click();
     await expect(page.getByText("Engagement details saved.", { exact: true })).toBeVisible();
 
-    await page.getByLabel("Next status", { exact: true }).selectOption("INTAKE");
+    const nextStatusSelect = page.locator("select").filter({
+      has: page.locator('option[value="INTAKE"]'),
+    });
+    await expect(nextStatusSelect).toBeVisible();
+    await nextStatusSelect.selectOption("INTAKE");
     await page.getByRole("button", { name: "Apply status change" }).click();
     await expect(page.getByText("Engagement status updated.", { exact: true })).toBeVisible();
     await expect(page.getByText("Status changed to Intake", { exact: true })).toBeVisible();
