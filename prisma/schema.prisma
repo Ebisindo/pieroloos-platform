@@ -164,6 +164,7 @@ enum EvidenceReviewStatus {
   PENDING
   VERIFIED
   CHANGES_REQUESTED
+  REVOKED
 }
 
 enum DocumentStorageStatus {
