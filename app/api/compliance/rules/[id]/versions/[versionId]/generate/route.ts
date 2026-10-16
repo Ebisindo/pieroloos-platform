@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
+import { prisma } from "@/lib/db/prisma";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 
@@ -62,6 +63,9 @@ export async function POST(request: Request, routeContext: RouteContext) {
   const { id, versionId } = await routeContext.params;
   const input = parsed.data;
   const now = new Date();
+  const generationKey = createHash("sha256")
+    .update(["compliance-rule-version", principal.organizationId, principal.workspaceId, input.clientId, versionId].join(":"))
+    .digest("hex");
 
   try {
     const result = await withAuthorizedWorkspaceTransaction(principal, "compliance:write", async (transaction) => {
@@ -157,9 +161,6 @@ export async function POST(request: Request, routeContext: RouteContext) {
         return { state: "UNKNOWN" as const, reasons: ["FACT_EVIDENCE_UNVERIFIED"], missingEvidence: [...new Set(missingEvidence)] };
       }
 
-      const generationKey = createHash("sha256")
-        .update(["compliance-rule-version", principal.organizationId, principal.workspaceId, client.id, version.id].join(":"))
-        .digest("hex");
       const existing = await transaction.complianceObligation.findFirst({
         where: { workspaceId: principal.workspaceId, generationKey },
       });
@@ -245,7 +246,17 @@ export async function POST(request: Request, routeContext: RouteContext) {
     if (error instanceof Error && error.message === "COMPLIANCE_RULE_VERSION_NOT_FOUND") return NextResponse.json({ error: "Rule version not found in the active workspace." }, { status: 404 });
     if (error instanceof Error && error.message === "COMPLIANCE_CLIENT_NOT_FOUND") return NextResponse.json({ error: "Client not found in the active workspace." }, { status: 404 });
     if (typeof error === "object" && error !== null && "code" in error && ["P2002", "P2034"].includes(String((error as { code?: unknown }).code))) {
-      return NextResponse.json({ error: "Concurrent obligation generation conflicted. Retry to retrieve the existing obligation." }, { status: 409 });
+      const existing = await prisma.complianceObligation.findFirst({
+        where: {
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+          clientId: input.clientId,
+          sourceRuleVersionId: versionId,
+          generationKey,
+        },
+      });
+      if (existing) return NextResponse.json({ data: existing, alreadyExists: true }, { status: 200 });
+      return NextResponse.json({ error: "Concurrent obligation generation conflicted. Retry the request." }, { status: 409 });
     }
     console.error("Compliance obligation generation failed.");
     return NextResponse.json({ error: "Unable to generate the compliance obligation." }, { status: 500 });
