@@ -216,7 +216,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     expect(reportDownload.suggestedFilename()).toMatch(/^pieroloos-report-.+\.html$/);
 
     await page.goto("/engagements", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Engagements" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Engagements", exact: true })).toBeVisible();
     await captureAuthenticatedViewportMatrix(page, "/engagements", "engagements-list");
     await expectNoSeriousAxeViolations(page, "/engagements");
     await expect(page.getByText("Foreign Private Client", { exact: true })).toHaveCount(0);
