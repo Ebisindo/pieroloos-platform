@@ -323,6 +323,10 @@ model Organization {
   clientPortalGrants   ClientPortalGrant[]
   clientPortalEvents   ClientPortalAuditEvent[]
   clientPortalInteractions ClientPortalInteraction[]
+  professionalPartnerIdentities ProfessionalPartnerIdentity[]
+  professionalPartnerGrants ProfessionalPartnerGrant[]
+  professionalPartnerIdentityAuditEvents ProfessionalPartnerIdentityAuditEvent[]
+  professionalPartnerGrantAuditEvents ProfessionalPartnerGrantAuditEvent[]
 }
 
 model User {
@@ -348,6 +352,15 @@ model User {
   businessIntentProposalsCreated BusinessIntentProposal[] @relation("BusinessIntentProposalCreator")
   businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
   businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
+  professionalPartnerIdentities ProfessionalPartnerIdentity[] @relation("ProfessionalPartnerIdentityUser")
+  professionalPartnerIdentitiesCreated ProfessionalPartnerIdentity[] @relation("ProfessionalPartnerIdentityCreator")
+  professionalPartnerIdentitiesReviewed ProfessionalPartnerIdentity[] @relation("ProfessionalPartnerIdentityReviewer")
+  professionalPartnerIdentitiesSuspended ProfessionalPartnerIdentity[] @relation("ProfessionalPartnerIdentitySuspender")
+  professionalPartnerGrantsCreated ProfessionalPartnerGrant[] @relation("ProfessionalPartnerGrantCreator")
+  professionalPartnerGrantsReviewed ProfessionalPartnerGrant[] @relation("ProfessionalPartnerGrantReviewer")
+  professionalPartnerGrantsRevoked ProfessionalPartnerGrant[] @relation("ProfessionalPartnerGrantRevoker")
+  professionalPartnerIdentityAuditEvents ProfessionalPartnerIdentityAuditEvent[] @relation("ProfessionalPartnerIdentityAuditActor")
+  professionalPartnerGrantAuditEvents ProfessionalPartnerGrantAuditEvent[] @relation("ProfessionalPartnerGrantAuditActor")
 }
 
 model PlatformAdministrator {
@@ -451,6 +464,10 @@ model Workspace {
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
   businessIntentProposals    BusinessIntentProposal[]
+  professionalPartnerIdentities ProfessionalPartnerIdentity[]
+  professionalPartnerGrants ProfessionalPartnerGrant[]
+  professionalPartnerIdentityAuditEvents ProfessionalPartnerIdentityAuditEvent[]
+  professionalPartnerGrantAuditEvents ProfessionalPartnerGrantAuditEvent[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
@@ -487,6 +504,8 @@ model Client {
   portalAccessGrants    ClientPortalGrant[]
   portalEvents          ClientPortalAuditEvent[]
   portalInteractions    ClientPortalInteraction[]
+  professionalPartnerGrants ProfessionalPartnerGrant[]
+  professionalPartnerGrantAuditEvents ProfessionalPartnerGrantAuditEvent[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -1369,6 +1388,127 @@ model NotificationDeliveryAttempt {
   @@index([status, startedAt])
 }
 
+model ProfessionalPartnerIdentity {
+  id                        String                           @id @default(cuid())
+  organizationId            String
+  workspaceId               String
+  userId                    String
+  contactName               String
+  organizationName           String
+  professionalType          ProfessionalPartnerType
+  professionalRegistrationRef String?
+  status                    ProfessionalPartnerIdentityStatus @default(PENDING_VERIFICATION)
+  createdByUserId            String
+  verifiedByUserId           String?
+  verifiedAt                 DateTime?
+  verificationNote           String?
+  suspendedByUserId          String?
+  suspendedAt                DateTime?
+  suspensionReason           String?
+  createdAt                  DateTime                         @default(now())
+  updatedAt                  DateTime                         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  user         User         @relation("ProfessionalPartnerIdentityUser", fields: [userId], references: [id], onDelete: Restrict)
+  creator      User         @relation("ProfessionalPartnerIdentityCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  verifier     User?        @relation("ProfessionalPartnerIdentityReviewer", fields: [verifiedByUserId], references: [id], onDelete: Restrict)
+  suspender    User?        @relation("ProfessionalPartnerIdentitySuspender", fields: [suspendedByUserId], references: [id], onDelete: Restrict)
+  grants       ProfessionalPartnerGrant[]
+  auditEvents  ProfessionalPartnerIdentityAuditEvent[]
+  grantAuditEvents ProfessionalPartnerGrantAuditEvent[] @relation("ProfessionalPartnerGrantAuditIdentity")
+
+  @@unique([organizationId, workspaceId, userId])
+  @@unique([id, organizationId, workspaceId])
+  @@index([organizationId, workspaceId, status])
+  @@index([userId, status])
+}
+
+model ProfessionalPartnerGrant {
+  id                   String                          @id @default(cuid())
+  organizationId       String
+  workspaceId          String
+  clientId              String
+  partnerIdentityId    String
+  grantKey             String
+  purpose              ProfessionalPartnerGrantPurpose
+  purposeDetails       String?
+  capabilities         ProfessionalPartnerCapability[] @default([])
+  status               ProfessionalPartnerGrantStatus  @default(PENDING_REVIEW)
+  grantedByUserId      String
+  reviewedByUserId     String?
+  reviewedAt           DateTime?
+  reviewNote           String?
+  changeRequestReason  String?
+  expiresAt            DateTime?
+  revokedAt            DateTime?
+  revokedByUserId      String?
+  revocationReason     String?
+  createdAt            DateTime                        @default(now())
+  updatedAt            DateTime                        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  partnerIdentity ProfessionalPartnerIdentity @relation(fields: [partnerIdentityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict)
+  grantor      User @relation("ProfessionalPartnerGrantCreator", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+  reviewer     User? @relation("ProfessionalPartnerGrantReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+  revoker      User? @relation("ProfessionalPartnerGrantRevoker", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+  auditEvents  ProfessionalPartnerGrantAuditEvent[]
+
+  @@unique([organizationId, workspaceId, grantKey])
+  @@unique([id, organizationId, workspaceId, clientId])
+  @@index([partnerIdentityId, status, expiresAt, revokedAt])
+  @@index([organizationId, workspaceId, clientId, status])
+}
+
+model ProfessionalPartnerIdentityAuditEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  identityId     String
+  actorUserId    String
+  action         String
+  note           String?
+  metadata       Json?
+  occurredAt     DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  identity     ProfessionalPartnerIdentity @relation(fields: [identityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict)
+  actor        User @relation("ProfessionalPartnerIdentityAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([identityId, occurredAt])
+  @@index([actorUserId, occurredAt])
+}
+
+model ProfessionalPartnerGrantAuditEvent {
+  id                String   @id @default(cuid())
+  organizationId    String
+  workspaceId       String
+  clientId          String
+  grantId           String
+  partnerIdentityId String
+  actorUserId       String
+  action            String
+  reason            String?
+  metadata          Json?
+  occurredAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  client       Client @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  grant        ProfessionalPartnerGrant @relation(fields: [grantId, organizationId, workspaceId, clientId], references: [id, organizationId, workspaceId, clientId], onDelete: Restrict)
+  partnerIdentity ProfessionalPartnerIdentity @relation("ProfessionalPartnerGrantAuditIdentity", fields: [partnerIdentityId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Restrict)
+  actor        User @relation("ProfessionalPartnerGrantAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([clientId, occurredAt])
+  @@index([grantId, occurredAt])
+  @@index([actorUserId, occurredAt])
+}
+
 model ClientPortalGrant {
   id                 String   @id @default(cuid())
   organizationId     String
@@ -1664,6 +1804,49 @@ model BillingWebhookEvent {
   @@unique([provider, providerEventId])
   @@index([status, receivedAt])
   @@index([organizationId, receivedAt])
+}
+
+enum ProfessionalPartnerType {
+  LEGAL_COUNSEL
+  ACCOUNTANT
+  TAX_ADVISOR
+  CORPORATE_SECRETARY
+  AUDITOR
+  CONSULTANT
+  OTHER
+}
+
+enum ProfessionalPartnerIdentityStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum ProfessionalPartnerGrantPurpose {
+  LEGAL_REVIEW
+  ACCOUNTING_REVIEW
+  TAX_REVIEW
+  COMPANY_SECRETARIAL
+  AUDIT
+  BUSINESS_ADVISORY
+  OTHER
+}
+
+enum ProfessionalPartnerCapability {
+  CLIENT_PROFILE_READ
+  COMPLIANCE_READ
+  DOCUMENT_METADATA_READ
+  EVIDENCE_ATTACH
+  GRAPH_READ
+  REPORT_READ
+}
+
+enum ProfessionalPartnerGrantStatus {
+  PENDING_REVIEW
+  ACTIVE
+  REJECTED
+  REVOKED
 }
 
 enum PartnershipInquiryType {
