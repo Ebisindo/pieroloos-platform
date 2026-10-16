@@ -1003,6 +1003,8 @@ model ComplianceObligation {
   activities    ComplianceActivity[]
   reminders     ComplianceReminder[]
   evidence      ComplianceEvidence[]
+  deadlineSnapshots ComplianceDeadlineSnapshot[]
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   documents     Document[]
 
   @@unique([id, workspaceId])
