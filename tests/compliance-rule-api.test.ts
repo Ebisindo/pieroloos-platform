@@ -43,6 +43,13 @@ describe("compliance rule authoring contracts", () => {
     })).success).toBe(false);
   });
 
+
+  it("preserves unknown null dates instead of coercing them to the Unix epoch", () => {
+    const draft = complianceRuleDraftSchema.parse(validDraft({ publicationDate: null, effectiveThrough: null }));
+    expect(draft.publicationDate).toBeNull();
+    expect(draft.effectiveThrough).toBeNull();
+  });
+
   it("creates version drafts without parent identifiers or review metadata", () => {
     const { ruleKey: _ruleKey, jurisdictionId: _jurisdictionId, ...version } = validDraft();
     expect(complianceRuleVersionDraftSchema.safeParse(version).success).toBe(true);
