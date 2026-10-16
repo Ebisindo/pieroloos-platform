@@ -55,19 +55,19 @@ The following work is not marked complete by CI emulation. Complete it before cl
 
 ## Current automated evidence
 
-Latest verified automated run: [CI #38853714889](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38853714889), code head `5a76aca2e40a95564e1312aefff93505a8f9ec2e`, completed successfully on 16 October 2026. Both `quality` and `e2e` passed:
-- PostgreSQL validation/migration and database-integrity tests.
+Latest verified automated run: [CI #38854474640](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38854474640), code head `bd15b6f9621a35cef67657d37a28a07557630d21`, completed successfully on 16 October 2026. Both `quality` and `e2e` passed:
+- PostgreSQL 16 migration/validation and database-integrity checks.
 - ESLint, TypeScript, unit tests and production builds.
-- Authenticated journeys for Business Profile save/reload, Reports generation/preview/HTML export, Engagement creation/edit/lifecycle/activity and foreign-workspace access denial.
-- 40 Playwright tests passed; responsive overflow and keyboard skip-link checks passed.
+- Authenticated Business Profile save/reload, Reports generate/preview/HTML export, Engagement create/edit/lifecycle/activity, and cross-workspace resource/list denial.
+- Playwright report `report.json`: 40 tests total, 40 expected, 0 unexpected, 0 flaky, 0 skipped.
+- Responsive overflow checks and keyboard skip-link activation/focus check.
+- en/fr/es/pt locale catalogs: 1,217 unique keys each, with no missing/extra/duplicate keys.
 
-The `playwright-results` artifact (ID `12026207411`, expires 30 October 2026) was downloaded and inspected. It contains public screenshots, 20+ authenticated responsive screenshots for Business Profile, Reports (including the generated report), and Engagements at 320, 390, 768 and 1280 CSS pixels, and the Playwright HTML report. Reviewed 320px views show the toolbar no longer displays the stray “Select language” label and content cards/forms stack vertically without observed horizontal overflow. These captures are browser emulation, not physical-device verification.
+The latest `playwright-results` artifact (ID `12027080653`, expires 30 October 2026) was downloaded and reviewed. It contains 24 authenticated screenshots for Business Profile list/detail, Reports before/after generation, and Engagement list/detail at 320, 390, 768 and 1280 CSS pixels, plus public-route screenshots and the embedded Playwright HTML report. The 320px views show the earlier visible “Select language” toolbar label is no longer present; content cards/forms stack vertically and the tested route/width matrix recorded no horizontal overflow.
 
-The Playwright report's six attached authenticated axe result payloads were inspected for `/business-profile`, `/business-profile/[id]`, `/reports`, the generated report view, `/engagements`, and `/engagements/[id]`: each has an empty `violations` array for the configured WCAG 2.1 A/AA rules. The public-route axe scans also passed for English, French, Portuguese and Spanish. This result is bounded to the tested DOM states and automated rules; it is not proof of complete WCAG conformance.
+The six authenticated axe result attachments cover `/business-profile`, `/business-profile/[id]`, `/reports`, the generated report view, `/engagements`, and `/engagements/[id]`; each has an empty `violations` array for the configured WCAG 2.1 A/AA automated rules. The public-route axe scans also passed for English, French, Portuguese and Spanish. Results are bounded to the automated rules and states tested; they do not certify WCAG conformance.
 
-The generated HTML report assertion passed: downloaded HTML contains the updated profile objective and professional-review caveat and does not contain a raw `<script>` tag. This verifies the test fixture's export contents and escaped script-like markup guard; it does **not** replace opening, reading and printing the file on real devices.
-
-Locale catalogs en/fr/es/pt were checked: 1,217 unique keys per catalog, with no missing, extra or duplicate keys.
+The downloaded report HTML assertions passed: export includes the updated profile objective and professional-review caveat and does not contain a raw `<script>` tag. This verifies test assertions, not real-device opening, reading or printing of the exported report.
 
 ## Release statement
 
