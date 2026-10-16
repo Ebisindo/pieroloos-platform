@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { getNextStatuses, type EngagementStatus } from "@/lib/domain/engagement";
 import { useLocale } from "@/components/i18n/LocaleProvider";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 type Activity = { id: string; type: string; title: string; summary: string | null; description: string | null; createdAt: string | Date; actor?: { name: string | null; email: string } | null };
 type Engagement = {
@@ -13,8 +14,14 @@ type Engagement = {
   activities: Activity[];
 };
 
+function displayActivityTitle(activity: Activity, t: (key: MessageKey, values?: Record<string, string | number>) => string) {
+  const match = /^Status changed to ([A-Z_]+)$/.exec(activity.title);
+  if (!match) return activity.title;
+  return t("engagements.activity.statusChangedTo", { status: t(`engagements.status.${match[1]}` as MessageKey) });
+}
+
 export function EngagementDetailEditor({ initialEngagement, canWrite }: { initialEngagement: Engagement; canWrite: boolean }) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [engagement, setEngagement] = useState(initialEngagement);
   const [service, setService] = useState(initialEngagement.service);
   const [nextAction, setNextAction] = useState(initialEngagement.nextAction ?? "");
@@ -69,7 +76,7 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
     <div className="space-y-5">
       <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-cyan-200">{engagement.status.replaceAll("_", " ")}</p><h2 className="mt-2 break-words text-xl font-semibold text-white">{engagement.service}</h2><p className="mt-2 text-sm text-slate-300">{engagement.client?.organizationName ?? engagement.client?.name ?? t("engagements.clientUnavailable")}</p><p className="mt-1 text-xs text-slate-400">{t("engagements.updatedAtLabel", { date: new Date(engagement.updatedAt).toLocaleString() })}</p></div>
+          <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-cyan-200">{t(`engagements.status.${engagement.status}` as MessageKey)}</p><h2 className="mt-2 break-words text-xl font-semibold text-white">{engagement.service}</h2><p className="mt-2 text-sm text-slate-300">{engagement.client?.organizationName ?? engagement.client?.name ?? t("engagements.clientUnavailable")}</p><p className="mt-1 text-xs text-slate-400">{t("engagements.updatedAtLabel", { date: new Date(engagement.updatedAt).toLocaleString(locale) })}</p></div>
           <Link href="/engagements" className="inline-flex min-h-11 items-center rounded-lg border border-white/15 px-4 py-2 text-sm text-cyan-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">{t("engagements.back")}</Link>
         </div>
       </section>
@@ -85,7 +92,7 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
       {canWrite ? <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 md:p-6">
         <h2 className="text-lg font-semibold text-white">{t("engagements.changeStatus")}</h2>
         {allowed.length ? <form onSubmit={changeStatus} className="mt-4 space-y-4">
-          <label className="block space-y-2"><span className="text-sm font-medium text-slate-200">{t("engagements.changeStatus")}</span><select required value={toStatus} onChange={(event) => setToStatus(event.target.value as EngagementStatus)} className="min-h-11 w-full rounded-xl border border-white/15 bg-slate-950/70 px-4 py-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">{allowed.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></label>
+          <label className="block space-y-2"><span className="text-sm font-medium text-slate-200">{t("engagements.changeStatus")}</span><select required value={toStatus} onChange={(event) => setToStatus(event.target.value as EngagementStatus)} className="min-h-11 w-full rounded-xl border border-white/15 bg-slate-950/70 px-4 py-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">{allowed.map((status) => <option key={status} value={status}>{t(`engagements.status.${status}` as MessageKey)}</option>)}</select></label>
           <label className="block space-y-2"><span className="text-sm font-medium text-slate-200">{t("engagements.transitionNote")}</span><textarea rows={2} maxLength={2000} value={transitionNote} onChange={(event) => setTransitionNote(event.target.value)} className="w-full rounded-xl border border-white/15 bg-slate-950/70 px-4 py-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300" /></label>
           <button disabled={saving || !toStatus} type="submit" className="min-h-11 rounded-xl border border-cyan-300/25 bg-cyan-300/[0.07] px-5 py-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-300/[0.12] disabled:opacity-50">{t("engagements.transition")}</button>
         </form> : <p className="mt-3 text-sm leading-6 text-slate-300">{t("engagements.noAllowedTransitions")}</p>}
@@ -93,7 +100,7 @@ export function EngagementDetailEditor({ initialEngagement, canWrite }: { initia
       <p aria-live="polite" role={error ? "alert" : "status"} className="text-sm text-slate-200">{message}</p>
       <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 md:p-6" aria-labelledby="engagement-history-heading">
         <h2 id="engagement-history-heading" className="text-lg font-semibold text-white">{t("engagements.activity")}</h2>
-        {engagement.activities.length ? <ol className="mt-4 space-y-4">{engagement.activities.map((activity) => <li key={activity.id} className="border-l-2 border-cyan-300/20 pl-4"><p className="break-words text-sm font-semibold text-white">{activity.title}</p>{activity.summary || activity.description ? <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{activity.summary ?? activity.description}</p> : null}<p className="mt-2 text-xs text-slate-400">{new Date(activity.createdAt).toLocaleString()}</p></li>)}</ol> : <p className="mt-4 text-sm leading-6 text-slate-300">{t("engagements.noActivity")}</p>}
+        {engagement.activities.length ? <ol className="mt-4 space-y-4">{engagement.activities.map((activity) => <li key={activity.id} className="border-l-2 border-cyan-300/20 pl-4"><p className="break-words text-sm font-semibold text-white">{displayActivityTitle(activity, t)}</p>{activity.summary || activity.description ? <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{activity.summary ?? activity.description}</p> : null}<p className="mt-2 text-xs text-slate-400">{new Date(activity.createdAt).toLocaleString(locale)}</p></li>)}</ol> : <p className="mt-4 text-sm leading-6 text-slate-300">{t("engagements.noActivity")}</p>}
       </section>
     </div>
   );
