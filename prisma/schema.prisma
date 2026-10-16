@@ -1635,3 +1635,114 @@ model PartnershipInquiry {
   @@index([status, createdAt])
   @@index([createdAt])
 }
+
+
+enum CorporateGraphNodeType {
+  COMPANY
+  PERSON
+  TRUST
+  PARTNERSHIP
+  BRANCH
+  BANKING_RELATIONSHIP
+  LICENSE
+  TAX_REGISTRATION
+  OTHER
+}
+
+enum CorporateGraphRelationType {
+  OWNS
+  CONTROLS
+  SUBSIDIARY_OF
+  BRANCH_OF
+  BANKS_WITH
+  LICENSED_BY
+  TAX_REGISTERED_WITH
+  RELATED_TO
+}
+
+enum CorporateRuleReviewStatus {
+  UNREVIEWED
+  IN_REVIEW
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+}
+
+enum CorporateRuleSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model CorporateGraphNode {
+  id                 String                   @id @default(cuid())
+  organizationId     String
+  workspaceId        String
+  clientId           String?
+  name               String
+  nodeType           CorporateGraphNodeType   @default(COMPANY)
+  jurisdictionCode   String?
+  entityType          String?
+  registrationNumber String?
+  metadata           Json?
+  createdByUserId    String
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  outgoing CorporateGraphEdge[] @relation("CorporateGraphFrom")
+  incoming CorporateGraphEdge[] @relation("CorporateGraphTo")
+  @@index([organizationId, workspaceId])
+  @@index([clientId, workspaceId])
+  @@index([jurisdictionCode, entityType])
+}
+
+model CorporateGraphEdge {
+  id               String                     @id @default(cuid())
+  organizationId   String
+  workspaceId      String
+  fromNodeId       String
+  toNodeId         String
+  relation         CorporateGraphRelationType
+  ownershipPercent Decimal?                   @db.Decimal(5, 2)
+  notes            String?
+  createdByUserId  String
+  createdAt        DateTime                   @default(now())
+  fromNode CorporateGraphNode @relation("CorporateGraphFrom", fields: [organizationId, workspaceId, fromNodeId], references: [organizationId, workspaceId, id], onDelete: Cascade)
+  toNode CorporateGraphNode @relation("CorporateGraphTo", fields: [organizationId, workspaceId, toNodeId], references: [organizationId, workspaceId, id], onDelete: Cascade)
+  @@unique([organizationId, workspaceId, fromNodeId, toNodeId, relation])
+  @@index([organizationId, workspaceId, fromNodeId])
+  @@index([organizationId, workspaceId, toNodeId])
+}
+
+model CorporateComplianceRule {
+  id                         String                   @id @default(cuid())
+  jurisdictionCode           String
+  entityType                 String
+  ruleKey                    String
+  title                      String
+  description                String?
+  frequency                  String?
+  severity                   CorporateRuleSeverity    @default(MEDIUM)
+  sourceTitle                String?
+  sourceUrl                  String?
+  sourceAuthority            String?
+  sourceRetrievedAt          DateTime?
+  effectiveFrom              DateTime?
+  effectiveTo                DateTime?
+  evidenceClass              EvidenceClass            @default(E0)
+  reviewStatus               CorporateRuleReviewStatus @default(UNREVIEWED)
+  reviewedByUserId           String?
+  reviewedAt                 DateTime?
+  version                    Int                      @default(1)
+  requiresProfessionalReview Boolean                  @default(true)
+  active                     Boolean                  @default(false)
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  @@unique([jurisdictionCode, entityType, ruleKey, version])
+  @@index([jurisdictionCode, entityType, active, reviewStatus])
+  @@index([sourceRetrievedAt])
+}
