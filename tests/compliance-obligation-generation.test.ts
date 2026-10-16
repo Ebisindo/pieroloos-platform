@@ -157,6 +157,18 @@ describe("reviewed compliance rule obligation generation", () => {
     expect(ruleActivityCreateMock).toHaveBeenCalled();
   });
 
+
+  it("does not treat a null trigger date as the Unix epoch", async () => {
+    const body = { ...payload(), baseDate: null };
+    const response = await POST(request(body), routeContext);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      data: { state: "UNKNOWN", reasons: expect.arrayContaining(["MISSING_DEADLINE_TRIGGER_DATE"]) },
+      mayGenerateObligation: false,
+    });
+    expect(obligationCreateMock).not.toHaveBeenCalled();
+  });
+
   it("rejects facts without exact structured verified evidence bindings", async () => {
     evidenceFindManyMock.mockResolvedValueOnce([
       { id: "ev-business", documentId: "doc-1", evidenceClass: "E3", factKey: "BUSINESS_TYPE", factValue: "SOLE_PROPRIETOR", validThrough: null },
