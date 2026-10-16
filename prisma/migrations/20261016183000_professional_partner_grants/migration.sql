@@ -208,7 +208,7 @@ ALTER TABLE "ProfessionalPartnerIdentityAuditEvent"
   ADD CONSTRAINT "ProfessionalPartnerIdentityAuditEvent_organizationId_fkey"
   FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ProfessionalPartnerIdentityAuditEvent"
-  ADD CONSTRAINT "ProfessionalPartnerIdentityAuditEvent_organizationId_workspaceId_fkey"
+  ADD CONSTRAINT "ProfessionalPartnerIdentityAuditEvent_workspace_scope_fkey"
   FOREIGN KEY ("organizationId", "workspaceId") REFERENCES "Workspace"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ProfessionalPartnerIdentityAuditEvent"
   ADD CONSTRAINT "ProfessionalPartnerIdentityAuditEvent_identityId_organizationId_workspaceId_fkey"
