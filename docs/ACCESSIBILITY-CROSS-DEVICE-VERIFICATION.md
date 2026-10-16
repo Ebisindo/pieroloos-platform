@@ -55,7 +55,15 @@ The following work is not marked complete by CI emulation. Complete it before cl
 
 ## Current automated evidence
 
-Verified baseline runs: [CI #38772915640](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38772915640) passed the public/signed-out suite and keyboard skip-link coverage; [CI #38796280517](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38796280517) passed the PostgreSQL workspace-isolation integration test. Subsequent commits added isolated auth, authenticated workspace journeys, additional screenshots and axe scans of signed-in workflows. The latest CI result must pass after those additions before they are considered verified. Review the artifact produced by that final successful run.
+The exact current PR head `3c8b4596b5bf17694a6b2fabab797be2db29454a` passed both GitHub Actions jobs in [CI #38853275312](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38853275312) on 16 October 2026:
+- PostgreSQL migration/validation and database-integrity tests.
+- ESLint, TypeScript, unit tests and production build.
+- Disposable PostgreSQL-backed authenticated browser tests, including Business Profile save/reload persistence; Reports generation and HTML download; Engagement create/edit/lifecycle/activity; and denial of foreign-workspace resource/list access.
+- Public and authenticated axe scans, viewport overflow checks, keyboard skip-link focus behavior, and screenshot/report artifact upload.
+
+Artifact `playwright-results` (ID `12026320763`, expires 30 October 2026) was downloaded and reviewed. Its 20 authenticated screenshots cover Business Profile list/detail, Reports, and Engagement list/detail at 320, 390, 768 and 1280 CSS pixels, plus public-route screenshots and the Playwright HTML report. The 320px toolbar no longer shows the previously observed stray “Select language” label; the forms and cards stack vertically in the reviewed responsive captures. This is still browser emulation, not real-device verification. Automated axe scans passed their critical/serious gate, and the latest test code attaches full axe findings to the Playwright report for human triage.
+
+Locale catalogs en/fr/es/pt were checked against one another: 1,217 unique keys per catalog, with no missing, extra or duplicate keys.
 
 ## Release statement
 
