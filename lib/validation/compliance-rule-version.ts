@@ -18,7 +18,7 @@ export const complianceRuleVersionSchema = z.object({
   ]),
   sourceAuthority: z.string().trim().min(2).max(300),
   sourceUrl: z.string().url().max(2000),
-  sourceRetrievedAt: z.coerce.date(),
+  sourceRetrievedAt: z.coerce.date().nullable(),
   publicationDate: z.coerce.date().nullable().optional(),
   effectiveFrom: z.coerce.date(),
   effectiveThrough: z.coerce.date().nullable().optional(),
@@ -39,7 +39,7 @@ export const complianceRuleVersionSchema = z.object({
     });
   }
 
-  if (rule.sourceRetrievedAt.getTime() > Date.now() + 5 * 60 * 1000) {
+  if (rule.sourceRetrievedAt && rule.sourceRetrievedAt.getTime() > Date.now() + 5 * 60 * 1000) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["sourceRetrievedAt"],
@@ -48,6 +48,9 @@ export const complianceRuleVersionSchema = z.object({
   }
 
   if (rule.reviewState === "VERIFIED") {
+    if (!rule.sourceRetrievedAt) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["sourceRetrievedAt"], message: "A verified rule must record when its source was independently retrieved." });
+    }
     if (!rule.reviewedByUserId?.trim()) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
