@@ -26,23 +26,23 @@ describe("workspace authorization boundaries", () => {
   });
 
   it("limits advisor and member destructive and review permissions", () => {
-    expect(permissionsForRole("advisor")).toContain("evidence:review");
+    expect(permissionsForRole("advisor")).toContain("documents:review");
     expect(permissionsForRole("advisor")).not.toContain("client:delete");
-    expect(permissionsForRole("advisor")).not.toContain("evidence:delete");
+    expect(permissionsForRole("advisor")).not.toContain("documents:delete");
     expect(permissionsForRole("member")).toContain("compliance:write");
-    expect(permissionsForRole("member")).not.toContain("evidence:review");
-    expect(permissionsForRole("member")).not.toContain("evidence:delete");
+    expect(permissionsForRole("member")).not.toContain("documents:review");
+    expect(permissionsForRole("member")).not.toContain("documents:delete");
   });
 
   it("keeps viewer read-only", () => {
     const viewer = permissionsForRole("viewer");
     expect(viewer).toContain("workspace:read");
     expect(viewer).toContain("client:read");
-    expect(viewer).toContain("evidence:read");
+    expect(viewer).toContain("documents:read");
     expect(viewer).not.toContain("workspace:manage");
     expect(viewer).not.toContain("client:write");
     expect(viewer).not.toContain("engagement:write");
-    expect(viewer).not.toContain("evidence:write");
+    expect(viewer).not.toContain("documents:write");
     expect(viewer).not.toContain("compliance:write");
     expect(viewer).not.toContain("settings:manage");
   });
