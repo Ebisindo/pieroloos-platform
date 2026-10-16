@@ -199,9 +199,7 @@ describe("compliance reminder scheduling API", () => {
   });
 
   it("returns the existing record after a unique-key race only within the active workspace", async () => {
-    mocks.withAuthorizedWorkspaceTransaction.mockImplementationOnce(async () => {
-      throw { code: "P2002" };
-    });
+    mocks.transaction.complianceNotification.create.mockRejectedValueOnce({ code: "P2002" });
     mocks.notificationFindFirst.mockResolvedValueOnce({ id: "notification-raced" });
     const response = await POST(request(payload()), routeContext());
     const result = await response.json() as { alreadyScheduled: boolean; data: { id: string } };
@@ -219,7 +217,7 @@ describe("compliance reminder scheduling API", () => {
   });
 
   it("does not return an unrelated record if a unique-key race cannot be resolved in this workspace", async () => {
-    mocks.withAuthorizedWorkspaceTransaction.mockRejectedValueOnce({ code: "P2002" });
+    mocks.transaction.complianceNotification.create.mockRejectedValueOnce({ code: "P2002" });
     mocks.notificationFindFirst.mockResolvedValueOnce(null);
     const response = await POST(request(payload()), routeContext());
     expect(response.status).toBe(500);
