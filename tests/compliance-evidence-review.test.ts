@@ -117,6 +117,50 @@ describe("compliance evidence governance", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+
+  it("rejects a stale expected status before applying side effects", async () => {
+    transactionObligationFindFirstMock.mockResolvedValueOnce({
+      id: "obligation-1", status: "IN_REVIEW", completedAt: null,
+      requiresEvidence: false, professionalReviewRequired: false,
+      professionalReviewCompleted: false, evidence: [{ id: "evidence-1" }],
+    });
+    const response = await updateStatus(
+      request({ status: "COMPLIANT", expectedStatus: "NOT_STARTED" }, "http://localhost/api/compliance/obligations/obligation-1/status"),
+      { params: Promise.resolve({ id: "obligation-1" }) },
+    );
+    expect(response.status).toBe(409);
+    expect(transactionObligationUpdateManyMock).not.toHaveBeenCalled();
+    expect(activityCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves the first completion timestamp and records each transition", async () => {
+    const completedAt = new Date("2026-09-01T10:00:00.000Z");
+    transactionObligationFindFirstMock.mockResolvedValueOnce({
+      id: "obligation-1", status: "IN_REVIEW", completedAt,
+      requiresEvidence: false, professionalReviewRequired: false,
+      professionalReviewCompleted: false, evidence: [{ id: "evidence-1" }],
+    });
+    const response = await updateStatus(
+      request({ status: "COMPLIANT", expectedStatus: "IN_REVIEW", note: "Review is complete." }, "http://localhost/api/compliance/obligations/obligation-1/status"),
+      { params: Promise.resolve({ id: "obligation-1" }) },
+    );
+    expect(response.status).toBe(200);
+    expect(transactionObligationUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: { status: "COMPLIANT", completedAt },
+    }));
+    expect(activityCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "STATUS_CHANGED",
+        metadata: expect.objectContaining({
+          from: "IN_REVIEW",
+          to: "COMPLIANT",
+          completedAtBefore: completedAt.toISOString(),
+          completedAtAfter: completedAt.toISOString(),
+        }),
+      }),
+    }));
+  });
+
   it("requires current verified evidence before marking an obligation compliant", async () => {
     transactionObligationFindFirstMock.mockResolvedValue({
       id: "obligation-1", status: "IN_REVIEW", completedAt: null,
