@@ -277,6 +277,34 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.getByRole("button", { name: "Apply status change" }).click();
     await expect(page.getByText("Engagement status updated.", { exact: true })).toBeVisible();
     await expect(page.getByText("Status changed to Intake", { exact: true })).toBeVisible();
+
+    // Emulate high-contrast and motion preferences for an authenticated workspace.
+    // This is automation coverage only; it does not replace testing real OS settings.
+    await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto("/business-profile", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Business Profiles" })).toBeVisible();
+    const skipLink = page.locator("a.skip-link");
+    await page.keyboard.press("Tab");
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toBeInViewport();
+    const focusStyle = await skipLink.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth };
+    });
+    expect(focusStyle.outlineStyle).not.toBe("none");
+    expect(Number.parseFloat(focusStyle.outlineWidth)).toBeGreaterThan(0);
+    const mediaPreferences = await page.evaluate(() => ({
+      forcedColors: window.matchMedia("(forced-colors: active)").matches,
+      reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    }));
+    expect(mediaPreferences).toEqual({ forcedColors: true, reducedMotion: true });
+    await expectNoHorizontalOverflow(page, "/business-profile (forced colors/reduced motion)", 320);
+    await mkdir(join(process.cwd(), "test-results", "responsive"), { recursive: true });
+    await page.screenshot({
+      path: join(process.cwd(), "test-results", "responsive", "authenticated-forced-colors-reduced-motion-320.png"),
+      fullPage: true,
+    });
   });
 
 });
