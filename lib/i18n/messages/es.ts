@@ -37,6 +37,7 @@ const es = {
   "navigation.marketExpansion": "Expansión de mercado",
   "navigation.crossBorder": "Preparación transfronteriza",
   "navigation.formation": "Constitución",
+  "navigation.corporateGraph": "Estudio del grafo corporativo",
   "navigation.compliance": "Cumplimiento",
   "navigation.reports": "Informes",
   "navigation.engagements": "Servicios",
