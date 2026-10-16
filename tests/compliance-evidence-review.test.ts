@@ -8,6 +8,7 @@ const {
   obligationFindFirstMock,
   evidenceFindFirstMock,
   evidenceUpdateManyMock,
+  transactionEvidenceFindFirstMock,
   activityCreateMock,
   transactionMock,
   transactionObligationFindFirstMock,
@@ -20,6 +21,7 @@ const {
   obligationFindFirstMock: vi.fn(),
   evidenceFindFirstMock: vi.fn(),
   evidenceUpdateManyMock: vi.fn(),
+  transactionEvidenceFindFirstMock: vi.fn(),
   activityCreateMock: vi.fn(),
   transactionMock: vi.fn(),
   transactionObligationFindFirstMock: vi.fn(),
@@ -60,6 +62,9 @@ describe("compliance evidence governance", () => {
     obligationFindFirstMock.mockReset().mockResolvedValue({ id: "obligation-1", evidence: [{ id: "evidence-1" }] });
     evidenceFindFirstMock.mockReset().mockResolvedValue({ id: "evidence-1", reviewStatus: "PENDING" });
     evidenceUpdateManyMock.mockReset().mockResolvedValue({ count: 1 });
+    transactionEvidenceFindFirstMock.mockReset()
+      .mockResolvedValueOnce({ id: "evidence-1", reviewStatus: "PENDING" })
+      .mockResolvedValue({ id: "evidence-1", reviewStatus: "VERIFIED" });
     activityCreateMock.mockReset().mockResolvedValue({ id: "activity-1" });
     transactionObligationFindFirstMock.mockReset().mockResolvedValue({
       id: "obligation-1", status: "IN_REVIEW", completedAt: null, requiresEvidence: false,
@@ -74,7 +79,7 @@ describe("compliance evidence governance", () => {
       workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
       complianceEvidence: {
         updateMany: evidenceUpdateManyMock,
-        findFirst: vi.fn().mockResolvedValue({ id: "evidence-1", reviewStatus: "VERIFIED" }),
+        findFirst: transactionEvidenceFindFirstMock,
       },
       complianceObligation: {
         findFirst: transactionObligationFindFirstMock,
@@ -97,7 +102,7 @@ describe("compliance evidence governance", () => {
       where: { id: "obligation-1", workspaceId: "workspace-1" },
     }));
     expect(evidenceUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "evidence-1", obligationId: "obligation-1" },
+      where: { id: "evidence-1", obligationId: "obligation-1", workspaceId: "workspace-1", reviewStatus: "PENDING" },
       data: expect.objectContaining({
         reviewStatus: "VERIFIED",
         reviewedByUserId: "reviewer-1",
@@ -110,6 +115,18 @@ describe("compliance evidence governance", () => {
         actorUserId: "reviewer-1",
       }),
     }));
+  });
+
+
+  it("rejects a stale evidence review when another reviewer changed the status concurrently", async () => {
+    transactionEvidenceFindFirstMock.mockReset().mockResolvedValueOnce(null);
+    const response = await reviewEvidence(
+      request({ reviewStatus: "VERIFIED", note: "Reviewed primary source." }, "http://localhost/api/compliance/obligations/obligation-1/evidence/evidence-1/review"),
+      { params: Promise.resolve({ id: "obligation-1", evidenceId: "evidence-1" }) },
+    );
+    expect(response.status).toBe(409);
+    expect(evidenceUpdateManyMock).not.toHaveBeenCalled();
+    expect(activityCreateMock).not.toHaveBeenCalled();
   });
 
   it("rejects evidence review when the obligation is outside the active workspace", async () => {
