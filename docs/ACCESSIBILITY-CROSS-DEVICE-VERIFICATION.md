@@ -19,7 +19,7 @@ These widths are browser-emulated CSS viewports, **not** evidence that physical 
 
 ## Route coverage
 
-The suite covers public routes `/` and `/partners`, plus signed-out access gates for `/business-profile`, `/reports`, `/engagements` and `/command-center`. The feature branch now provisions a disposable PostgreSQL CI database and a reserved `@integration.invalid` test identity; the test-only credentials provider is guarded by `CI=true`, `DATABASE_ENV=ci`, a loopback-only URL and database, and a per-run random secret. This path is not enabled in preview or production. Authenticated journeys are implemented and the CI run is being validated; do not mark them verified until the latest run is green.
+The suite covers public routes `/` and `/partners`, plus signed-out access gates for `/business-profile`, `/reports`, `/engagements` and `/command-center`. The feature branch provisions a disposable PostgreSQL CI database, a separate shadow database and a reserved `@integration.invalid` test identity. The test-only credentials provider is guarded by `DATABASE_ENV=ci`, a loopback-only `NEXTAUTH_URL` and database URL, a per-run random secret, and the explicit E2E flag. The automated CI workflow passed on the verified PR head; this does not imply the provider is enabled in preview or production.
 
 ## Automated checks
 
@@ -55,7 +55,7 @@ The following work is not marked complete by CI emulation. Complete it before cl
 
 ## Current automated evidence
 
-Latest verified automated run for the current PR head: [CI #38863928160](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38863928160), code head `46320a370464bd82a1008e93d1b1a2694fcde5c5`, completed successfully on 16 October 2026. Both `quality` and `e2e` passed:
+Latest verified automated run documented by the PR release gate: [CI #38864360084](https://github.com/Ebisindo/pieroloos-platform/actions/runs/38864360084), code head `39128b1a723b2973c916b3eb4e4cd55234403549`, completed successfully on 16 October 2026. Both `quality` and `e2e` passed:
 - PostgreSQL 16 migration/validation and database-integrity tests.
 - ESLint, TypeScript, unit tests and production builds.
 - Authenticated Business Profile save/reload, Reports generation/preview/HTML export, Engagement create/edit/lifecycle/activity, and cross-workspace resource/list denial.
@@ -63,7 +63,7 @@ Latest verified automated run for the current PR head: [CI #38863928160](https:/
 - Responsive overflow checks and keyboard skip-link activation/focus.
 - Locale catalogs en/fr/es/pt: 1,217 unique keys each, with no missing/extra/duplicate keys.
 
-The latest `playwright-results` artifact (ID `12030219260`, expires 30 October 2026) was downloaded and reviewed. It contains 24 authenticated screenshots for Business Profile list/detail, Reports before/after generation, and Engagement list/detail at 320, 390, 768 and 1280 CSS pixels, plus public-route screenshots and the embedded Playwright report. At 320px the former visible “Select language” toolbar label is no longer present; content cards/forms stack vertically and the tested route/width matrix recorded no horizontal overflow.
+The latest verified-head `playwright-results` artifact (ID `12029749268`, expires 30 October 2026) was downloaded and reviewed. It contains 24 authenticated screenshots for Business Profile list/detail, Reports before/after generation, and Engagement list/detail at 320, 390, 768 and 1280 CSS pixels, plus public-route screenshots and the embedded Playwright report. At 320px the former visible “Select language” toolbar label is no longer present; content cards/forms stack vertically and the tested route/width matrix recorded no horizontal overflow.
 
 The six authenticated axe result attachments cover `/business-profile`, `/business-profile/[id]`, `/reports`, the generated report view, `/engagements`, and `/engagements/[id]`; each has an empty `violations` array for the configured WCAG 2.1 A/AA automated rules. The public-route axe scans passed in English, French, Portuguese and Spanish. This is evidence for the tested states and automated rules only; it is not WCAG certification.
 
