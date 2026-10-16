@@ -711,6 +711,7 @@ const pt = {
   "engagements.detail.noNextAction": "Nenhuma próxima ação foi definida.",
   "engagements.detail.context": "Contexto da empresa",
   "engagements.detail.unnamedProfile": "O perfil da empresa ainda não tem nome.",
+  "engagements.activity.statusChangedTo": "Estado alterado para {status}",
   "engagements.activity.empty": "Ainda não foi registada nenhuma atividade.",
   "engagements.status.DRAFT": "Rascunho",
   "engagements.status.INTAKE": "Admissão",
