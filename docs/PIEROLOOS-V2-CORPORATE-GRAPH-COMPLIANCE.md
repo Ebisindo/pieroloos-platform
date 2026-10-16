@@ -4,18 +4,19 @@ This increment extends the existing Next.js, Prisma and PostgreSQL application w
 
 ## Implemented in this increment
 
-- Workspace-scoped corporate graph nodes and relationships.
-- Existing membership-role checks, authorization transaction pattern and workspace scoping.
-- Graph validation for self-links, bounded ownership percentages, relationship-specific ownership percentages, duplicate prevention and ownership-cycle rejection.
-- Direct ownership percentage-total validation so recorded direct ownership percentages for one entity cannot exceed 100%.
-- Deterministic spatial graph layout rendered as SVG, with the equivalent entity and relationship inventory retained for accessible use.
+- Workspace-scoped corporate graph nodes and relationships with authorization transaction revalidation.
+- Graph validation for self-links, ownership percentage bounds, relationship-specific ownership percentages, direct ownership totals, duplicate prevention and ownership-cycle rejection.
+- Deterministic SVG graph layout and an accessible parallel entity/relationship inventory.
+- Create, edit and archive entity operations; archive relationship operations; and a workspace-scoped recent graph activity timeline.
+- Archival is non-destructive: archived entities and connected relationships are excluded from the active graph, while audit records and archive timestamps remain available.
+- Graph audit events are written with the originating user and within the same authorized database transaction as the graph mutation.
 - Loading, retryable failure, empty and success states with screen-reader status announcements.
 - Compliance rules with jurisdiction, source metadata, effective dates, review status, version, evidence class and professional-review requirements.
 - Compliance assessment endpoint that reports source gaps and requires professional review when evidence is incomplete.
 
 ## Limits and follow-on work
 
-This is a graph-visualization and compliance-assessment foundation. It does not yet provide graph edit/archive operations, full graph change history, an automatically scheduled statutory-obligation engine, an AI intent provider, risk simulations or advisor approval workflow.
+This remains a graph and compliance-assessment foundation. The graph lifecycle records changes and archives records but is not a legal approval system. It does not yet provide the full automatically scheduled statutory-obligation engine, AI intent provider, risk simulations or advisor approval workflow.
 
 No jurisdiction's legal obligations should be represented as verified until primary-source evidence has been recorded and appropriately reviewed. No active rules are seeded by the migration. An empty rule registry does not imply that no obligations exist. AI outputs, when implemented, must remain reviewable proposals and must not approve incorporation, determine definitive tax positions, file government forms or mark obligations completed without the required authority.
 
@@ -28,5 +29,9 @@ Run the repository's actual CI scripts: `npm run db:generate`, `npm run db:valid
 - `/corporate-graph`
 - `GET /api/corporate-graph`
 - `POST /api/corporate-graph/nodes`
+- `PATCH /api/corporate-graph/nodes/[id]`
+- `DELETE /api/corporate-graph/nodes/[id]` (archives entity and active connected relationships)
 - `POST /api/corporate-graph/edges`
+- `DELETE /api/corporate-graph/edges/[id]` (archives relationship)
+- `GET /api/corporate-graph/audit`
 - `GET /api/compliance/rules?jurisdiction=NG&entityType=COMPANY`
