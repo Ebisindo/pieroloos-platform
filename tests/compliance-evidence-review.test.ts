@@ -10,6 +10,9 @@ const {
   evidenceUpdateManyMock,
   activityCreateMock,
   transactionMock,
+  transactionObligationFindFirstMock,
+  transactionObligationUpdateManyMock,
+  transactionObligationFindFirstOrThrowMock,
 } = vi.hoisted(() => ({
   getWorkspaceContextMock: vi.fn(),
   obligationFindFirstMock: vi.fn(),
@@ -17,6 +20,9 @@ const {
   evidenceUpdateManyMock: vi.fn(),
   activityCreateMock: vi.fn(),
   transactionMock: vi.fn(),
+  transactionObligationFindFirstMock: vi.fn(),
+  transactionObligationUpdateManyMock: vi.fn(),
+  transactionObligationFindFirstOrThrowMock: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/workspace-context", () => ({ getWorkspaceContext: getWorkspaceContextMock }));
@@ -51,12 +57,23 @@ describe("compliance evidence governance", () => {
     evidenceFindFirstMock.mockReset().mockResolvedValue({ id: "evidence-1", reviewStatus: "PENDING" });
     evidenceUpdateManyMock.mockReset().mockResolvedValue({ count: 1 });
     activityCreateMock.mockReset().mockResolvedValue({ id: "activity-1" });
+    transactionObligationFindFirstMock.mockReset().mockResolvedValue({
+      id: "obligation-1", status: "IN_REVIEW", completedAt: null, requiresEvidence: false,
+      professionalReviewRequired: false, professionalReviewCompleted: false, evidence: [{ id: "evidence-1" }],
+    });
+    transactionObligationUpdateManyMock.mockReset().mockResolvedValue({ count: 1 });
+    transactionObligationFindFirstOrThrowMock.mockReset().mockResolvedValue({ id: "obligation-1", status: "COMPLIANT" });
     transactionMock.mockReset().mockImplementation((callback) => callback({
       membership: { findUnique: vi.fn().mockResolvedValue({ role: "OWNER" }) },
       workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
       complianceEvidence: {
         updateMany: evidenceUpdateManyMock,
         findFirst: vi.fn().mockResolvedValue({ id: "evidence-1", reviewStatus: "VERIFIED" }),
+      },
+      complianceObligation: {
+        findFirst: transactionObligationFindFirstMock,
+        updateMany: transactionObligationUpdateManyMock,
+        findFirstOrThrow: transactionObligationFindFirstOrThrowMock,
       },
       complianceActivity: { create: activityCreateMock },
     }));
@@ -101,13 +118,10 @@ describe("compliance evidence governance", () => {
   });
 
   it("requires current verified evidence before marking an obligation compliant", async () => {
-    obligationFindFirstMock.mockResolvedValue({
-      id: "obligation-1",
-      status: "IN_REVIEW",
-      requiresEvidence: true,
-      professionalReviewRequired: false,
-      professionalReviewCompleted: false,
-      evidence: [],
+    transactionObligationFindFirstMock.mockResolvedValue({
+      id: "obligation-1", status: "IN_REVIEW", completedAt: null,
+      requiresEvidence: true, professionalReviewRequired: false,
+      professionalReviewCompleted: false, evidence: [],
     });
 
     const response = await updateStatus(
