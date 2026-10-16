@@ -100,10 +100,34 @@ export default function CorporateGraphStudio() {
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void refreshGraph(false, controller.signal);
-    return () => controller.abort();
-  }, [refreshGraph]);
+    let mounted = true;
+    fetch("/api/corporate-graph", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as GraphData & ApiErrorPayload;
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to load the corporate graph.");
+        }
+        if (mounted) {
+          setGraph({
+            nodes: Array.isArray(payload.nodes) ? payload.nodes : [],
+            edges: Array.isArray(payload.edges) ? payload.edges : [],
+          });
+          setError("");
+        }
+      })
+      .catch((cause: unknown) => {
+        if (mounted) {
+          setError(cause instanceof Error ? cause.message : "Unable to load the corporate graph.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const layout = useMemo(
     () => layoutCorporateGraph(graph.nodes.map((node) => ({ id: node.id }))),
