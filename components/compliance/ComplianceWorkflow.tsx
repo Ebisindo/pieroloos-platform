@@ -352,7 +352,7 @@ export function ComplianceWorkflow({
                   <div className="mt-2 space-y-3">
                     {obligation.evidence.map((item) => (
                       <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 p-3">
-                        <span className={`status-badge ${item.validThrough && currentTime !== null && new Date(item.validThrough).getTime() < currentTime ? "status-danger" : item.reviewStatus === "VERIFIED" ? "status-success" : item.reviewStatus === "CHANGES_REQUESTED" ? "status-danger" : "status-info"}`}>
+                        <span className={`status-badge ${item.validThrough && currentTime !== null && new Date(item.validThrough).getTime() < currentTime ? "status-danger" : item.reviewStatus === "VERIFIED" ? "status-success" : item.reviewStatus === "CHANGES_REQUESTED" || item.reviewStatus === "REVOKED" ? "status-danger" : "status-info"}`}>
                           {item.evidenceClass} · {item.validThrough && currentTime !== null && new Date(item.validThrough).getTime() < currentTime ? t("app.compliance.expired") : evidenceReviewStatusKeys[item.reviewStatus] ? t(evidenceReviewStatusKeys[item.reviewStatus]) : item.reviewStatus.replaceAll("_", " ")}
                         </span>
                         {item.sourceReference ? <span>{t("app.compliance.source", { source: item.sourceReference })}</span> : <span>{t("app.compliance.sourceMissing")}</span>}
