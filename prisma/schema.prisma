@@ -354,6 +354,7 @@ model User {
   complianceRuleVersionsCreated      ComplianceRuleVersion[]           @relation("ComplianceRuleVersionCreatedBy")
   complianceRulesReviewed             ComplianceRuleVersion[]           @relation("ComplianceRuleVersionReviewer")
   complianceDeadlineSnapshots         ComplianceDeadlineSnapshot[]      @relation("ComplianceDeadlineSnapshotActor")
+  complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
   complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
 }
 
@@ -446,6 +447,7 @@ model Workspace {
   complianceRules              ComplianceRule[]
   complianceRuleVersions       ComplianceRuleVersion[]
   complianceDeadlineSnapshots  ComplianceDeadlineSnapshot[]
+  complianceStatusSnapshots    ComplianceStatusSnapshot[]
   complianceRuleActivities     ComplianceRuleActivity[]
   marketEntryPlans           MarketEntryPlan[]
   marketReadinessAssessments MarketReadinessAssessment[]
@@ -1006,6 +1008,7 @@ model ComplianceObligation {
   reminders     ComplianceReminder[]
   evidence      ComplianceEvidence[]
   deadlineSnapshots ComplianceDeadlineSnapshot[]
+  statusSnapshots ComplianceStatusSnapshot[]
   sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   documents     Document[]
 
@@ -1813,6 +1816,28 @@ model ComplianceDeadlineSnapshot {
   @@unique([obligationId, sequence])
   @@index([workspaceId, createdAt])
   @@index([obligationId, createdAt])
+}
+
+model ComplianceStatusSnapshot {
+  id                String           @id @default(cuid())
+  obligationId      String
+  workspaceId       String
+  sequence          Int
+  previousStatus    ComplianceStatus
+  currentStatus     ComplianceStatus
+  completedAtBefore DateTime?
+  completedAtAfter  DateTime?
+  reason            String?
+  actorUserId       String
+  occurredAt        DateTime         @default(now())
+
+  obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  actor      User                 @relation("ComplianceStatusSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([obligationId, sequence])
+  @@index([workspaceId, occurredAt])
+  @@index([obligationId, occurredAt])
 }
 
 enum PartnershipInquiryType {
