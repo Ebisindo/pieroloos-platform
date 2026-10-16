@@ -8,6 +8,14 @@ import { reminderSchema } from "@/lib/validation/compliance";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+const CLOSED_OBLIGATION_STATUSES = new Set([
+  "COMPLETE",
+  "COMPLETED",
+  "COMPLIANT",
+  "WAIVED",
+  "NOT_APPLICABLE",
+]);
+
 export async function POST(request: Request, routeContext: RouteContext) {
   if (hasInvalidRequestOrigin(request)) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
@@ -37,14 +45,14 @@ export async function POST(request: Request, routeContext: RouteContext) {
       { status: 422 },
     );
   }
-  const now = new Date();
-  if (parsed.data.scheduledFor.getTime() < now.getTime()) {
+  if (parsed.data.scheduledFor.getTime() < Date.now()) {
     return NextResponse.json({ error: "Reminder time cannot be in the past." }, { status: 422 });
   }
 
   const principal = context.principal;
   const { id: obligationId } = await routeContext.params;
   let dedupeKey = "";
+
   try {
     const result = await withAuthorizedWorkspaceTransaction(
       principal,
@@ -59,7 +67,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
           select: { id: true, title: true, status: true, ownerUserId: true },
         });
         if (!obligation) throw new Error("COMPLIANCE_OBLIGATION_NOT_FOUND");
-        if (["COMPLETE", "COMPLETED", "COMPLIANT", "WAIVED", "NOT_APPLICABLE"].includes(obligation.status)) {
+        if (CLOSED_OBLIGATION_STATUSES.has(obligation.status)) {
           throw new Error("COMPLIANCE_OBLIGATION_CLOSED");
         }
 
@@ -75,7 +83,10 @@ export async function POST(request: Request, routeContext: RouteContext) {
         });
         if (!recipientMembership) throw new Error("REMINDER_RECIPIENT_NOT_IN_ORGANIZATION");
 
-        const messageDigest = createHash("sha256").update(parsed.data.message).digest("hex").slice(0, 16);
+        const messageDigest = createHash("sha256")
+          .update(parsed.data.message)
+          .digest("hex")
+          .slice(0, 16);
         dedupeKey = [
           "compliance-reminder",
           obligation.id,
@@ -138,6 +149,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
         return { notification, alreadyScheduled: false };
       },
     );
+
     return NextResponse.json(
       { data: result.notification, alreadyScheduled: result.alreadyScheduled },
       { status: result.alreadyScheduled ? 200 : 201 },
@@ -156,6 +168,8 @@ export async function POST(request: Request, routeContext: RouteContext) {
       return NextResponse.json({ error: "Reminder recipient is not a member of the active organization." }, { status: 409 });
     }
     if (isUniqueConstraintError(error) && dedupeKey) {
+      // Re-query only within the active tenant boundary. The unique index remains
+      // the concurrency guard if two transactions both pass the initial lookup.
       const existing = await prisma.complianceNotification.findFirst({
         where: {
           organizationId: principal.organizationId,
@@ -165,6 +179,9 @@ export async function POST(request: Request, routeContext: RouteContext) {
       });
       if (existing) return NextResponse.json({ data: existing, alreadyScheduled: true }, { status: 200 });
     }
+    if (isSerializationConflict(error)) {
+      return NextResponse.json({ error: "Reminder scheduling conflicted with a concurrent change. Retry the request." }, { status: 409 });
+    }
     console.error("Compliance reminder scheduling failed.", error);
     return NextResponse.json({ error: "Unable to schedule compliance reminder." }, { status: 500 });
   }
@@ -173,4 +190,9 @@ export async function POST(request: Request, routeContext: RouteContext) {
 function isUniqueConstraintError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error &&
     (error as { code?: unknown }).code === "P2002";
+}
+
+function isSerializationConflict(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error &&
+    (error as { code?: unknown }).code === "P2034";
 }
