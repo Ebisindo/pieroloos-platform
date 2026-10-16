@@ -1698,6 +1698,7 @@ model CorporateGraphNode {
   client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   outgoing CorporateGraphEdge[] @relation("CorporateGraphFrom")
   incoming CorporateGraphEdge[] @relation("CorporateGraphTo")
+  @@unique([organizationId, workspaceId, id])
   @@index([organizationId, workspaceId])
   @@index([clientId, workspaceId])
   @@unique([organizationId, workspaceId, id])
