@@ -296,6 +296,7 @@ model Organization {
 
   memberships           Membership[]
   workspaces            Workspace[]
+  corporateGraphNodes   CorporateGraphNode[]
   clients               Client[]
   jurisdictions         Jurisdiction[]
   complianceObligations ComplianceObligation[]
@@ -433,6 +434,7 @@ model Workspace {
   clientPortalInteractions    ClientPortalInteraction[]
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
+  corporateGraphNodes        CorporateGraphNode[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
