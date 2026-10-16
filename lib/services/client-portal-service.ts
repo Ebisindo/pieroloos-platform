@@ -303,6 +303,59 @@ export async function revokeClientPortalGrant(
   });
 }
 
+export async function updateClientPortalGrant(
+  clientId: string,
+  grantId: string,
+  input: {
+    expiresAt: Date | null;
+    canViewStatus: boolean;
+    canViewTasks: boolean;
+    canUploadEvidence: boolean;
+  },
+  principal: WorkspacePrincipal,
+) {
+  return withAuthorizedWorkspaceTransaction(principal, "client:write", async (transaction) => {
+    const grant = await transaction.clientPortalGrant.findFirst({
+      where: {
+        id: grantId,
+        clientId,
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+      },
+      select: { id: true, clientId: true, revokedAt: true, expiresAt: true },
+    });
+    if (!grant || grant.revokedAt) throw new Error("CLIENT_PORTAL_GRANT_NOT_FOUND");
+
+    const updated = await transaction.clientPortalGrant.update({
+      where: { id: grant.id },
+      data: {
+        expiresAt: input.expiresAt,
+        canViewStatus: input.canViewStatus,
+        canViewTasks: input.canViewTasks,
+        canUploadEvidence: input.canUploadEvidence,
+      },
+    });
+    await transaction.clientPortalAuditEvent.create({
+      data: {
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId: grant.clientId,
+        grantId: grant.id,
+        actorUserId: principal.userId,
+        action: "ACCESS_UPDATED",
+        metadata: {
+          previousExpiresAt: grant.expiresAt?.toISOString() ?? null,
+          expiresAt: input.expiresAt?.toISOString() ?? null,
+          canViewStatus: input.canViewStatus,
+          canViewTasks: input.canViewTasks,
+          canUploadEvidence: input.canUploadEvidence,
+        },
+      },
+    });
+    return updated;
+  });
+}
+
 export async function setClientPortalTaskVisibility(
   clientId: string,
   input: { resourceType: "TASK" | "FORMATION_TASK" | "OBLIGATION"; resourceId: string; visible: boolean },
