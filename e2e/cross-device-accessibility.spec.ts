@@ -44,8 +44,15 @@ async function captureAuthenticatedViewportMatrix(
   await expect(page.locator("main")).toHaveCount(1);
   await mkdir(join(process.cwd(), "test-results", "responsive"), { recursive: true });
   for (const width of [320, 390, 768, 1280]) {
-    await expect(page.locator("main"), `${route} should remain rendered at ${width}px`).toHaveCount(1);
     await page.setViewportSize({ width, height: 900 });
+    // The sidebar animates off-canvas at tablet/mobile sizes; wait for the transition
+    // rather than capturing a misleading mid-animation screenshot.
+    if (width <= 1000) {
+      await expect(page.locator(".sidebar")).toHaveCSS("visibility", "hidden");
+    } else {
+      await expect(page.locator(".sidebar")).toHaveCSS("visibility", "visible");
+    }
+    await expect(page.locator("main"), `${route} should remain rendered at ${width}px`).toHaveCount(1);
     await expectNoHorizontalOverflow(page, route, width);
     await page.screenshot({
       path: join(process.cwd(), "test-results", "responsive", `authenticated-${slug}-${width}.png`),
