@@ -709,6 +709,7 @@ const en = {
   "engagements.detail.noNextAction": "No next action has been defined.",
   "engagements.detail.context": "Business Context",
   "engagements.detail.unnamedProfile": "Business profile not yet named.",
+  "engagements.activity.statusChangedTo": "Status changed to {status}",
   "engagements.activity.empty": "No activity has been recorded yet.",
   "engagements.status.DRAFT": "Draft",
   "engagements.status.INTAKE": "Intake",
