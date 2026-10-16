@@ -80,6 +80,8 @@ export async function POST(request: Request, routeContext: RouteContext) {
           documentId: document.id,
           workspaceId: principal.workspaceId,
           evidenceClass: parsed.data.evidenceClass,
+          factKey: parsed.data.factKey ?? null,
+          factValue: parsed.data.factValue ?? null,
           note: parsed.data.note,
           sourceReference: parsed.data.sourceReference || null,
           validThrough,
