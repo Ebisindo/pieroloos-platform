@@ -58,7 +58,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
           obligationType: input.type,
           sourceAuthority: input.sourceAuthority,
           sourceUrl: input.sourceUrl,
-          sourceRetrievedAt: now,
+          sourceRetrievedAt: null,
           publicationDate: input.publicationDate ?? null,
           effectiveFrom: input.effectiveFrom,
           effectiveThrough: input.effectiveThrough ?? null,
