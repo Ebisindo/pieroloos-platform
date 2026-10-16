@@ -5,10 +5,10 @@ import { ModuleBanner } from "@/components/ui/ModuleBanner";
 import { EmptyState, GlassPanel, StatusBadge } from "@/components/ui/primitives";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { businessProfileRepository } from "@/lib/db/business-profile-repository";
-import { getRequestTranslator } from "@/lib/i18n/request";
+import { getRequestLocale, getRequestTranslator } from "@/lib/i18n/request";
 
 export default async function BusinessProfilePage() {
-  const t = await getRequestTranslator();
+  const [t, locale] = await Promise.all([getRequestTranslator(), getRequestLocale()]);
   const context = await getWorkspaceContext();
   if (!context.userId) return <WorkspaceAccessState title={t("app.clients.signInTitle")} description={t("app.clients.signInDescription")} href="/signin?callbackUrl=/business-profile" action={t("navigation.signIn")} />;
   if (!context.activeWorkspace || !context.principal) return <WorkspaceAccessState title={t("app.clients.workspaceRequired")} description={t("app.clients.workspaceDescription")} />;
@@ -30,7 +30,7 @@ export default async function BusinessProfilePage() {
               </div>
               <h2 className="mt-4 break-words text-lg font-semibold text-white group-hover:text-cyan-100">{client.businessProfile.businessName ?? client.proposedBusiness ?? client.organizationName ?? client.name ?? t("profile.unnamedBusiness")}</h2>
               <p className="mt-2 break-words text-sm leading-6 text-slate-300">{client.businessProfile.businessType ?? t("profile.typeNotRecorded")}</p>
-              <p className="mt-3 text-xs text-slate-400">{client.country ?? t("profile.countryNotRecorded")} · {t("profile.updatedAt", { date: new Date(client.businessProfile.updatedAt).toLocaleDateString("en") })}</p>
+              <p className="mt-3 text-xs text-slate-400">{client.country ?? t("profile.countryNotRecorded")} · {t("profile.updatedAt", { date: new Date(client.businessProfile.updatedAt).toLocaleDateString(locale) })}</p>
               <p className="mt-4 text-sm font-semibold text-cyan-200">{t("profile.open")} →</p>
             </Link>
           )] : [])}
