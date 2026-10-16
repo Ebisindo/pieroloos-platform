@@ -21,6 +21,7 @@ export const workspaceNavigation = [
   { href: "/expansion", label: "Market Expansion", icon: Globe2 },
   { href: "/cross-border", label: "Cross-border Preparation", icon: ArrowLeftRight },
   { href: "/formation", label: "Formation", icon: GitBranch },
+  { href: "/corporate-graph", label: "Corporate Graph Studio", icon: Building2 },
   { href: "/compliance", label: "Compliance", icon: ClipboardCheck },
   { href: "/reports", label: "Reports", icon: FileBarChart },
   { href: "/engagements", label: "Engagements", icon: Activity },
