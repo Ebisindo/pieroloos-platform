@@ -13,6 +13,8 @@ const {
   transactionObligationFindFirstMock,
   transactionObligationUpdateManyMock,
   transactionObligationFindFirstOrThrowMock,
+  statusSnapshotAggregateMock,
+  statusSnapshotCreateMock,
 } = vi.hoisted(() => ({
   getWorkspaceContextMock: vi.fn(),
   obligationFindFirstMock: vi.fn(),
@@ -23,6 +25,8 @@ const {
   transactionObligationFindFirstMock: vi.fn(),
   transactionObligationUpdateManyMock: vi.fn(),
   transactionObligationFindFirstOrThrowMock: vi.fn(),
+  statusSnapshotAggregateMock: vi.fn(),
+  statusSnapshotCreateMock: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/workspace-context", () => ({ getWorkspaceContext: getWorkspaceContextMock }));
@@ -63,6 +67,8 @@ describe("compliance evidence governance", () => {
     });
     transactionObligationUpdateManyMock.mockReset().mockResolvedValue({ count: 1 });
     transactionObligationFindFirstOrThrowMock.mockReset().mockResolvedValue({ id: "obligation-1", status: "COMPLIANT" });
+    statusSnapshotAggregateMock.mockReset().mockResolvedValue({ _max: { sequence: 0 } });
+    statusSnapshotCreateMock.mockReset().mockResolvedValue({ id: "status-snapshot-1" });
     transactionMock.mockReset().mockImplementation((callback) => callback({
       membership: { findUnique: vi.fn().mockResolvedValue({ role: "OWNER" }) },
       workspace: { findFirst: vi.fn().mockResolvedValue({ id: "workspace-1" }) },
@@ -75,6 +81,7 @@ describe("compliance evidence governance", () => {
         updateMany: transactionObligationUpdateManyMock,
         findFirstOrThrow: transactionObligationFindFirstOrThrowMock,
       },
+      complianceStatusSnapshot: { aggregate: statusSnapshotAggregateMock, create: statusSnapshotCreateMock },
       complianceActivity: { create: activityCreateMock },
     }));
   });
@@ -147,6 +154,15 @@ describe("compliance evidence governance", () => {
     expect(response.status).toBe(200);
     expect(transactionObligationUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
       data: { status: "COMPLIANT", completedAt },
+    }));
+    expect(statusSnapshotCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        sequence: 1,
+        previousStatus: "IN_REVIEW",
+        currentStatus: "COMPLIANT",
+        completedAtBefore: completedAt,
+        completedAtAfter: completedAt,
+      }),
     }));
     expect(activityCreateMock).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
