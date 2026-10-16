@@ -985,6 +985,7 @@ model ComplianceRule {
 
   @@unique([organizationId, workspaceId, ruleKey])
   @@unique([id, workspaceId])
+  @@unique([id, workspaceId, jurisdictionId])
   @@index([workspaceId, jurisdictionId, active])
 }
 
@@ -1016,7 +1017,7 @@ model ComplianceRuleVersion {
   createdByUserId     String
   createdAt           DateTime                  @default(now())
 
-  rule ComplianceRule @relation(fields: [ruleId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  rule ComplianceRule @relation(fields: [ruleId, workspaceId, jurisdictionId], references: [id, workspaceId, jurisdictionId], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User @relation("ComplianceRuleVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   reviewer User? @relation("ComplianceRuleVersionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
@@ -1069,7 +1070,7 @@ model ComplianceDeadlineSnapshot {
 
   obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId], references: [id], onDelete: SetNull)
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   actor User @relation("ComplianceDeadlineSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@unique([obligationId, sequence])
@@ -1111,7 +1112,7 @@ model ComplianceObligation {
   reminders     ComplianceReminder[]
   evidence      ComplianceEvidence[]
   deadlineSnapshots ComplianceDeadlineSnapshot[]
-  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId], references: [id], onDelete: SetNull)
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   documents     Document[]
 
   @@unique([id, workspaceId])
