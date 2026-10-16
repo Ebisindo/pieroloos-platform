@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const nullableDateSchema = z.preprocess((value) => value === null ? null : value, z.coerce.date().nullable());
+
 export const createObligationSchema = z.object({
   clientId: z.string().min(1),
   businessProfileId: z.string().optional().nullable(),
@@ -12,7 +14,7 @@ export const createObligationSchema = z.object({
     "PAYMENT_INFRASTRUCTURE","ANNUAL_FILING","LICENSE","REPORTING",
     "RENEWAL","RECORDKEEPING","OTHER",
   ]),
-  dueAt: z.coerce.date().optional().nullable(),
+  dueAt: nullableDateSchema.optional(),
   requiresEvidence: z.boolean().default(false),
   professionalReviewRequired: z.boolean().default(false),
 });
@@ -40,7 +42,7 @@ export const addComplianceEvidenceSchema = z.object({
   factValue: z.string().trim().min(1).max(500).optional(),
   note: z.string().max(4000).optional(),
   sourceReference: z.string().trim().max(2000).optional(),
-  validThrough: z.coerce.date().optional().nullable(),
+  validThrough: nullableDateSchema.optional(),
 }).strict().superRefine((value, context) => {
   if ((value.factKey && !value.factValue) || (!value.factKey && value.factValue)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["factValue"], message: "Structured fact assertions require both factKey and factValue." });
