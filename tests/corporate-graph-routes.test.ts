@@ -102,7 +102,7 @@ describe("corporate graph and compliance API boundaries", () => {
       take: 250,
     }));
     expect(graphEdgeFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { organizationId: "org-1", workspaceId: "workspace-1" },
+      where: { organizationId: "org-1", workspaceId: "workspace-1", archivedAt: null },
       take: 500,
     }));
   });
