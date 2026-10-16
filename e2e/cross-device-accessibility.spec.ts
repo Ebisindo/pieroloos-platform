@@ -38,8 +38,13 @@ async function captureAuthenticatedViewportMatrix(
   route: string,
   slug: string,
 ) {
+  // Avoid capturing the decorative boot overlay; wait for the actual authenticated view to be revealed.
+  const bootLayer = page.locator(".boot-layer");
+  if (await bootLayer.count()) await expect(bootLayer).toHaveClass(/boot-hidden/);
+  await expect(page.locator("main")).toHaveCount(1);
   await mkdir(join(process.cwd(), "test-results", "responsive"), { recursive: true });
   for (const width of [320, 390, 768, 1280]) {
+    await expect(page.locator("main"), `${route} should remain rendered at ${width}px`).toHaveCount(1);
     await page.setViewportSize({ width, height: 900 });
     await expectNoHorizontalOverflow(page, route, width);
     await page.screenshot({
@@ -146,6 +151,7 @@ test.describe("cross-device responsive smoke matrix", () => {
     await page.getByRole("button", { name: "Sign in to isolated CI workspace" }).click();
     await expect(page).toHaveURL(/\/business-profile$/);
     await expect(page.getByRole("heading", { name: "Business Profiles" })).toBeVisible();
+    expect(new URL(page.url()).origin).toBe("http://localhost:3100");
     await expect(page.getByText("Foreign Private Business", { exact: true })).toHaveCount(0);
 
     const foreignProfileResponse = await page.request.get("/api/business-profile/pieroloos-e2e-foreign-profile");
@@ -173,7 +179,13 @@ test.describe("cross-device responsive smoke matrix", () => {
     await expectNoSeriousAxeViolations(page, "/business-profile/[id]");
     await expect(objective).toHaveValue("Initial objective from CI seed");
     await objective.fill("Updated objective from authenticated E2E");
+    const profileSaveResponsePromise = page.waitForResponse((response) =>
+      response.url().includes(`/api/business-profile/${encodeURIComponent(new URL(page.url()).pathname.split("/").pop()!)}`) &&
+      response.request().method() === "PATCH",
+    );
     await page.getByRole("button", { name: "Save profile" }).click();
+    const profileSaveResponse = await profileSaveResponsePromise;
+    expect(profileSaveResponse.status(), await profileSaveResponse.text()).toBe(200);
     await expect(page.getByText("Saved as version 2.", { exact: true })).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Business objective")).toHaveValue("Updated objective from authenticated E2E");
