@@ -71,6 +71,7 @@ CREATE TABLE "ProfessionalPartnerGrant" (
   "clientId" TEXT NOT NULL,
   "partnerIdentityId" TEXT NOT NULL,
   "grantKey" TEXT NOT NULL,
+  "requestDigest" TEXT NOT NULL,
   "purpose" "ProfessionalPartnerGrantPurpose" NOT NULL,
   "purposeDetails" TEXT,
   "capabilities" "ProfessionalPartnerCapability"[] NOT NULL DEFAULT ARRAY[]::"ProfessionalPartnerCapability"[],
