@@ -46,6 +46,11 @@ export async function POST(request: Request, routeContext: RouteContext) {
       if (!rule) throw new Error("COMPLIANCE_RULE_NOT_FOUND");
 
       const nextVersion = rule.currentVersion + 1;
+      const previous = await transaction.complianceRuleVersion.findFirst({
+        where: { ruleId: rule.id, workspaceId: principal.workspaceId, version: rule.currentVersion },
+        select: { id: true, version: true, reviewState: true, supersededByVersion: true },
+      });
+      if (!previous || previous.supersededByVersion !== null) throw new Error("COMPLIANCE_RULE_VERSION_CONFLICT");
       const now = new Date();
       const created = await transaction.complianceRuleVersion.create({
         data: {
@@ -74,6 +79,19 @@ export async function POST(request: Request, routeContext: RouteContext) {
           createdByUserId: principal.userId,
         },
       });
+      const superseded = await transaction.complianceRuleVersion.updateMany({
+        where: {
+          id: previous.id,
+          ruleId: rule.id,
+          workspaceId: principal.workspaceId,
+          version: rule.currentVersion,
+          reviewState: previous.reviewState,
+          supersededByVersion: null,
+        },
+        data: { reviewState: "SUPERSEDED", supersededByVersion: nextVersion },
+      });
+      if (superseded.count !== 1) throw new Error("COMPLIANCE_RULE_VERSION_CONFLICT");
+
       const pointer = await transaction.complianceRule.updateMany({
         where: {
           id: rule.id,
@@ -97,6 +115,8 @@ export async function POST(request: Request, routeContext: RouteContext) {
           metadata: {
             ruleKey: rule.ruleKey,
             previousVersion: rule.currentVersion,
+            previousReviewState: previous.reviewState,
+            previousSupersededByVersion: nextVersion,
             version: nextVersion,
             evidenceClass: "E1",
             reviewState: "UNREVIEWED",
@@ -115,7 +135,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
       return NextResponse.json({ error: "Compliance rule not found in the active workspace." }, { status: 404 });
     }
     if (error instanceof Error && error.message === "COMPLIANCE_RULE_VERSION_CONFLICT") {
-      return NextResponse.json({ error: "A concurrent rule update occurred. Reload and create a new version." }, { status: 409 });
+      return NextResponse.json({ error: "A concurrent or inconsistent rule-version state was detected. Refresh before creating the next version." }, { status: 409 });
     }
     if (typeof error === "object" && error !== null && "code" in error &&
       ["P2002", "P2034"].includes(String((error as { code?: unknown }).code))) {
