@@ -118,6 +118,20 @@ describe("compliance evidence governance", () => {
   });
 
 
+
+  it("treats revoked evidence as terminal and requires a replacement for corrections", async () => {
+    evidenceFindFirstMock.mockResolvedValueOnce({ id: "evidence-1", reviewStatus: "REVOKED" });
+    transactionEvidenceFindFirstMock.mockReset().mockResolvedValueOnce({ id: "evidence-1", reviewStatus: "REVOKED" });
+    const response = await reviewEvidence(
+      request({ reviewStatus: "VERIFIED", note: "Trying to restore revoked evidence." }, "http://localhost/api/compliance/obligations/obligation-1/evidence/evidence-1/review"),
+      { params: Promise.resolve({ id: "obligation-1", evidenceId: "evidence-1" }) },
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("Revoked evidence is immutable") });
+    expect(evidenceUpdateManyMock).not.toHaveBeenCalled();
+    expect(activityCreateMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a stale evidence review when another reviewer changed the status concurrently", async () => {
     transactionEvidenceFindFirstMock.mockReset().mockResolvedValueOnce(null);
     const response = await reviewEvidence(
