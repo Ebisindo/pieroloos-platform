@@ -6,6 +6,7 @@ const {
   notificationFindUniqueOrThrowMock,
   attemptCreateMock,
   attemptUpdateMock,
+  attemptUpdateManyMock,
   userFindUniqueMock,
   preferenceFindUniqueMock,
   workspaceFindFirstMock,
@@ -19,6 +20,7 @@ const {
   notificationFindUniqueOrThrowMock: vi.fn(),
   attemptCreateMock: vi.fn(),
   attemptUpdateMock: vi.fn(),
+  attemptUpdateManyMock: vi.fn(),
   userFindUniqueMock: vi.fn(),
   preferenceFindUniqueMock: vi.fn(),
   workspaceFindFirstMock: vi.fn(),
@@ -37,6 +39,7 @@ const transaction = {
   notificationDeliveryAttempt: {
     create: attemptCreateMock,
     update: attemptUpdateMock,
+    updateMany: attemptUpdateManyMock,
   },
 };
 
@@ -83,6 +86,7 @@ describe("notification background worker", () => {
     notificationFindUniqueOrThrowMock.mockReset().mockResolvedValue({ attemptCount: 1 });
     attemptCreateMock.mockReset().mockResolvedValue({ id: "attempt-1" });
     attemptUpdateMock.mockReset().mockResolvedValue({});
+    attemptUpdateManyMock.mockReset().mockResolvedValue({ count: 1 });
     userFindUniqueMock.mockReset().mockResolvedValue({ id: "user-1", email: "user@example.com" });
     preferenceFindUniqueMock.mockReset().mockResolvedValue({
       inAppEnabled: true,
@@ -142,6 +146,70 @@ describe("notification background worker", () => {
       data: expect.objectContaining({
         status: "QUEUED",
         nextAttemptAt: new Date(now.getTime() + 30_000),
+      }),
+    }));
+  });
+
+
+  it("moves permanent provider failures directly to dead-letter with sanitized failure details", async () => {
+    const permanent = Object.assign(new Error("provider rejected credentials and included private response text"), { responseCode: 550, code: "EAUTH" });
+    sendEmailMock.mockRejectedValueOnce(permanent);
+    const now = new Date("2026-10-06T06:30:00Z");
+
+    const result = await runNotificationWorker(now);
+
+    expect(result).toMatchObject({ claimed: 1, deadLettered: 1, retried: 0 });
+    expect(attemptUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "PERMANENT_FAILURE",
+        failureCode: "EAUTH",
+        failureMessage: "Notification delivery failed (EAUTH).",
+      }),
+    }));
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "DEAD_LETTER",
+        deadLetteredAt: now,
+        failureReason: "Notification delivery failed (EAUTH).",
+      }),
+    }));
+  });
+
+  it("dead-letters a retryable failure when the notification has exhausted its retry budget", async () => {
+    notificationFindManyMock.mockResolvedValueOnce([{ ...queuedEmail, attemptCount: 4, maxAttempts: 5 }]);
+    sendEmailMock.mockRejectedValueOnce(Object.assign(new Error("temporary provider outage"), { code: "ETIMEDOUT" }));
+    const now = new Date("2026-10-06T06:30:00Z");
+
+    const result = await runNotificationWorker(now);
+
+    expect(result).toMatchObject({ deadLettered: 1, retried: 0 });
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "DEAD_LETTER", deadLetteredAt: now }),
+    }));
+  });
+
+  it("marks an expired worker lease as retryable before safely reclaiming the notification", async () => {
+    const now = new Date("2026-10-06T06:30:00Z");
+    notificationFindManyMock.mockResolvedValueOnce([{
+      ...queuedEmail,
+      status: "PROCESSING",
+      attemptCount: 1,
+      lockedBy: "worker-that-crashed",
+      lockedAt: new Date(now.getTime() - 6 * 60 * 1000),
+    }]);
+
+    const result = await runNotificationWorker(now);
+
+    expect(result).toMatchObject({ claimed: 1, delivered: 1 });
+    expect(attemptUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        notificationId: "notification-1",
+        attemptNumber: 1,
+        status: "ATTEMPTING",
+      }),
+      data: expect.objectContaining({
+        status: "RETRYABLE_FAILURE",
+        failureCode: "WORKER_LEASE_EXPIRED",
       }),
     }));
   });

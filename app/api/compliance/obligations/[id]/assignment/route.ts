@@ -63,13 +63,27 @@ export async function PATCH(
         });
         if (!currentMembership) throw new Error("ASSIGNEE_NOT_MEMBER");
       }
+      const current = await transaction.complianceObligation.findFirst({
+        where: {
+          id: existing.id,
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+        },
+        select: { id: true, ownerUserId: true },
+      });
+      if (!current) throw new Error("OBLIGATION_NOT_FOUND");
       const updated = await transaction.complianceObligation.updateMany({
-        where: { id: existing.id, workspaceId: principal.workspaceId },
+        where: {
+          id: current.id,
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+          ownerUserId: current.ownerUserId,
+        },
         data: { ownerUserId: parsed.data.ownerUserId },
       });
-      if (updated.count !== 1) throw new Error("OBLIGATION_NOT_FOUND");
+      if (updated.count !== 1) throw new Error("COMPLIANCE_ASSIGNMENT_CONFLICT");
       const obligation = await transaction.complianceObligation.findFirst({
-        where: { id: existing.id, workspaceId: principal.workspaceId },
+        where: { id: current.id, organizationId: principal.organizationId, workspaceId: principal.workspaceId },
       });
       if (!obligation) throw new Error("OBLIGATION_NOT_FOUND");
       await transaction.complianceActivity.create({
@@ -78,7 +92,7 @@ export async function PATCH(
           action: parsed.data.ownerUserId ? "OWNER_ASSIGNED" : "OWNER_UNASSIGNED",
           actorUserId: principal.userId,
           metadata: {
-            previousOwnerUserId: existing.ownerUserId,
+            previousOwnerUserId: current.ownerUserId,
             ownerUserId: parsed.data.ownerUserId,
           },
         },
@@ -92,6 +106,12 @@ export async function PATCH(
     }
     if (error instanceof Error && error.message === "OBLIGATION_NOT_FOUND") {
       return NextResponse.json({ error: "Compliance obligation not found." }, { status: 404 });
+    }
+    if (error instanceof Error && error.message === "COMPLIANCE_ASSIGNMENT_CONFLICT") {
+      return NextResponse.json({ error: "The obligation assignment changed concurrently. Refresh and retry." }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
+      return NextResponse.json({ error: "Workspace authorization changed. Refresh and retry." }, { status: 409 });
     }
     throw error;
   }
