@@ -42,6 +42,20 @@ describe("business-intent evidence intake provenance", () => {
     }).success).toBe(false);
   });
 
+  it("rejects non-HTTPS source URLs", () => {
+    expect(businessIntentInputSchema.safeParse({
+      ...validInput,
+      knownFacts: [{ ...validInput.knownFacts[0], sourceUrl: "http://example.com/source" }],
+    }).success).toBe(false);
+  });
+
+  it("rejects source URLs containing embedded credentials", () => {
+    expect(businessIntentInputSchema.safeParse({
+      ...validInput,
+      knownFacts: [{ ...validInput.knownFacts[0], sourceUrl: "https://user:secret@example.com/source" }],
+    }).success).toBe(false);
+  });
+
   it("rejects unknown provenance fields because the intake schema is strict", () => {
     expect(businessIntentInputSchema.safeParse({
       ...validInput,
