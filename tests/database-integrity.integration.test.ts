@@ -6,6 +6,8 @@ import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 const integrationEnabled = process.env.DATABASE_INTEGRATION_TESTS === "1";
 const prisma = new PrismaClient();
 const organizationIds: string[] = [];
+const evidenceIds: string[] = [];
+const userIds: string[] = [];
 
 async function createOrganization(slug: string) {
   const organization = await prisma.organization.create({
@@ -26,6 +28,16 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
     if (organizationIds.length > 0) {
       await prisma.organization.deleteMany({ where: { id: { in: organizationIds } } });
       organizationIds.length = 0;
+    }
+    // Evidence is a legacy global model, so clean up explicitly after workspace-owned
+    // documents and proposal references have cascaded away with their organizations.
+    if (evidenceIds.length > 0) {
+      await prisma.evidence.deleteMany({ where: { id: { in: evidenceIds } } });
+      evidenceIds.length = 0;
+    }
+    if (userIds.length > 0) {
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+      userIds.length = 0;
     }
   });
 
@@ -296,4 +308,140 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       where: { notificationId: notification.id },
     })).resolves.toBe(0);
   });
+
+  it("enforces business-intent evidence bindings across proposal, document, client, and workspace", async () => {
+    const suffix = crypto.randomUUID();
+    const organization = await createOrganization(`intent-evidence-${suffix}`);
+    const workspace = await createWorkspace(organization.id, `intent-evidence-${suffix}`);
+    const firstClient = await prisma.client.create({
+      data: { organizationId: organization.id, workspaceId: workspace.id, name: "First client" },
+    });
+    const secondClient = await prisma.client.create({
+      data: { organizationId: organization.id, workspaceId: workspace.id, name: "Second client" },
+    });
+    const creator = await prisma.user.create({
+      data: { email: `intent-evidence-${suffix}@integration.invalid` },
+    });
+    userIds.push(creator.id);
+
+    async function createSource(title: string) {
+      const source = await prisma.evidence.create({
+        data: {
+          title,
+          source: `https://registry.example.gov/${encodeURIComponent(title)}`,
+          sourceType: "OFFICIAL_REGISTRY",
+          retrievedAt: new Date("2026-10-18T10:00:00.000Z"),
+          evidenceClass: "E3",
+          reviewStatus: "VERIFIED",
+        },
+      });
+      evidenceIds.push(source.id);
+      return source;
+    }
+    const firstSource = await createSource("First verified source");
+    const secondSource = await createSource("Second verified source");
+
+    async function createSourceDocument(clientId: string, evidenceId: string) {
+      const id = crypto.randomUUID();
+      return prisma.document.create({
+        data: {
+          id,
+          workspaceId: workspace.id,
+          clientId,
+          evidenceId,
+          rootDocumentId: id,
+          version: 1,
+          latestVersion: 1,
+          name: "Verified source.pdf",
+          mimeType: "application/pdf",
+          storageKey: `${workspace.id}/documents/${id}/source.pdf`,
+          sizeBytes: 25,
+          checksum: "b".repeat(64),
+          status: "AVAILABLE",
+          scanStatus: "CLEAN",
+          reviewStatus: "VERIFIED",
+          uploadedByUserId: creator.id,
+        },
+      });
+    }
+    const firstDocument = await createSourceDocument(firstClient.id, firstSource.id);
+    const secondDocument = await createSourceDocument(secondClient.id, secondSource.id);
+
+    async function createProposal(clientId: string, suffix: string) {
+      return prisma.businessIntentProposal.create({
+        data: {
+          organizationId: organization.id,
+          workspaceId: workspace.id,
+          clientId,
+          createdByUserId: creator.id,
+          status: "PROPOSED",
+          version: 1,
+          inputDigest: suffix,
+          proposal: { businessSummary: "Provisional proposal requiring advisor review." },
+          evidenceReferences: { claims: [], trustedSources: [] },
+        },
+      });
+    }
+    const firstProposal = await createProposal(firstClient.id, `first-${suffix}`);
+    const secondProposal = await createProposal(secondClient.id, `second-${suffix}`);
+
+    const reference = await prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: firstProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: firstSource.id,
+        documentId: firstDocument.id,
+        clientId: firstClient.id,
+        claimStatement: "The statement is supported by the attached source record.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    });
+    expect(reference.workspaceId).toBe(workspace.id);
+
+    // A reference cannot substitute a different client's document, even in the same workspace.
+    await expect(prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: secondProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: secondSource.id,
+        documentId: firstDocument.id,
+        clientId: secondClient.id,
+        claimStatement: "Cross-client attachment must be rejected.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    })).rejects.toThrow();
+
+    // The evidence ID must be the evidence actually attached to the selected document.
+    await expect(prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: secondProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: firstSource.id,
+        documentId: secondDocument.id,
+        clientId: secondClient.id,
+        claimStatement: "Evidence/document mismatch must be rejected.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    })).rejects.toThrow();
+
+    // The proposal's client scope must match the evidence reference's client scope.
+    await expect(prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: firstProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: secondSource.id,
+        documentId: secondDocument.id,
+        clientId: secondClient.id,
+        claimStatement: "Proposal/client mismatch must be rejected.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    })).rejects.toThrow();
+
+    // Once a source document is referenced, its client/evidence/workspace identity cannot be rebound.
+    await expect(prisma.document.update({
+      where: { id: firstDocument.id },
+      data: { clientId: secondClient.id },
+    })).rejects.toThrow();
+  });
+
 });
