@@ -20,6 +20,7 @@ PieroloOS is a professional decision-support and workflow-organization platform.
 | Lint/typecheck troubleshooting | [docs/LINT-PROJECT-DIRECTORY.md](docs/LINT-PROJECT-DIRECTORY.md) |
 | GitHub Codespaces localhost:3000 preview and port forwarding | [docs/CODESPACES-PREVIEW.md](docs/CODESPACES-PREVIEW.md) |
 | Permanent public pre-operation preview deployment standard | [docs/PERMANENT-PREVIEW-DEPLOYMENT.md](docs/PERMANENT-PREVIEW-DEPLOYMENT.md) |
+| GitHub branch, pull request, review, and merge workflow | [docs/GITHUB-PULL-REQUEST-WORKFLOW.md](docs/GITHUB-PULL-REQUEST-WORKFLOW.md) |
 
 The `README-SESSION-*`, `SESSION-*` and `docs/SESSION-*` files are historical delivery notes. A feature described only there is not evidence that it is implemented; check the code and tests.
 
