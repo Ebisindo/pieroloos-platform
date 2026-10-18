@@ -58,11 +58,29 @@ ALTER TABLE "BusinessIntentEvidenceReference"
 -- Composite FKs above protect workspace/client existence; this trigger protects
 -- the cross-column relationship which ordinary FKs cannot express independently.
 CREATE OR REPLACE FUNCTION enforce_business_intent_evidence_reference_scope()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql AS $
 DECLARE
   document_client_id TEXT;
   document_evidence_id TEXT;
+  proposal_client_id TEXT;
 BEGIN
+  SELECT "clientId"
+    INTO proposal_client_id
+    FROM "BusinessIntentProposal"
+   WHERE "id" = NEW."proposalId"
+     AND "workspaceId" = NEW."workspaceId"
+   FOR KEY SHARE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Business-intent evidence proposal must exist in the same workspace'
+      USING ERRCODE = '23503';
+  END IF;
+
+  IF proposal_client_id IS DISTINCT FROM NEW."clientId" THEN
+    RAISE EXCEPTION 'Business-intent evidence client must match the proposal client'
+      USING ERRCODE = '23514';
+  END IF;
+
   SELECT "clientId", "evidenceId"
     INTO document_client_id, document_evidence_id
     FROM "Document"
@@ -87,7 +105,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$;
+$;
 
 CREATE TRIGGER "BusinessIntentEvidenceReference_scope_guard"
 BEFORE INSERT OR UPDATE OF "documentId", "workspaceId", "clientId", "evidenceId"
