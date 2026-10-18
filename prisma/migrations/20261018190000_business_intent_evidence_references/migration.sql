@@ -58,18 +58,27 @@ ALTER TABLE "BusinessIntentEvidenceReference"
 -- Composite FKs above protect workspace/client existence; this trigger protects
 -- the cross-column relationship which ordinary FKs cannot express independently.
 CREATE OR REPLACE FUNCTION enforce_business_intent_evidence_reference_scope()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
+  proposal_client_id TEXT;
   document_client_id TEXT;
   document_evidence_id TEXT;
-  proposal_client_id TEXT;
+  document_status TEXT;
+  document_scan_status TEXT;
+  document_review_status TEXT;
+  document_deleted_at TIMESTAMP(3);
+  evidence_review_status TEXT;
+  evidence_class TEXT;
+  evidence_source TEXT;
+  evidence_retrieved_at TIMESTAMP(3);
 BEGIN
+  -- Serialize the bind against changes to the proposal's client scope.
   SELECT "clientId"
     INTO proposal_client_id
     FROM "BusinessIntentProposal"
    WHERE "id" = NEW."proposalId"
      AND "workspaceId" = NEW."workspaceId"
-   FOR KEY SHARE;
+   FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Business-intent evidence proposal must exist in the same workspace'
@@ -81,12 +90,15 @@ BEGIN
       USING ERRCODE = '23514';
   END IF;
 
-  SELECT "clientId", "evidenceId"
-    INTO document_client_id, document_evidence_id
+  -- Lock the document row and ensure both tenant and source identity match the link.
+  SELECT "clientId", "evidenceId", "status"::text, "scanStatus"::text,
+         "reviewStatus"::text, "deletedAt"
+    INTO document_client_id, document_evidence_id, document_status,
+         document_scan_status, document_review_status, document_deleted_at
     FROM "Document"
    WHERE "id" = NEW."documentId"
      AND "workspaceId" = NEW."workspaceId"
-   FOR KEY SHARE;
+   FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Business-intent evidence document must exist in the same workspace'
@@ -103,10 +115,48 @@ BEGIN
       USING ERRCODE = '23514';
   END IF;
 
+  IF document_status IS DISTINCT FROM 'AVAILABLE'
+    OR document_scan_status IS DISTINCT FROM 'CLEAN'
+    OR document_review_status IS DISTINCT FROM 'VERIFIED'
+    OR document_deleted_at IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'Business-intent evidence document must be available, clean, verified, and not deleted'
+      USING ERRCODE = '23514';
+  END IF;
+
+  -- Lock the authoritative source so a concurrent revoke/update cannot slip between
+  -- the eligibility check and binding. Revocation after binding remains auditable history.
+  SELECT "reviewStatus", "evidenceClass"::text, "source", "retrievedAt"
+    INTO evidence_review_status, evidence_class, evidence_source, evidence_retrieved_at
+    FROM "Evidence"
+   WHERE "id" = NEW."evidenceId"
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Business-intent evidence source does not exist'
+      USING ERRCODE = '23503';
+  END IF;
+
+  IF evidence_review_status IS DISTINCT FROM 'VERIFIED'
+    OR evidence_class NOT IN ('E3', 'E4', 'E3_PRIMARY', 'E4_CROSS_VERIFIED')
+    OR evidence_source IS NULL
+    OR btrim(evidence_source) NOT LIKE 'https://%'
+    OR evidence_retrieved_at IS NULL
+  THEN
+    RAISE EXCEPTION 'Business-intent evidence source is not eligible for verified binding'
+      USING ERRCODE = '23514';
+  END IF;
+
+  IF NEW."verificationState" IS DISTINCT FROM 'SOURCE_VERIFIED_RECORD'
+    OR btrim(NEW."claimStatement") = ''
+  THEN
+    RAISE EXCEPTION 'Business-intent evidence binding must preserve a verified source record and non-empty claim'
+      USING ERRCODE = '23514';
+  END IF;
+
   RETURN NEW;
 END;
-$;
-
+$$;
 CREATE TRIGGER "BusinessIntentEvidenceReference_scope_guard"
 BEFORE INSERT OR UPDATE OF "documentId", "workspaceId", "clientId", "evidenceId"
 ON "BusinessIntentEvidenceReference"
