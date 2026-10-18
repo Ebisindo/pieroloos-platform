@@ -671,7 +671,6 @@ model Evidence {
   complianceItem ComplianceItem? @relation(fields: [complianceItemId], references: [id], onDelete: SetNull)
   documents      Document[]
   businessIntentReferences BusinessIntentEvidenceReference[]
-  corporateGraphRuleAssessments CorporateGraphRuleAssessment[]
 
   @@unique([id, jurisdictionId], map: "Evidence_id_jurisdictionId_key")
   @@index([evidenceClass])
@@ -1761,7 +1760,6 @@ model ComplianceRule {
   createdBy    User                   @relation("ComplianceRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   versions     ComplianceRuleVersion[]
   activities   ComplianceRuleActivity[]
-  corporateGraphRuleAssessments CorporateGraphRuleAssessment[]
 
   @@unique([organizationId, workspaceId, ruleKey])
   @@unique([id, workspaceId])
@@ -2000,22 +1998,7 @@ model CorporateGraphAuditEvent {
   @@index([subjectType, subjectId, occurredAt])
 }
 
-model CorporateGraphRuleAssessment {
-  id               String   @id @default(cuid())
-  workspaceId      String
-  corporateRuleKey String
-  complianceRuleId String
-  evidenceId       String?
-  assessmentState  ComplianceRuleAssessmentState @default(UNKNOWN)
-  assessmentFacts  Json
-  createdAt        DateTime @default(now())
 
-  complianceRule ComplianceRule @relation(fields: [complianceRuleId], references: [id], onDelete: Restrict)
-  evidence       Evidence?      @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
-
-  @@index([workspaceId, complianceRuleId])
-  @@index([evidenceId])
-}
 
 }
 
