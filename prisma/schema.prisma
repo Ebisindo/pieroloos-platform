@@ -450,6 +450,7 @@ model Workspace {
   complianceObligations      ComplianceObligation[]
   corporateGraphNodes CorporateGraphNode[]
   corporateGraphAuditEvents CorporateGraphAuditEvent[]
+  businessIntentEvidenceReferences BusinessIntentEvidenceReference[]
   complianceRules              ComplianceRule[]
   complianceRuleVersions       ComplianceRuleVersion[]
   complianceDeadlineSnapshots  ComplianceDeadlineSnapshot[]
@@ -1054,6 +1055,7 @@ model BusinessIntentProposal {
   @@index([organizationId, workspaceId, status, createdAt], map: "BusinessIntentProposal_tenant_status_created_idx")
   @@index([clientId, createdAt], map: "BusinessIntentProposal_client_created_idx")
   reviews BusinessIntentProposalReview[]
+  evidenceReferences BusinessIntentEvidenceReference[]
 }
 
 model BusinessIntentProposalReview {
