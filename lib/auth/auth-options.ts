@@ -177,9 +177,9 @@ export const authOptions: AuthOptions = {
         },
       });
 
-      if (existingUser?.memberships.length) return true;
-      const hasPortalGrant = Boolean(existingUser?.clientPortalGrants.length);
-      const hasPartnerGrant = Boolean(existingUser?.professionalPartnerIdentities.length);
+      if (existingUser?.memberships?.length) return true;
+      const hasPortalGrant = Boolean(existingUser?.clientPortalGrants?.length);
+      const hasPartnerGrant = Boolean(existingUser?.professionalPartnerIdentities?.length);
       if (!hasPortalGrant && !hasPartnerGrant) return false;
       const emailVerified = "emailVerified" in user && user.emailVerified instanceof Date
         ? user.emailVerified
