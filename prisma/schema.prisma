@@ -1896,6 +1896,8 @@ model BusinessIntentEvidenceReference {
   @@unique([proposalId, evidenceId])
   @@index([workspaceId, evidenceId])
   @@index([clientId, evidenceId])
+}
+
 enum CorporateGraphNodeType {
   COMPANY
   PERSON
