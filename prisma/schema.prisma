@@ -164,6 +164,7 @@ enum EvidenceReviewStatus {
   PENDING
   VERIFIED
   CHANGES_REQUESTED
+  REVOKED
 }
 
 enum DocumentStorageStatus {
@@ -310,9 +311,13 @@ model Organization {
 
   memberships           Membership[]
   workspaces            Workspace[]
+  corporateGraphNodes CorporateGraphNode[]
+  corporateGraphAuditEvents CorporateGraphAuditEvent[]
   clients               Client[]
   jurisdictions         Jurisdiction[]
   complianceObligations ComplianceObligation[]
+  complianceRules             ComplianceRule[]
+  complianceRuleActivities    ComplianceRuleActivity[]
   marketEntryPlans      MarketEntryPlan[]
   billingSubscriptions  BillingSubscription[]
   billingUsageEvents    BillingUsageEvent[]
@@ -348,6 +353,13 @@ model User {
   businessIntentProposalsCreated BusinessIntentProposal[] @relation("BusinessIntentProposalCreator")
   businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
   businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
+  corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
+  complianceRulesCreated             ComplianceRule[]                  @relation("ComplianceRuleCreatedBy")
+  complianceRuleVersionsCreated      ComplianceRuleVersion[]           @relation("ComplianceRuleVersionCreatedBy")
+  complianceRulesReviewed             ComplianceRuleVersion[]           @relation("ComplianceRuleVersionReviewer")
+  complianceDeadlineSnapshots         ComplianceDeadlineSnapshot[]      @relation("ComplianceDeadlineSnapshotActor")
+  complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
+  complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
 }
 
 model PlatformAdministrator {
@@ -436,6 +448,14 @@ model Workspace {
   formationPlans             FormationPlan[]
   workingDecisions           WorkingJurisdictionDecision[]
   complianceObligations      ComplianceObligation[]
+  corporateGraphNodes CorporateGraphNode[]
+  corporateGraphAuditEvents CorporateGraphAuditEvent[]
+  businessIntentEvidenceReferences BusinessIntentEvidenceReference[]
+  complianceRules              ComplianceRule[]
+  complianceRuleVersions       ComplianceRuleVersion[]
+  complianceDeadlineSnapshots  ComplianceDeadlineSnapshot[]
+  complianceStatusSnapshots    ComplianceStatusSnapshot[]
+  complianceRuleActivities     ComplianceRuleActivity[]
   marketEntryPlans           MarketEntryPlan[]
   marketReadinessAssessments MarketReadinessAssessment[]
   documents                  Document[]
@@ -487,6 +507,7 @@ model Client {
   portalAccessGrants    ClientPortalGrant[]
   portalEvents          ClientPortalAuditEvent[]
   portalInteractions    ClientPortalInteraction[]
+  corporateGraphNodes CorporateGraphNode[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -569,6 +590,7 @@ model Jurisdiction {
   workingDecisions               WorkingJurisdictionDecision[]
   formationPlans                 FormationPlan[]
   complianceObligations          ComplianceObligation[]
+  complianceRules                 ComplianceRule[]
   marketEntryPlans               MarketEntryPlan[]
   crossBorderDossiersOrigin      CrossBorderDossier[]          @relation("CrossBorderOrigin")
   crossBorderDossiersDestination CrossBorderDossier[]          @relation("CrossBorderDestination")
@@ -649,6 +671,7 @@ model Evidence {
   jurisdiction   Jurisdiction?   @relation(fields: [jurisdictionId], references: [id], onDelete: SetNull)
   complianceItem ComplianceItem? @relation(fields: [complianceItemId], references: [id], onDelete: SetNull)
   documents      Document[]
+  businessIntentReferences BusinessIntentEvidenceReference[]
 
   @@index([evidenceClass])
   @@index([jurisdictionId])
@@ -695,6 +718,7 @@ model Document {
   nextVersions               Document[]                   @relation("DocumentPreviousVersion")
   accessEvents               DocumentAccessEvent[]
   complianceEvidence         ComplianceEvidence[]
+  businessIntentEvidenceReferences BusinessIntentEvidenceReference[]
   crossBorderControlEvidence CrossBorderControlEvidence[]
 
   @@unique([rootDocumentId, version])
@@ -989,6 +1013,10 @@ model ComplianceObligation {
   jurisdiction  Jurisdiction?        @relation(fields: [jurisdictionId], references: [id], onDelete: SetNull)
   activities    ComplianceActivity[]
   reminders     ComplianceReminder[]
+  sourceRuleVersionId String?
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  deadlineSnapshots ComplianceDeadlineSnapshot[]
+  statusSnapshots ComplianceStatusSnapshot[]
   evidence      ComplianceEvidence[]
   documents     Document[]
 
@@ -1026,6 +1054,7 @@ model BusinessIntentProposal {
   @@index([organizationId, workspaceId, status, createdAt], map: "BusinessIntentProposal_tenant_status_created_idx")
   @@index([clientId, createdAt], map: "BusinessIntentProposal_client_created_idx")
   reviews BusinessIntentProposalReview[]
+  evidenceReferences BusinessIntentEvidenceReference[]
 }
 
 model BusinessIntentProposalReview {
@@ -1698,4 +1727,289 @@ model PartnershipInquiry {
 
   @@index([status, createdAt])
   @@index([createdAt])
+
+
 }
+enum ComplianceRuleReviewState {
+  UNREVIEWED
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ComplianceRuleAssessmentState {
+  APPLICABLE
+  NOT_APPLICABLE
+  UNKNOWN
+}
+
+model ComplianceRule {
+  id              String   @id @default(cuid())
+  organizationId  String
+  workspaceId     String
+  jurisdictionId  String
+  ruleKey         String
+  currentVersion  Int      @default(1)
+  active          Boolean  @default(true)
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace              @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  jurisdiction Jurisdiction            @relation(fields: [jurisdictionId], references: [id], onDelete: Restrict)
+  createdBy    User                   @relation("ComplianceRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  versions     ComplianceRuleVersion[]
+  activities   ComplianceRuleActivity[]
+
+  @@unique([organizationId, workspaceId, ruleKey])
+  @@unique([id, workspaceId])
+  @@unique([id, workspaceId, jurisdictionId])
+  @@index([workspaceId, jurisdictionId, active])
+}
+
+model ComplianceRuleVersion {
+  id                       String                   @id @default(cuid())
+  ruleId                   String
+  workspaceId              String
+  version                  Int
+  jurisdictionId           String
+  title                    String
+  description              String?
+  obligationType           String
+  sourceAuthority          String
+  sourceUrl                String
+  sourceRetrievedAt        DateTime?
+  publicationDate          DateTime?
+  effectiveFrom            DateTime
+  effectiveThrough         DateTime?
+  evidenceClass            EvidenceClass
+  applicability            Json
+  relativeDueDays          Int?
+  requiresEvidence         Boolean                  @default(false)
+  professionalReviewRequired Boolean                @default(true)
+  reviewState              ComplianceRuleReviewState @default(UNREVIEWED)
+  reviewedByUserId         String?
+  reviewedAt               DateTime?
+  reviewNote               String?
+  supersededByVersion      Int?
+  createdByUserId          String
+  createdAt                DateTime                 @default(now())
+
+  rule      ComplianceRule @relation(fields: [ruleId, workspaceId, jurisdictionId], references: [id, workspaceId, jurisdictionId], onDelete: Cascade)
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User          @relation("ComplianceRuleVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  obligations ComplianceObligation[]
+  deadlineSnapshots ComplianceDeadlineSnapshot[]
+  sourceRuleActivities ComplianceRuleActivity[]
+  reviewer  User?         @relation("ComplianceRuleVersionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([ruleId, version])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, jurisdictionId, reviewState])
+  @@index([sourceRetrievedAt, effectiveThrough])
+}
+
+model ComplianceDeadlineSnapshot {
+  id                 String                       @id @default(cuid())
+  obligationId       String
+  workspaceId        String
+  sequence           Int
+  previousDueAt      DateTime?
+  dueAt              DateTime?
+  reason             String
+  sourceRuleVersionId String?
+  assessmentState    ComplianceRuleAssessmentState @default(UNKNOWN)
+  assessmentFacts    Json
+  actorUserId        String
+  createdAt          DateTime                     @default(now())
+
+  obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User      @relation("ComplianceDeadlineSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([obligationId, sequence])
+  @@index([workspaceId, createdAt])
+  @@index([obligationId, createdAt])
+}
+
+model ComplianceStatusSnapshot {
+  id                String           @id @default(cuid())
+  obligationId      String
+  workspaceId       String
+  sequence          Int
+  previousStatus    ComplianceStatus
+  currentStatus     ComplianceStatus
+  completedAtBefore DateTime?
+  completedAtAfter  DateTime?
+  reason            String?
+  actorUserId       String
+  occurredAt        DateTime         @default(now())
+
+  obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  actor      User                 @relation("ComplianceStatusSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([obligationId, sequence])
+  @@index([workspaceId, occurredAt])
+  @@index([obligationId, occurredAt])
+}
+
+model ComplianceRuleActivity {
+  id             String   @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  ruleId         String
+  ruleVersionId  String?
+  actorUserId    String
+  action         String
+  note           String?
+  metadata       Json?
+  occurredAt     DateTime @default(now())
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace             @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  rule         ComplianceRule        @relation(fields: [ruleId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  ruleVersion  ComplianceRuleVersion? @relation(fields: [ruleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  actor        User                  @relation("ComplianceRuleActivityActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([ruleId, occurredAt])
+  @@index([ruleVersionId, occurredAt])
+}
+
+model BusinessIntentEvidenceReference {
+  id                String   @id @default(cuid())
+  proposalId        String
+  workspaceId       String
+  evidenceId        String
+  documentId        String
+  clientId          String?
+  claimStatement    String
+  verificationState String   @default("SOURCE_VERIFIED_RECORD")
+  createdAt         DateTime @default(now())
+
+  proposal BusinessIntentProposal @relation(fields: [proposalId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  document Document @relation(fields: [documentId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+
+  @@unique([proposalId, evidenceId])
+  @@index([workspaceId, evidenceId])
+  @@index([clientId, evidenceId])
+}
+
+enum CorporateGraphNodeType {
+  COMPANY
+  PERSON
+  TRUST
+  PARTNERSHIP
+  BRANCH
+  BANKING_RELATIONSHIP
+  LICENSE
+  TAX_REGISTRATION
+  OTHER
+}
+
+enum CorporateGraphRelationType {
+  OWNS
+  CONTROLS
+  SUBSIDIARY_OF
+  BRANCH_OF
+  BANKS_WITH
+  LICENSED_BY
+  TAX_REGISTERED_WITH
+  RELATED_TO
+}
+
+enum CorporateRuleSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CorporateGraphAuditAction {
+  NODE_CREATED
+  NODE_UPDATED
+  NODE_ARCHIVED
+  EDGE_CREATED
+  EDGE_ARCHIVED
+}
+
+model CorporateGraphNode {
+  id                 String                 @id @default(cuid())
+  organizationId     String
+  workspaceId        String
+  clientId           String?
+  name               String
+  nodeType           CorporateGraphNodeType @default(COMPANY)
+  jurisdictionCode   String?
+  entityType         String?
+  registrationNumber String?
+  metadata           Json?
+  createdByUserId    String
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  archivedAt         DateTime?
+  archivedByUserId   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  client       Client?      @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  outgoing     CorporateGraphEdge[] @relation("CorporateGraphFrom")
+  incoming     CorporateGraphEdge[] @relation("CorporateGraphTo")
+
+  @@index([organizationId, workspaceId])
+  @@index([clientId, workspaceId])
+  @@index([jurisdictionCode, entityType])
+  @@index([organizationId, workspaceId, archivedAt])
+}
+
+model CorporateGraphEdge {
+  id               String                     @id @default(cuid())
+  organizationId   String
+  workspaceId      String
+  fromNodeId       String
+  toNodeId         String
+  relation         CorporateGraphRelationType
+  ownershipPercent Decimal?                   @db.Decimal(5, 2)
+  notes            String?
+  createdByUserId  String
+  createdAt        DateTime                   @default(now())
+  archivedAt       DateTime?
+  archivedByUserId String?
+
+  fromNode CorporateGraphNode @relation("CorporateGraphFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode   CorporateGraphNode @relation("CorporateGraphTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, workspaceId, fromNodeId, toNodeId, relation])
+  @@index([organizationId, workspaceId, fromNodeId])
+  @@index([organizationId, workspaceId, toNodeId])
+  @@index([organizationId, workspaceId, archivedAt])
+}
+
+model CorporateGraphAuditEvent {
+  id             String                   @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  actorUserId    String
+  action         CorporateGraphAuditAction
+  subjectType    String
+  subjectId      String
+  details        Json?
+  occurredAt     DateTime                 @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  actor        User         @relation("CorporateGraphAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([subjectType, subjectId, occurredAt])
+}
+
+
+
+}
+

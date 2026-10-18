@@ -83,9 +83,127 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to authorize business-intent analysis." }, { status: 500 });
   }
 
+  // Resolve all submitted evidence before calling the provider. Request content is an
+  // untrusted claim; only the server-selected record data may be described as evidence.
+  const submittedEvidenceIds = [...new Set(parsed.data.knownFacts.map((fact) => fact.evidenceId).filter((id): id is string => Boolean(id)))];
+  let trustedEvidence: Array<{
+    id: string;
+    title: string;
+    source: string | null;
+    sourceType: string | null;
+    publicationDate: Date | null;
+    retrievedAt: Date | null;
+    evidenceClass: string;
+    reviewStatus: string | null;
+    jurisdictionId: string | null;
+    documents: Array<{ id: string; clientId: string | null; workspaceId: string; checksum: string }>;
+  }> = [];
+
+  try {
+    trustedEvidence = await withAuthorizedWorkspaceTransaction(principal, "formation:write", async (transaction) => {
+      await assertBusinessIntentEntitlement(transaction, principal.organizationId, new Date());
+      if (parsed.data.clientId) {
+        const client = await transaction.client.findFirst({
+          where: {
+            id: parsed.data.clientId,
+            organizationId: principal.organizationId,
+            workspaceId: principal.workspaceId,
+          },
+          select: { id: true },
+        });
+        if (!client) throw new Error("INTENT_CLIENT_NOT_FOUND");
+      }
+
+      if (submittedEvidenceIds.length === 0) return [];
+      const selected = await transaction.evidence.findMany({
+        where: {
+          id: { in: submittedEvidenceIds },
+          reviewStatus: "VERIFIED",
+          evidenceClass: { in: ["E3", "E4", "E3_PRIMARY", "E4_CROSS_VERIFIED"] },
+          documents: {
+            some: {
+              workspaceId: principal.workspaceId,
+              ...(parsed.data.clientId ? { clientId: parsed.data.clientId } : {}),
+              status: "AVAILABLE",
+              scanStatus: "CLEAN",
+              reviewStatus: "VERIFIED",
+              deletedAt: null,
+            },
+          },
+        },
+        select: {
+          id: true,
+          title: true,
+          source: true,
+          sourceType: true,
+          publicationDate: true,
+          retrievedAt: true,
+          evidenceClass: true,
+          reviewStatus: true,
+          jurisdictionId: true,
+          documents: {
+            where: {
+              workspaceId: principal.workspaceId,
+              ...(parsed.data.clientId ? { clientId: parsed.data.clientId } : {}),
+              status: "AVAILABLE",
+              scanStatus: "CLEAN",
+              reviewStatus: "VERIFIED",
+              deletedAt: null,
+            },
+            select: { id: true, clientId: true, workspaceId: true, checksum: true },
+            take: 1,
+          },
+        },
+      });
+      if (selected.length !== submittedEvidenceIds.length || selected.some((evidence) =>
+        !evidence.retrievedAt || !evidence.source?.trim() || !evidence.documents.length
+      )) {
+        throw new Error("INTENT_EVIDENCE_NOT_TRUSTED");
+      }
+      return selected;
+    });
+  } catch (error) {
+    const response = entitlementOrClientError(error);
+    if (response) return response;
+    if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
+      return NextResponse.json({ error: "Workspace authorization changed. Refresh and retry." }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "INTENT_EVIDENCE_NOT_TRUSTED") {
+      return NextResponse.json({ error: "One or more evidence references are unknown, unverified, revoked, or outside the active workspace/client. Submit claims as unverified or attach eligible evidence first." }, { status: 422 });
+    }
+    if (isSerializationConflict(error)) {
+      return NextResponse.json({ error: "Workspace changed during evidence authorization. Retry the request." }, { status: 409 });
+    }
+    console.error("Business-intent evidence preflight failed.", safeErrorCode(error));
+    return NextResponse.json({ error: "Unable to authorize business-intent evidence." }, { status: 500 });
+  }
+
+  const trustedEvidenceById = new Map(trustedEvidence.map((evidence) => [evidence.id, evidence]));
+  const providerInput = {
+    ...parsed.data,
+    knownFacts: parsed.data.knownFacts.map((fact) => {
+      const source = fact.evidenceId ? trustedEvidenceById.get(fact.evidenceId) : undefined;
+      return source
+        ? {
+            statement: fact.statement,
+            id: source.id,
+            title: source.title,
+            sourceUrl: source.source,
+            sourceType: source.sourceType,
+            retrievedAt: source.retrievedAt?.toISOString() ?? null,
+            evidenceClass: source.evidenceClass,
+            verificationState: "SOURCE_VERIFIED_RECORD",
+          }
+        : {
+            statement: fact.statement,
+            evidenceClass: "E1",
+            verificationState: "UNVERIFIED_USER_CLAIM",
+          };
+    }),
+  };
   let analysis;
   try {
-    analysis = await analyzeBusinessIntent(parsed.data);
+    analysis = await analyzeBusinessIntent(providerInput);
   } catch (error) {
     if (error instanceof BusinessIntentProviderError) {
       if (error.kind === "NOT_CONFIGURED") {
@@ -104,13 +222,6 @@ export async function POST(request: Request) {
   }
 
   const inputDigest = createHash("sha256").update(JSON.stringify(parsed.data)).digest("hex");
-  const evidenceReferences = parsed.data.knownFacts.map((fact) => ({
-    id: fact.id,
-    statement: fact.statement,
-    sourceUrl: fact.sourceUrl ?? null,
-    evidenceClass: fact.evidenceClass,
-    retrievedAt: fact.retrievedAt ?? null,
-  }));
 
   try {
     const proposal = await withAuthorizedWorkspaceTransaction(
@@ -132,6 +243,25 @@ export async function POST(request: Request) {
           if (!client) throw new Error("INTENT_CLIENT_NOT_FOUND");
         }
 
+
+        const submittedClaims = parsed.data.knownFacts.map((fact) => {
+          const source = fact.evidenceId ? trustedEvidenceById.get(fact.evidenceId) : undefined;
+          if (fact.evidenceId && !source) throw new Error("INTENT_EVIDENCE_NOT_TRUSTED");
+          return { statement: fact.statement, evidenceId: fact.evidenceId ?? null, verificationState: source ? "SOURCE_VERIFIED_RECORD" : "UNVERIFIED" };
+        });
+        const trustedEvidenceReferences = trustedEvidence.map((evidence) => ({
+          id: evidence.id,
+          title: evidence.title,
+          source: evidence.source,
+          sourceType: evidence.sourceType,
+          publicationDate: evidence.publicationDate?.toISOString() ?? null,
+          retrievedAt: evidence.retrievedAt?.toISOString() ?? null,
+          evidenceClass: evidence.evidenceClass,
+          reviewStatus: evidence.reviewStatus,
+          jurisdictionId: evidence.jurisdictionId,
+          documentId: evidence.documents[0]?.id ?? null,
+          documentChecksum: evidence.documents[0]?.checksum ?? null,
+        }));
         const created = await transaction.businessIntentProposal.create({
           data: {
             organizationId: principal.organizationId,
@@ -142,11 +272,30 @@ export async function POST(request: Request) {
             version: 1,
             inputDigest,
             proposal: analysis.proposal as unknown as Prisma.InputJsonValue,
-            evidenceReferences: evidenceReferences as unknown as Prisma.InputJsonValue,
+            evidenceReferences: { claims: submittedClaims, trustedSources: trustedEvidenceReferences } as unknown as Prisma.InputJsonValue,
             provider: analysis.provider,
             providerModel: analysis.model,
           },
         });
+
+        for (const evidence of trustedEvidence) {
+          const source = trustedEvidenceById.get(evidence.id);
+          const document = source?.documents[0];
+          if (!document) throw new Error("INTENT_EVIDENCE_NOT_TRUSTED");
+          const claim = parsed.data.knownFacts.find((fact) => fact.evidenceId === evidence.id);
+          if (!claim) throw new Error("INTENT_EVIDENCE_NOT_TRUSTED");
+          await transaction.businessIntentEvidenceReference.create({
+            data: {
+              proposalId: created.id,
+              workspaceId: principal.workspaceId,
+              evidenceId: evidence.id,
+              documentId: document.id,
+              clientId: parsed.data.clientId ?? document.clientId,
+              claimStatement: claim.statement,
+              verificationState: "SOURCE_VERIFIED_RECORD",
+            },
+          });
+        }
 
         await transaction.billingUsageEvent.create({
           data: {
@@ -214,6 +363,9 @@ function entitlementOrClientError(error: unknown): NextResponse | null {
   }
   if (error instanceof Error && error.message === "INTENT_CLIENT_NOT_FOUND") {
     return NextResponse.json({ error: "Client not found in the active workspace." }, { status: 404 });
+  }
+  if (error instanceof Error && error.message === "INTENT_EVIDENCE_NOT_TRUSTED") {
+    return NextResponse.json({ error: "One or more evidence references are unknown, unverified, revoked, or outside the active workspace/client. Submit claims as unverified or attach eligible evidence first." }, { status: 422 });
   }
   return null;
 }
