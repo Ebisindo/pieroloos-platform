@@ -1922,6 +1922,14 @@ enum CorporateGraphRelationType {
   RELATED_TO
 }
 
+enum CorporateRuleSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 enum CorporateGraphAuditAction {
   NODE_CREATED
   NODE_UPDATED
