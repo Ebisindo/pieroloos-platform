@@ -202,6 +202,33 @@ describe("reviewed compliance rule obligation generation", () => {
     expect(deadlineSnapshotCreateMock).not.toHaveBeenCalled();
   });
 
+  it("converges concurrent identical generation requests on one obligation", async () => {
+    const generated = { id: "obligation-raced", workspaceId: principal.workspaceId, clientId: "client-1" };
+    obligationFindFirstMock.mockResolvedValue(null);
+    obligationCreateMock
+      .mockReset()
+      .mockResolvedValueOnce(generated)
+      .mockRejectedValueOnce({ code: "P2002" });
+    globalObligationFindFirstMock.mockReset().mockResolvedValue(generated);
+
+    const responses = await Promise.all([
+      POST(request(payload()), routeContext),
+      POST(request(payload()), routeContext),
+    ]);
+    const statusCodes = responses.map((response) => response.status).sort();
+
+    expect(statusCodes).toEqual([200, 201]);
+    expect(obligationCreateMock).toHaveBeenCalledTimes(2);
+    expect(deadlineSnapshotCreateMock).toHaveBeenCalledTimes(1);
+    expect(complianceActivityCreateMock).toHaveBeenCalledTimes(1);
+    expect(ruleActivityCreateMock).toHaveBeenCalledTimes(1);
+    const bodies = await Promise.all(responses.map((response) => response.json()));
+    expect(bodies).toEqual(expect.arrayContaining([
+      expect.objectContaining({ data: expect.objectContaining({ id: "obligation-raced" }), alreadyExists: true }),
+      expect.objectContaining({ data: expect.objectContaining({ id: "obligation-raced" }), alreadyExists: false }),
+    ]));
+  });
+
   it("rechecks a unique-key race and returns the scoped existing obligation", async () => {
     obligationCreateMock.mockRejectedValueOnce({ code: "P2002" });
     globalObligationFindFirstMock.mockResolvedValueOnce({ id: "obligation-raced", workspaceId: principal.workspaceId, clientId: "client-1" });
