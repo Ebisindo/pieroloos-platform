@@ -1864,6 +1864,8 @@ model ComplianceRuleActivity {
   @@index([organizationId, workspaceId, occurredAt])
   @@index([ruleId, occurredAt])
   @@index([ruleVersionId, occurredAt])
+}
+
 model BusinessIntentEvidenceReference {
   id                String   @id @default(cuid())
   proposalId        String
