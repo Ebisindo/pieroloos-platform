@@ -145,6 +145,8 @@ describe("business-intent trusted evidence binding", () => {
     for (const bad of [
       evidence("evidence-1", { reviewStatus: "REVOKED" }),
       evidence("evidence-1", { source: null }),
+      evidence("evidence-1", { source: "http://registry.example.gov/source" }),
+      evidence("evidence-1", { source: "https://user:password@registry.example.gov/source" }),
       evidence("evidence-1", { retrievedAt: null }),
       evidence("evidence-1", { documents: [] }),
     ]) {
