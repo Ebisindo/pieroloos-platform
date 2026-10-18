@@ -29,3 +29,10 @@ The AI proposal request now accepts an `evidenceId` reference rather than caller
 
 ## Current boundary
 This branch is a draft checkpoint. Text-level schema structure has been checked, but Prisma validation, database migration rehearsal, full test suites, independent review, merge, production database changes and deployment are not yet complete or authorized.
+
+
+## Evidence-boundary limitations requiring resolution before merge
+- `Evidence` is currently a legacy global model with no `workspaceId`; trusted use relies on a separately linked document satisfying tenant/client filters. Review whether one evidence record can be linked to documents in multiple workspaces and enforce the required tenant isolation with a schema constraint or a workspace-scoped evidence source model.
+- Establish a definitive null-client policy. When no client is selected, the application must still prove workspace ownership and may not rely on an arbitrary first matching document.
+- Verify source/document immutability, revocation races, and a durable tenant-aware evidence binding constraint. Evidence review status must be rechecked transactionally at binding, and document/evidence relationships must not cross workspace or client boundaries.
+- CI must verify the new Prisma relations/migration and negative tests on this exact branch head. Structural text inspection is not Prisma validation.
