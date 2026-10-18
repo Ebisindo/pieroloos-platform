@@ -44,7 +44,7 @@ ALTER TABLE "BusinessIntentEvidenceReference"
   ADD CONSTRAINT "BusinessIntentEvidenceReference_workspaceId_fkey"
   FOREIGN KEY ("workspaceId")
   REFERENCES "Workspace"("id")
-  ON DELETE RESTRICT ON UPDATE CASCADE;
+  ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "BusinessIntentEvidenceReference"
   ADD CONSTRAINT "BusinessIntentEvidenceReference_clientId_workspaceId_fkey"
@@ -124,9 +124,9 @@ BEGIN
   THEN
     IF EXISTS (
       SELECT 1
-        FROM "BusinessIntentEvidenceReference" reference
-       WHERE reference."documentId" = OLD."id"
-         AND reference."workspaceId" = OLD."workspaceId"
+        FROM "BusinessIntentEvidenceReference" binding
+       WHERE binding."documentId" = OLD."id"
+         AND binding."workspaceId" = OLD."workspaceId"
     ) THEN
       RAISE EXCEPTION 'Document identity is bound to a business-intent evidence reference; create a replacement document'
         USING ERRCODE = '23514';
