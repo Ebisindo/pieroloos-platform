@@ -210,6 +210,9 @@ describe("reviewed compliance rule obligation generation", () => {
       .mockResolvedValueOnce(generated)
       .mockRejectedValueOnce({ code: "P2002" });
     globalObligationFindFirstMock.mockReset().mockResolvedValue(generated);
+    // Both requests must first observe no existing obligation; the loser of the
+    // unique-key race sees the winner only during authorized recovery.
+    obligationFindFirstMock.mockReset().mockResolvedValue(null);
 
     const responses = await Promise.all([
       POST(request(payload()), routeContext),
@@ -232,6 +235,7 @@ describe("reviewed compliance rule obligation generation", () => {
   it("rechecks a unique-key race and returns the scoped existing obligation", async () => {
     obligationCreateMock.mockRejectedValueOnce({ code: "P2002" });
     globalObligationFindFirstMock.mockResolvedValueOnce({ id: "obligation-raced", workspaceId: principal.workspaceId, clientId: "client-1" });
+    obligationFindFirstMock.mockReset().mockResolvedValue(null);
     const response = await POST(request(payload()), routeContext);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { id: "obligation-raced" }, alreadyExists: true });
