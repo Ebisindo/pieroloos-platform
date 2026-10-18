@@ -385,6 +385,31 @@ describe("professional partner grant lifecycle and privilege boundaries", () => 
     expect(grantAuditCreateMock).not.toHaveBeenCalled();
   });
 
+  it("rejects cross-origin mutations across every partner identity and grant lifecycle endpoint before database work", async () => {
+    hasInvalidRequestOriginMock.mockReturnValue(true);
+
+    const crossOrigin = "https://attacker.example";
+    const results = await Promise.all([
+      createIdentity(routeRequest({}, "/api/professional-partners", "POST", crossOrigin)),
+      reviewIdentity(routeRequest({}, "/api/professional-partners/identity-1/review", "POST", crossOrigin), identityContext),
+      suspendIdentity(routeRequest({}, "/api/professional-partners/identity-1/suspend", "POST", crossOrigin), identityContext),
+      createGrant(routeRequest({}, "/api/professional-partner-grants", "POST", crossOrigin)),
+      reviewGrant(routeRequest({}, "/api/professional-partner-grants/grant-1/review", "POST", crossOrigin), grantContext),
+      amendGrant(routeRequest({}, "/api/professional-partner-grants/grant-1", "PATCH", crossOrigin), grantContext),
+      revokeGrant(routeRequest({}, "/api/professional-partner-grants/grant-1/revoke", "POST", crossOrigin), grantContext),
+    ]);
+
+    expect(results.map((response) => response.status)).toEqual([403, 403, 403, 403, 403, 403, 403]);
+    expect(getWorkspaceContextMock).not.toHaveBeenCalled();
+    expect(authorizedTransactionMock).not.toHaveBeenCalled();
+    expect(identityCreateMock).not.toHaveBeenCalled();
+    expect(identityUpdateManyMock).not.toHaveBeenCalled();
+    expect(grantCreateMock).not.toHaveBeenCalled();
+    expect(grantUpdateManyMock).not.toHaveBeenCalled();
+    expect(identityAuditCreateMock).not.toHaveBeenCalled();
+    expect(grantAuditCreateMock).not.toHaveBeenCalled();
+  });
+
   it("suspends verified partner identity with a recorded reason", async () => {
     identityFindFirstMock.mockResolvedValueOnce({
       ...identity, status: "VERIFIED", updatedAt: new Date("2026-10-10T10:00:00.000Z"),
