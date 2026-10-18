@@ -503,6 +503,7 @@ model Client {
   documents             Document[]
   reports               Report[]
   businessIntentProposals BusinessIntentProposal[]
+  businessIntentEvidenceReferences BusinessIntentEvidenceReference[]
   crossBorderDossiers   CrossBorderDossier[]
   portalAccessGrants    ClientPortalGrant[]
   portalEvents          ClientPortalAuditEvent[]
@@ -1897,6 +1898,7 @@ model BusinessIntentEvidenceReference {
   proposal BusinessIntentProposal @relation(fields: [proposalId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
   document Document @relation(fields: [documentId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
 
   @@unique([proposalId, evidenceId])
