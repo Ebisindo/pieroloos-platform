@@ -104,6 +104,53 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
     }
   });
 
+  it("enforces idempotent obligation-generation keys under concurrent PostgreSQL writes", async () => {
+    const suffix = crypto.randomUUID();
+    const organization = await createOrganization(`obligation-generation-${suffix}`);
+    const workspace = await createWorkspace(organization.id, `obligation-generation-${suffix}`);
+    const client = await prisma.client.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        name: "Concurrent generation client",
+      },
+    });
+    const generationKey = suffix.replaceAll("-", "");
+    const attempts = await Promise.allSettled([
+      prisma.complianceObligation.create({
+        data: {
+          organizationId: organization.id,
+          workspaceId: workspace.id,
+          clientId: client.id,
+          generationKey,
+          title: "Generated obligation A",
+          type: "ANNUAL_FILING",
+        },
+      }),
+      prisma.complianceObligation.create({
+        data: {
+          organizationId: organization.id,
+          workspaceId: workspace.id,
+          clientId: client.id,
+          generationKey,
+          title: "Generated obligation B",
+          type: "ANNUAL_FILING",
+        },
+      }),
+    ]);
+
+    expect(attempts.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = attempts.find((result) => result.status === "rejected");
+    expect(rejected).toBeDefined();
+    if (rejected?.status === "rejected") {
+      expect(rejected.reason).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+      expect(rejected.reason.code).toBe("P2002");
+    }
+    await expect(prisma.complianceObligation.count({
+      where: { workspaceId: workspace.id, generationKey },
+    })).resolves.toBe(1);
+  });
+
   it("cascades organization deletion to its workspace-owned clients", async () => {
     const organization = await createOrganization(`cascade-${crypto.randomUUID()}`);
     const workspace = await prisma.workspace.create({
