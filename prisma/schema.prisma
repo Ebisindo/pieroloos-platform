@@ -326,9 +326,9 @@ model Organization {
   clientPortalGrants   ClientPortalGrant[]
   clientPortalEvents   ClientPortalAuditEvent[]
   clientPortalInteractions ClientPortalInteraction[]
-}
   corporateGraphNodes CorporateGraphNode[]
   corporateGraphAuditEvents CorporateGraphAuditEvent[]
+}
 
 model User {
   id        String   @id @default(cuid())
@@ -359,8 +359,8 @@ model User {
   complianceDeadlineSnapshots         ComplianceDeadlineSnapshot[]      @relation("ComplianceDeadlineSnapshotActor")
   complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
   complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
-}
   corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
+}
 
 model PlatformAdministrator {
   id        String   @id @default(cuid())
@@ -472,6 +472,8 @@ model Workspace {
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
   @@index([organizationId])
+  corporateGraphNodes CorporateGraphNode[]
+  corporateGraphAuditEvents CorporateGraphAuditEvent[]
 }
 
 model Client {
@@ -507,6 +509,7 @@ model Client {
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
+  corporateGraphNodes CorporateGraphNode[]
 }
 
 model BusinessProfile {
@@ -1909,8 +1912,6 @@ enum CorporateRuleSeverity {
   CRITICAL
 }
 
-// Physical enum retained only to preserve the legacy corporate-compliance table during migration.
-
 enum LegacyCorporateRuleReviewStatus {
   UNREVIEWED
   IN_REVIEW
@@ -1999,10 +2000,6 @@ model CorporateGraphAuditEvent {
   @@index([organizationId, workspaceId, occurredAt])
   @@index([subjectType, subjectId, occurredAt])
 }
-
-/// Historical-only storage retained so migration replay preserves legacy rows.
-/// Do not use this model in API routes or compliance decisions. The canonical operational
-/// registry is ComplianceRule + ComplianceRuleVersion.
 
 model LegacyCorporateComplianceRule {
   id                         String                       @id @default(cuid())
