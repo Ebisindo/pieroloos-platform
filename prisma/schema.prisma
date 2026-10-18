@@ -326,6 +326,8 @@ model Organization {
   clientPortalGrants   ClientPortalGrant[]
   clientPortalEvents   ClientPortalAuditEvent[]
   clientPortalInteractions ClientPortalInteraction[]
+  corporateGraphNodes CorporateGraphNode[]
+  corporateGraphAuditEvents CorporateGraphAuditEvent[]
 }
   corporateGraphNodes CorporateGraphNode[]
   corporateGraphAuditEvents CorporateGraphAuditEvent[]
@@ -359,6 +361,7 @@ model User {
   complianceDeadlineSnapshots         ComplianceDeadlineSnapshot[]      @relation("ComplianceDeadlineSnapshotActor")
   complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
   complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
+  corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
 }
   corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
 
