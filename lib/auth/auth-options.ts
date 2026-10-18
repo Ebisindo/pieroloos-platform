@@ -160,11 +160,27 @@ export const authOptions: AuthOptions = {
             select: { id: true },
             take: 1,
           },
+          professionalPartnerIdentities: {
+            where: {
+              status: "VERIFIED",
+              grants: {
+                some: {
+                  status: "ACTIVE",
+                  revokedAt: null,
+                  OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                },
+              },
+            },
+            select: { id: true },
+            take: 1,
+          },
         },
       });
 
-      if (existingUser?.memberships.length) return true;
-      if (!existingUser?.clientPortalGrants.length) return false;
+      if (existingUser?.memberships?.length) return true;
+      const hasPortalGrant = Boolean(existingUser?.clientPortalGrants?.length);
+      const hasPartnerGrant = Boolean(existingUser?.professionalPartnerIdentities?.length);
+      if (!hasPortalGrant && !hasPartnerGrant) return false;
       const emailVerified = "emailVerified" in user && user.emailVerified instanceof Date
         ? user.emailVerified
         : null;
