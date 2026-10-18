@@ -2,7 +2,7 @@ import { BusinessIntentProposalWorkspace, type ProposalRecord } from "@/componen
 import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { ModuleBanner } from "@/components/ui/ModuleBanner";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
-import { prisma } from "@/lib/db/prisma";
+import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import type { BusinessIntentProposal } from "@/lib/domain/business-intent-proposal";
 
 type EvidenceReference = { id: string; statement: string; sourceUrl: string | null; evidenceClass: string; retrievedAt: string | null };
@@ -18,33 +18,56 @@ export default async function BusinessIntentPage() {
   if (!context.principal.permissions.includes("formation:read")) return <WorkspaceAccessState title="Workspace access required" description="Your role cannot read business-intent proposals in this workspace." />;
 
   const principal = context.principal;
-  const records = await prisma.businessIntentProposal.findMany({
-    where: { organizationId: principal.organizationId, workspaceId: principal.workspaceId },
-    select: {
-      id: true, clientId: true, createdByUserId: true, reviewedByUserId: true, status: true, version: true,
-      proposal: true, evidenceReferences: true, provider: true, providerModel: true, reviewNote: true,
-      reviewedAt: true, createdAt: true, updatedAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
+  let records;
+  try {
+    records = await withAuthorizedWorkspaceTransaction(
+      principal,
+      "formation:read",
+      (transaction) => transaction.businessIntentProposal.findMany({
+        where: { organizationId: principal.organizationId, workspaceId: principal.workspaceId },
+        select: {
+          id: true, clientId: true, createdByUserId: true, reviewedByUserId: true, status: true, version: true,
+          proposal: true, evidenceReferences: true, provider: true, providerModel: true, reviewNote: true,
+          reviewedAt: true, createdAt: true, updatedAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
+      return <WorkspaceAccessState title="Workspace changed" description="Your workspace access changed. Refresh this page and select the active workspace again." />;
+    }
+    throw error;
+  }
 
   let linkedClients: ClientRecord[] = [];
   let clientOptions: ClientRecord[] = [];
   if (principal.permissions.includes("client:read")) {
     const linkedIds = [...new Set(records.flatMap((record) => record.clientId ? [record.clientId] : []))];
-    [linkedClients, clientOptions] = await Promise.all([
-      linkedIds.length ? prisma.client.findMany({
-        where: { id: { in: linkedIds }, workspaceId: principal.workspaceId },
-        select: { id: true, organizationName: true, name: true, firstName: true, lastName: true },
-      }) : Promise.resolve([]),
-      prisma.client.findMany({
-        where: { workspaceId: principal.workspaceId },
-        select: { id: true, organizationName: true, name: true, firstName: true, lastName: true },
-        orderBy: { updatedAt: "desc" },
-        take: 100,
-      }),
-    ]);
+    try {
+      [linkedClients, clientOptions] = await withAuthorizedWorkspaceTransaction(
+        principal,
+        "client:read",
+        async (transaction) => Promise.all([
+          linkedIds.length ? transaction.client.findMany({
+            where: { id: { in: linkedIds }, workspaceId: principal.workspaceId },
+            select: { id: true, organizationName: true, name: true, firstName: true, lastName: true },
+          }) : Promise.resolve([]),
+          transaction.client.findMany({
+            where: { workspaceId: principal.workspaceId },
+            select: { id: true, organizationName: true, name: true, firstName: true, lastName: true },
+            orderBy: { updatedAt: "desc" },
+            take: 100,
+          }),
+        ]),
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
+        return <WorkspaceAccessState title="Workspace access changed" description="Your client access changed. Refresh this page before viewing proposal-linked client details." />;
+      }
+      throw error;
+    }
   }
   const labelByClientId = new Map(linkedClients.map((client) => [client.id, clientLabel(client)]));
   const proposals: ProposalRecord[] = records.map((record) => ({
