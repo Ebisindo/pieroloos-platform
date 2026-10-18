@@ -164,6 +164,7 @@ enum EvidenceReviewStatus {
   PENDING
   VERIFIED
   CHANGES_REQUESTED
+  REVOKED
 }
 
 enum DocumentStorageStatus {
@@ -1850,5 +1851,4 @@ model ComplianceRuleActivity {
   @@index([organizationId, workspaceId, occurredAt])
   @@index([ruleId, occurredAt])
   @@index([ruleVersionId, occurredAt])
-}
 }
