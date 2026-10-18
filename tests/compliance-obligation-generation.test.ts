@@ -210,9 +210,11 @@ describe("reviewed compliance rule obligation generation", () => {
       .mockResolvedValueOnce(generated)
       .mockRejectedValueOnce({ code: "P2002" });
     globalObligationFindFirstMock.mockReset().mockResolvedValue(generated);
-    // Both requests must first observe no existing obligation; the loser of the
-    // unique-key race sees the winner only during authorized recovery.
-    obligationFindFirstMock.mockReset().mockResolvedValue(null);
+    // Each transaction performs its initial scoped read before creation. Only the
+    // losing request reaches the global recovery lookup after P2002 is raised.
+    obligationFindFirstMock.mockReset()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
 
     const responses = await Promise.all([
       POST(request(payload()), routeContext),
