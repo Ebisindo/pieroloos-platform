@@ -51,3 +51,73 @@ ALTER TABLE "BusinessIntentEvidenceReference"
   FOREIGN KEY ("clientId", "workspaceId")
   REFERENCES "Client"("id", "workspaceId")
   ON DELETE RESTRICT ON UPDATE CASCADE;
+
+
+-- Enforce that the referenced document is the source document for this evidence,
+-- and that the client/workspace scope on the binding exactly matches the document.
+-- Composite FKs above protect workspace/client existence; this trigger protects
+-- the cross-column relationship which ordinary FKs cannot express independently.
+CREATE OR REPLACE FUNCTION enforce_business_intent_evidence_reference_scope()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  document_client_id TEXT;
+  document_evidence_id TEXT;
+BEGIN
+  SELECT "clientId", "evidenceId"
+    INTO document_client_id, document_evidence_id
+    FROM "Document"
+   WHERE "id" = NEW."documentId"
+     AND "workspaceId" = NEW."workspaceId"
+   FOR KEY SHARE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Business-intent evidence document must exist in the same workspace'
+      USING ERRCODE = '23503';
+  END IF;
+
+  IF document_client_id IS DISTINCT FROM NEW."clientId" THEN
+    RAISE EXCEPTION 'Business-intent evidence client must match the source document client'
+      USING ERRCODE = '23514';
+  END IF;
+
+  IF document_evidence_id IS DISTINCT FROM NEW."evidenceId" THEN
+    RAISE EXCEPTION 'Business-intent evidence ID must match the source document evidence ID'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "BusinessIntentEvidenceReference_scope_guard"
+BEFORE INSERT OR UPDATE OF "documentId", "workspaceId", "clientId", "evidenceId"
+ON "BusinessIntentEvidenceReference"
+FOR EACH ROW EXECUTE FUNCTION enforce_business_intent_evidence_reference_scope();
+
+-- Preserve the identity binding once used by a saved proposal. Lifecycle/status
+-- changes to a document remain possible, but changing its tenant/client/evidence
+-- identity cannot silently rewrite the meaning of an existing proposal reference.
+CREATE OR REPLACE FUNCTION prevent_rebinding_referenced_business_intent_document()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD."workspaceId" IS DISTINCT FROM NEW."workspaceId"
+    OR OLD."clientId" IS DISTINCT FROM NEW."clientId"
+    OR OLD."evidenceId" IS DISTINCT FROM NEW."evidenceId"
+  THEN
+    IF EXISTS (
+      SELECT 1
+        FROM "BusinessIntentEvidenceReference" reference
+       WHERE reference."documentId" = OLD."id"
+         AND reference."workspaceId" = OLD."workspaceId"
+    ) THEN
+      RAISE EXCEPTION 'Document identity is bound to a business-intent evidence reference; create a replacement document'
+        USING ERRCODE = '23514';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "Document_business_intent_evidence_identity_guard"
+BEFORE UPDATE OF "workspaceId", "clientId", "evidenceId" ON "Document"
+FOR EACH ROW EXECUTE FUNCTION prevent_rebinding_referenced_business_intent_document();
