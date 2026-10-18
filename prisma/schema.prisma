@@ -991,6 +991,7 @@ model ComplianceObligation {
   formationPlanId             String?
   jurisdictionId              String?
   sourceRuleId                String?
+  generationKey               String?
   title                       String
   description                 String?
   type                        String
@@ -1021,6 +1022,7 @@ model ComplianceObligation {
   documents     Document[]
 
   @@unique([id, workspaceId])
+  @@unique([workspaceId, generationKey], map: "ComplianceObligation_workspace_generationKey_key")
   @@index([organizationId, workspaceId, status])
   @@index([workspaceId, dueAt])
   @@index([clientId])
@@ -1177,6 +1179,8 @@ model ComplianceEvidence {
   evidenceClass    String
   note             String?
   sourceReference  String?
+  factKey          String?
+  factValue        String?
   validThrough     DateTime?
   reviewStatus     EvidenceReviewStatus @default(PENDING)
   reviewNote       String?
@@ -1931,6 +1935,17 @@ enum CorporateRuleSeverity {
   CRITICAL
 }
 
+// Physical enum retained only to preserve the legacy corporate-compliance table during migration.
+enum LegacyCorporateRuleReviewStatus {
+  UNREVIEWED
+  IN_REVIEW
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+
+  @@map("CorporateRuleReviewStatus")
+}
+
 enum CorporateGraphAuditAction {
   NODE_CREATED
   NODE_UPDATED
@@ -2008,4 +2023,38 @@ model CorporateGraphAuditEvent {
 
   @@index([organizationId, workspaceId, occurredAt])
   @@index([subjectType, subjectId, occurredAt])
+}
+
+/// Historical-only storage retained so migration replay preserves legacy rows.
+/// Do not use this model in API routes or compliance decisions. The canonical operational
+/// registry is ComplianceRule + ComplianceRuleVersion.
+model LegacyCorporateComplianceRule {
+  id                         String                       @id @default(cuid())
+  jurisdictionCode           String
+  entityType                 String
+  ruleKey                    String
+  title                      String
+  description                String?
+  frequency                  String?
+  severity                   CorporateRuleSeverity        @default(MEDIUM)
+  sourceTitle                String?
+  sourceUrl                  String?
+  sourceAuthority            String?
+  sourceRetrievedAt          DateTime?
+  effectiveFrom              DateTime?
+  effectiveTo                DateTime?
+  evidenceClass              EvidenceClass                @default(E0)
+  reviewStatus               LegacyCorporateRuleReviewStatus @default(UNREVIEWED)
+  reviewedByUserId           String?
+  reviewedAt                 DateTime?
+  version                    Int                          @default(1)
+  requiresProfessionalReview Boolean                      @default(true)
+  active                     Boolean                      @default(false)
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+
+  @@unique([jurisdictionCode, entityType, ruleKey, version], map: "CorporateComplianceRule_jurisdictionCode_entityType_ruleKey_key")
+  @@index([jurisdictionCode, entityType, active, reviewStatus], map: "CorporateComplianceRule_jurisdictionCode_entityType_active__idx")
+  @@index([sourceRetrievedAt], map: "CorporateComplianceRule_sourceRetrievedAt_idx")
+  @@map("CorporateComplianceRule")
 }
