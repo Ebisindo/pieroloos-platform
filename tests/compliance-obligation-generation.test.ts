@@ -236,6 +236,9 @@ describe("reviewed compliance rule obligation generation", () => {
     obligationCreateMock.mockRejectedValueOnce({ code: "P2002" });
     globalObligationFindFirstMock.mockResolvedValueOnce({ id: "obligation-raced", workspaceId: principal.workspaceId, clientId: "client-1" });
     obligationFindFirstMock.mockReset().mockResolvedValue(null);
+    globalObligationFindFirstMock.mockReset().mockResolvedValue({
+      id: "obligation-raced", workspaceId: principal.workspaceId, clientId: "client-1",
+    });
     const response = await POST(request(payload()), routeContext);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { id: "obligation-raced" }, alreadyExists: true });
