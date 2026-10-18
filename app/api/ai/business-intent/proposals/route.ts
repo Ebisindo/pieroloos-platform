@@ -22,6 +22,16 @@ type TrustedEvidenceRecord = {
   documents: Array<{ id: string; clientId: string | null; workspaceId: string; checksum: string }>;
 };
 
+function isSafeHttpsSource(value: string | null): value is string {
+  if (!value?.trim()) return false;
+  try {
+    const source = new URL(value);
+    return source.protocol === "https:" && !source.username && !source.password;
+  } catch {
+    return false;
+  }
+}
+
 function evidenceSnapshotFingerprint(records: readonly TrustedEvidenceRecord[]): string {
   const normalized = [...records]
     .map((evidence) => ({
@@ -189,7 +199,7 @@ export async function POST(request: Request) {
       });
       if (selected.length !== submittedEvidenceIds.length || selected.some((evidence) =>
         !evidence.retrievedAt ||
-        !evidence.source?.trim() ||
+        !isSafeHttpsSource(evidence.source) ||
         !evidence.documents.length ||
         evidence.documents.some((document) =>
           document.workspaceId !== principal.workspaceId ||
@@ -294,7 +304,7 @@ export async function POST(request: Request) {
         if (currentTrustedEvidence.length !== submittedEvidenceIds.length ||
             currentTrustedEvidence.some((evidence) =>
               !evidence.retrievedAt ||
-              !evidence.source?.trim() ||
+              !isSafeHttpsSource(evidence.source) ||
               !evidence.documents.length ||
               evidence.documents.some((document) =>
                 document.workspaceId !== principal.workspaceId ||
