@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     statement: fact.statement,
     sourceUrl: fact.sourceUrl ?? null,
     evidenceClass: fact.evidenceClass,
-    retrievedAt: fact.retrievedAt ?? null,
+    retrievedAt: null,
   }));
 
   try {
