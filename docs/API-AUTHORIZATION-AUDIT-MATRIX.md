@@ -135,3 +135,25 @@ For every GET, POST, PATCH, PUT, DELETE, HEAD or OPTIONS handler, record:
 - PR #40 evidence-binding branch: latest-head run [#39173090235](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39173090235) passed quality and e2e; branch still diverges from current `main`, so reconcile and rerun integrated CI.
 - No independent review submissions are currently recorded for PRs #21, #35, #37, #38, #39 or #40. Reviewer requests to the available placeholder accounts were rejected by GitHub because they are not eligible collaborators.
 - No merge, production migration or deployment is authorized by this matrix. Keep Issues #24/#25 and release gate #32 open pending code changes, integrated CI, named independent security/database reviews and verified backup/restore evidence.
+
+
+## Additional findings from source-level spot checks (2026-10-19)
+
+These are **confirmed implementation observations**, not a claim that the full 78-route audit has passed.
+
+### Confirmed blockers / remediation items
+- `lib/http/rate-limit.ts` uses an `InMemoryRateLimitStore` by default and explicitly notes that it is correct for a single instance only. Production multi-instance protection requires a shared store (for example Redis) or edge/WAF enforcement. A passing in-process test is not production-wide rate-limit evidence.
+- `app/api/clients/[clientId]/portal-access/route.ts` POST and `app/api/clients/[clientId]/portal-visibility/route.ts` PATCH call `request.json()` directly without an explicit body-byte limit or route-level mutation rate limit. Their service calls do perform workspace-transaction permission checks, but body/resource denial and rate-limit regression cases are needed.
+- `app/api/clients/[clientId]/portal-interactions/route.ts` POST and `app/api/clients/[clientId]/portal-interactions/[interactionId]/route.ts` PATCH similarly parse JSON directly and lack explicit route-level mutation rate limits. They do call origin validation and the service layer rechecks workspace/client scope inside authorized transactions. Add bounded-body and repeated-mutation tests; do not treat the service-scope check as proof of request-size/rate protection.
+- `lib/services/client-portal-service.ts` currently recreates or reactivates a matching client portal grant by setting `revokedAt: null`, `expiresAt: null`, and all three capability flags true. This may be intended re-grant behavior, but it gives an indefinite, all-capability grant and makes a repeated grant operation revive a revoked/expired grant. Product/security policy must explicitly decide whether this is permitted; otherwise require an explicit capability set, expiry and reason, and test reactivation boundaries. Do not invent a retention/expiry duration without owner approval. Client-portal grants remain distinct from professional-partner grants.
+- `app/api/admin/administrators/route.ts` has a stronger pattern in this sample: platform actor check, super-admin gate on mutation, origin check, rate limit, bounded body and audit of denied elevation attempts. Full service-level atomicity and privilege-escalation regression coverage still require independent review.
+- `app/api/portal/clients/[clientId]/documents/route.ts` applies portal context, capability/rate checks, upload parser validation and service-layer grant/document checks; download route also rate-limits and asks the service to authorize the exact document. Complete tests still need cross-client ID, expiry/revocation races and short-lived URL assertions.
+- `app/api/compliance/evidence/route.ts` is deliberately disabled by PR #44 until a real authenticated and workspace-scoped repository contract exists. Its prior hard-coded example response must not return.
+- `app/api/reports/[id]/evidence/route.ts` remains a 501 placeholder, not a completed feature.
+
+### Additional test requirements
+- Test JSON bodies over the defined byte limit and mutation throttling for staff-side portal grant, visibility and interaction routes.
+- Test that revocation/expiry wins a race against in-flight portal operations; test whether explicit re-grant may restore capabilities and expiry, with owner-approved semantics.
+- Test shared-store/rate-limit behavior across instances or demonstrate enforced edge/WAF limits in the production deployment design.
+- Test platform-admin privilege changes and partner-grant changes under concurrency with audit results committed atomically.
+- Keep this matrix incomplete until every route/method has an inspected source, recorded authorization predicate, negative tests, current-head CI evidence and reviewer sign-off.
