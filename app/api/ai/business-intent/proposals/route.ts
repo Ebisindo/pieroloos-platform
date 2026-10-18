@@ -129,14 +129,69 @@ export async function POST(request: Request) {
         }
 
         const trustedEvidence = submittedEvidenceIds.length === 0 ? [] : await transaction.evidence.findMany({
-          where: { id: { in: submittedEvidenceIds }, reviewStatus: "VERIFIED", evidenceClass: { in: ["E3", "E4", "E3_PRIMARY", "E4_CROSS_VERIFIED"] }, documents: { some: { workspaceId: principal.workspaceId, ...(parsed.data.clientId ? { clientId: parsed.data.clientId } : {}), status: "AVAILABLE", scanStatus: "CLEAN", reviewStatus: "VERIFIED", deletedAt: null } } },
-          select: { id: true, title: true, source: true, sourceType: true, publicationDate: true, retrievedAt: true, evidenceClass: true, reviewStatus: true, jurisdictionId: true, documents: { where: { workspaceId: principal.workspaceId, ...(parsed.data.clientId ? { clientId: parsed.data.clientId } : {}), status: "AVAILABLE", scanStatus: "CLEAN", reviewStatus: "VERIFIED", deletedAt: null }, select: { id: true, clientId: true, workspaceId: true, checksum: true }, take: 1 } },
+          where: {
+            id: { in: submittedEvidenceIds },
+            reviewStatus: "VERIFIED",
+            evidenceClass: { in: ["E3", "E4", "E3_PRIMARY", "E4_CROSS_VERIFIED"] },
+            documents: {
+              some: {
+                workspaceId: principal.workspaceId,
+                ...(parsed.data.clientId ? { clientId: parsed.data.clientId } : {}),
+                status: "AVAILABLE",
+                scanStatus: "CLEAN",
+                reviewStatus: "VERIFIED",
+                deletedAt: null,
+              },
+            },
+          },
+          select: {
+            id: true,
+            title: true,
+            source: true,
+            sourceType: true,
+            publicationDate: true,
+            retrievedAt: true,
+            evidenceClass: true,
+            reviewStatus: true,
+            jurisdictionId: true,
+            documents: {
+              where: {
+                workspaceId: principal.workspaceId,
+                ...(parsed.data.clientId ? { clientId: parsed.data.clientId } : {}),
+                status: "AVAILABLE",
+                scanStatus: "CLEAN",
+                reviewStatus: "VERIFIED",
+                deletedAt: null,
+              },
+              select: { id: true, clientId: true, workspaceId: true, checksum: true },
+              take: 1,
+            },
+          },
         });
-        if (trustedEvidence.length !== submittedEvidenceIds.length || trustedEvidence.some((evidence) => !evidence.retrievedAt || !evidence.source?.trim() || !evidence.documents.length)) {
+        if (trustedEvidence.length !== submittedEvidenceIds.length || trustedEvidence.some((evidence) =>
+          !evidence.retrievedAt || !evidence.source?.trim() || !evidence.documents.length
+        )) {
           throw new Error("INTENT_EVIDENCE_NOT_TRUSTED");
         }
-        const trustedEvidenceReferences = trustedEvidence.map((evidence) => ({ id: evidence.id, title: evidence.title, source: evidence.source, sourceType: evidence.sourceType, publicationDate: evidence.publicationDate?.toISOString() ?? null, retrievedAt: evidence.retrievedAt?.toISOString() ?? null, evidenceClass: evidence.evidenceClass, reviewStatus: evidence.reviewStatus, jurisdictionId: evidence.jurisdictionId, documentId: evidence.documents[0]?.id ?? null, documentChecksum: evidence.documents[0]?.checksum ?? null }));
-        const submittedClaims = parsed.data.knownFacts.map((fact) => ({ statement: fact.statement, evidenceId: fact.evidenceId ?? null, verificationState: fact.evidenceId ? (trustedEvidenceReferences.some((evidence) => evidence.id === fact.evidenceId) ? "SOURCE_VERIFIED_RECORD" : "UNVERIFIED") : "UNVERIFIED" }));
+        const trustedEvidenceById = new Map(trustedEvidence.map((evidence) => [evidence.id, evidence]));
+        const submittedClaims = parsed.data.knownFacts.map((fact) => {
+          const source = fact.evidenceId ? trustedEvidenceById.get(fact.evidenceId) : undefined;
+          if (fact.evidenceId && !source) throw new Error("INTENT_EVIDENCE_NOT_TRUSTED");
+          return { statement: fact.statement, evidenceId: fact.evidenceId ?? null, verificationState: source ? "SOURCE_VERIFIED_RECORD" : "UNVERIFIED" };
+        });
+        const trustedEvidenceReferences = trustedEvidence.map((evidence) => ({
+          id: evidence.id,
+          title: evidence.title,
+          source: evidence.source,
+          sourceType: evidence.sourceType,
+          publicationDate: evidence.publicationDate?.toISOString() ?? null,
+          retrievedAt: evidence.retrievedAt?.toISOString() ?? null,
+          evidenceClass: evidence.evidenceClass,
+          reviewStatus: evidence.reviewStatus,
+          jurisdictionId: evidence.jurisdictionId,
+          documentId: evidence.documents[0]?.id ?? null,
+          documentChecksum: evidence.documents[0]?.checksum ?? null,
+        }));
         const created = await transaction.businessIntentProposal.create({
           data: {
             organizationId: principal.organizationId,
@@ -152,6 +207,25 @@ export async function POST(request: Request) {
             providerModel: analysis.model,
           },
         });
+
+        for (const evidence of trustedEvidence) {
+          const source = trustedEvidenceById.get(evidence.id);
+          const document = source?.documents[0];
+          if (!document) throw new Error("INTENT_EVIDENCE_NOT_TRUSTED");
+          const claim = parsed.data.knownFacts.find((fact) => fact.evidenceId === evidence.id);
+          if (!claim) throw new Error("INTENT_EVIDENCE_NOT_TRUSTED");
+          await transaction.businessIntentEvidenceReference.create({
+            data: {
+              proposalId: created.id,
+              workspaceId: principal.workspaceId,
+              evidenceId: evidence.id,
+              documentId: document.id,
+              clientId: parsed.data.clientId ?? document.clientId,
+              claimStatement: claim.statement,
+              verificationState: "SOURCE_VERIFIED_RECORD",
+            },
+          });
+        }
 
         await transaction.billingUsageEvent.create({
           data: {
