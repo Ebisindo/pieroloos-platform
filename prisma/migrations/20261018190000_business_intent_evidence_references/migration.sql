@@ -45,3 +45,9 @@ ALTER TABLE "BusinessIntentEvidenceReference"
   FOREIGN KEY ("workspaceId")
   REFERENCES "Workspace"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "BusinessIntentEvidenceReference"
+  ADD CONSTRAINT "BusinessIntentEvidenceReference_clientId_workspaceId_fkey"
+  FOREIGN KEY ("clientId", "workspaceId")
+  REFERENCES "Client"("id", "workspaceId")
+  ON DELETE RESTRICT ON UPDATE CASCADE;
