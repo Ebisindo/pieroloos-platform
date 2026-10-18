@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { clientRepository } from "@/lib/db/client-repository";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
@@ -366,4 +366,163 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       where: { notificationId: notification.id },
     })).resolves.toBe(0);
   });
+
+  it("converges concurrent compliance-generation route requests through PostgreSQL", async () => {
+    const suffix = crypto.randomUUID().replaceAll("-", "").slice(0, 18);
+    const organization = await createOrganization(`route-generation-${suffix}`);
+    const workspace = await createWorkspace(organization.id, `route-generation-${suffix}`);
+    const owner = await prisma.user.create({
+      data: { email: `route-owner-${suffix}@integration.invalid` },
+    });
+    const reviewer = await prisma.user.create({
+      data: { email: `route-reviewer-${suffix}@integration.invalid` },
+    });
+    await prisma.membership.create({
+      data: { userId: owner.id, organizationId: organization.id, role: "OWNER" },
+    });
+    const jurisdiction = await prisma.jurisdiction.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        name: `Integration jurisdiction ${suffix}`,
+        country: "Integration Test",
+        code: `IT-${suffix}`,
+      },
+    });
+    const client = await prisma.client.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        name: "Concurrent obligation generation client",
+      },
+    });
+    const rule = await prisma.complianceRule.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        jurisdictionId: jurisdiction.id,
+        ruleKey: `concurrent-generation-${suffix}`,
+        currentVersion: 1,
+        active: true,
+        createdByUserId: owner.id,
+      },
+    });
+    const now = new Date();
+    const version = await prisma.complianceRuleVersion.create({
+      data: {
+        ruleId: rule.id,
+        workspaceId: workspace.id,
+        version: 1,
+        jurisdictionId: jurisdiction.id,
+        title: "Integration-only sourced rule",
+        description: "A test fixture; not a real statutory rule.",
+        obligationType: "ANNUAL_FILING",
+        sourceAuthority: "Integration fixture",
+        sourceUrl: "https://example.gov/integration-test",
+        sourceRetrievedAt: now,
+        effectiveFrom: new Date("2020-01-01T00:00:00.000Z"),
+        evidenceClass: "E3",
+        applicability: {},
+        relativeDueDays: null,
+        requiresEvidence: false,
+        professionalReviewRequired: true,
+        reviewState: "VERIFIED",
+        reviewedByUserId: reviewer.id,
+        reviewedAt: now,
+        reviewNote: "Integration fixture only.",
+        createdByUserId: owner.id,
+      },
+    });
+
+    const principal: WorkspacePrincipal = {
+      userId: owner.id,
+      organizationId: organization.id,
+      workspaceId: workspace.id,
+      role: "owner",
+      permissions: ["compliance:write"],
+    };
+    let routePrisma: { $disconnect: () => Promise<void> } | null = null;
+
+    try {
+      vi.doMock("@/lib/auth/workspace-context", () => ({
+        getWorkspaceContext: async () => ({ userId: owner.id, principal }),
+      }));
+      vi.doMock("@/lib/auth/request-origin", () => ({
+        hasInvalidRequestOrigin: () => false,
+      }));
+      vi.resetModules();
+
+      const { POST } = await import("@/app/api/compliance/rules/[id]/versions/[versionId]/generate/route");
+      const dbModule = await import("@/lib/db/prisma");
+      routePrisma = dbModule.prisma;
+
+      const request = () => new Request(
+        `http://localhost/api/compliance/rules/${rule.id}/versions/${version.id}/generate`,
+        {
+          method: "POST",
+          headers: { origin: "http://localhost", "content-type": "application/json" },
+          body: JSON.stringify({
+            clientId: client.id,
+            businessType: null,
+            formationCompleted: null,
+            baseDate: null,
+            factEvidence: [],
+          }),
+        },
+      );
+      const routeContext = { params: Promise.resolve({ id: rule.id, versionId: version.id }) };
+      const responses = await Promise.all([
+        POST(request(), routeContext),
+        POST(request(), routeContext),
+      ]);
+      const statusCodes = responses.map((response) => response.status).sort();
+      expect(statusCodes).toEqual([200, 201]);
+
+      const bodies = await Promise.all(responses.map((response) => response.json()));
+      const obligationIds = bodies.map((body) => body.data.id);
+      expect(obligationIds[0]).toBe(obligationIds[1]);
+      const obligationId = obligationIds[0];
+
+      await expect(prisma.complianceObligation.count({
+        where: { workspaceId: workspace.id, clientId: client.id, sourceRuleVersionId: version.id },
+      })).resolves.toBe(1);
+      await expect(prisma.complianceDeadlineSnapshot.count({
+        where: { obligationId },
+      })).resolves.toBe(1);
+      await expect(prisma.complianceActivity.count({
+        where: { obligationId, action: "RULE_OBLIGATION_GENERATED" },
+      })).resolves.toBe(1);
+      await expect(prisma.complianceRuleActivity.count({
+        where: { ruleId: rule.id, action: "OBLIGATION_GENERATED" },
+      })).resolves.toBe(1);
+    } finally {
+      vi.doUnmock("@/lib/auth/workspace-context");
+      vi.doUnmock("@/lib/auth/request-origin");
+      if (routePrisma) await routePrisma.$disconnect();
+
+      const obligationRows = await prisma.complianceObligation.findMany({
+        where: { workspaceId: workspace.id },
+        select: { id: true },
+      });
+      const obligationIds = obligationRows.map((item) => item.id);
+      await prisma.complianceDeadlineSnapshot.deleteMany({
+        where: { obligationId: { in: obligationIds } },
+      });
+      await prisma.complianceStatusSnapshot.deleteMany({
+        where: { obligationId: { in: obligationIds } },
+      });
+      await prisma.complianceActivity.deleteMany({
+        where: { obligationId: { in: obligationIds } },
+      });
+      await prisma.complianceRuleActivity.deleteMany({ where: { ruleId: rule.id } });
+      await prisma.complianceObligation.deleteMany({ where: { workspaceId: workspace.id } });
+      await prisma.organization.deleteMany({ where: { id: organization.id } });
+      await prisma.jurisdiction.deleteMany({ where: { id: jurisdiction.id } });
+      await prisma.user.deleteMany({ where: { id: { in: [owner.id, reviewer.id] } } });
+      const organizationIndex = organizationIds.indexOf(organization.id);
+      if (organizationIndex >= 0) organizationIds.splice(organizationIndex, 1);
+      vi.resetModules();
+    }
+  });
+
 });
