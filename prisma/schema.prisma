@@ -164,6 +164,7 @@ enum EvidenceReviewStatus {
   PENDING
   VERIFIED
   CHANGES_REQUESTED
+  REVOKED
 }
 
 enum DocumentStorageStatus {
@@ -313,6 +314,8 @@ model Organization {
   clients               Client[]
   jurisdictions         Jurisdiction[]
   complianceObligations ComplianceObligation[]
+  complianceRules             ComplianceRule[]
+  complianceRuleActivities    ComplianceRuleActivity[]
   marketEntryPlans      MarketEntryPlan[]
   billingSubscriptions  BillingSubscription[]
   billingUsageEvents    BillingUsageEvent[]
@@ -348,6 +351,12 @@ model User {
   businessIntentProposalsCreated BusinessIntentProposal[] @relation("BusinessIntentProposalCreator")
   businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
   businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
+  complianceRulesCreated             ComplianceRule[]                  @relation("ComplianceRuleCreatedBy")
+  complianceRuleVersionsCreated      ComplianceRuleVersion[]           @relation("ComplianceRuleVersionCreatedBy")
+  complianceRulesReviewed             ComplianceRuleVersion[]           @relation("ComplianceRuleVersionReviewer")
+  complianceDeadlineSnapshots         ComplianceDeadlineSnapshot[]      @relation("ComplianceDeadlineSnapshotActor")
+  complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
+  complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
 }
 
 model PlatformAdministrator {
@@ -436,6 +445,11 @@ model Workspace {
   formationPlans             FormationPlan[]
   workingDecisions           WorkingJurisdictionDecision[]
   complianceObligations      ComplianceObligation[]
+  complianceRules              ComplianceRule[]
+  complianceRuleVersions       ComplianceRuleVersion[]
+  complianceDeadlineSnapshots  ComplianceDeadlineSnapshot[]
+  complianceStatusSnapshots    ComplianceStatusSnapshot[]
+  complianceRuleActivities     ComplianceRuleActivity[]
   marketEntryPlans           MarketEntryPlan[]
   marketReadinessAssessments MarketReadinessAssessment[]
   documents                  Document[]
@@ -569,6 +583,7 @@ model Jurisdiction {
   workingDecisions               WorkingJurisdictionDecision[]
   formationPlans                 FormationPlan[]
   complianceObligations          ComplianceObligation[]
+  complianceRules                ComplianceRule[]
   marketEntryPlans               MarketEntryPlan[]
   crossBorderDossiersOrigin      CrossBorderDossier[]          @relation("CrossBorderOrigin")
   crossBorderDossiersDestination CrossBorderDossier[]          @relation("CrossBorderDestination")
@@ -967,6 +982,9 @@ model ComplianceObligation {
   formationPlanId             String?
   jurisdictionId              String?
   sourceRuleId                String?
+  sourceRuleVersionId         String?
+  // Stable scoped idempotency key for rule-generated obligations; manual entries remain null.
+  generationKey               String?
   title                       String
   description                 String?
   type                        String
@@ -990,9 +1008,13 @@ model ComplianceObligation {
   activities    ComplianceActivity[]
   reminders     ComplianceReminder[]
   evidence      ComplianceEvidence[]
+  deadlineSnapshots ComplianceDeadlineSnapshot[]
+  statusSnapshots ComplianceStatusSnapshot[]
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   documents     Document[]
 
   @@unique([id, workspaceId])
+  @@unique([workspaceId, generationKey], map: "ComplianceObligation_workspace_generationKey_key")
   @@index([organizationId, workspaceId, status])
   @@index([workspaceId, dueAt])
   @@index([clientId])
@@ -1146,6 +1168,9 @@ model ComplianceEvidence {
   obligationId     String
   documentId       String
   evidenceClass    String
+  // Optional structured assertion recorded when evidence is attached; it is not trusted until reviewStatus=VERIFIED.
+  factKey          String?
+  factValue        String?
   note             String?
   sourceReference  String?
   validThrough     DateTime?
@@ -1664,6 +1689,156 @@ model BillingWebhookEvent {
   @@unique([provider, providerEventId])
   @@index([status, receivedAt])
   @@index([organizationId, receivedAt])
+}
+
+
+enum ComplianceRuleReviewState {
+  UNREVIEWED
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ComplianceRuleAssessmentState {
+  APPLICABLE
+  NOT_APPLICABLE
+  UNKNOWN
+}
+
+model ComplianceRule {
+  id             String   @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  jurisdictionId String
+  ruleKey        String
+  currentVersion Int      @default(1)
+  active         Boolean  @default(true)
+  createdByUserId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace             @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  jurisdiction Jurisdiction           @relation(fields: [jurisdictionId], references: [id], onDelete: Restrict)
+  createdBy     User                  @relation("ComplianceRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  versions     ComplianceRuleVersion[]
+  activities   ComplianceRuleActivity[]
+
+  @@unique([organizationId, workspaceId, ruleKey])
+  @@unique([id, workspaceId])
+  @@unique([id, workspaceId, jurisdictionId])
+  @@index([workspaceId, jurisdictionId, active])
+}
+
+model ComplianceRuleVersion {
+  id                  String                    @id @default(cuid())
+  ruleId              String
+  workspaceId         String
+  version             Int
+  jurisdictionId      String
+  title               String
+  description         String?
+  obligationType      String
+  sourceAuthority     String
+  sourceUrl           String
+  sourceRetrievedAt   DateTime?
+  publicationDate     DateTime?
+  effectiveFrom       DateTime
+  effectiveThrough    DateTime?
+  evidenceClass       EvidenceClass
+  applicability       Json
+  relativeDueDays     Int?
+  requiresEvidence    Boolean                   @default(false)
+  professionalReviewRequired Boolean             @default(true)
+  reviewState         ComplianceRuleReviewState  @default(UNREVIEWED)
+  reviewedByUserId    String?
+  reviewedAt          DateTime?
+  reviewNote          String?
+  supersededByVersion Int?
+  createdByUserId     String
+  createdAt           DateTime                  @default(now())
+
+  rule ComplianceRule @relation(fields: [ruleId, workspaceId, jurisdictionId], references: [id, workspaceId, jurisdictionId], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User @relation("ComplianceRuleVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  reviewer User? @relation("ComplianceRuleVersionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+  deadlineSnapshots ComplianceDeadlineSnapshot[]
+  obligations ComplianceObligation[]
+  activities ComplianceRuleActivity[]
+
+  @@unique([ruleId, version])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, jurisdictionId, reviewState])
+  @@index([sourceRetrievedAt, effectiveThrough])
+}
+
+model ComplianceRuleActivity {
+  id             String   @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  ruleId         String
+  ruleVersionId  String?
+  actorUserId    String
+  action         String
+  note           String?
+  metadata       Json?
+  occurredAt     DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  rule         ComplianceRule @relation(fields: [ruleId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  ruleVersion  ComplianceRuleVersion? @relation(fields: [ruleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  actor        User @relation("ComplianceRuleActivityActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([ruleId, occurredAt])
+  @@index([ruleVersionId, occurredAt])
+}
+
+model ComplianceDeadlineSnapshot {
+  id                       String   @id @default(cuid())
+  obligationId             String
+  workspaceId              String
+  sequence                 Int
+  previousDueAt             DateTime?
+  dueAt                     DateTime?
+  reason                    String
+  sourceRuleVersionId       String?
+  assessmentState           ComplianceRuleAssessmentState @default(UNKNOWN)
+  assessmentFacts           Json
+  actorUserId               String
+  createdAt                 DateTime @default(now())
+
+  obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  actor User @relation("ComplianceDeadlineSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([obligationId, sequence])
+  @@index([workspaceId, createdAt])
+  @@index([obligationId, createdAt])
+}
+
+model ComplianceStatusSnapshot {
+  id                String           @id @default(cuid())
+  obligationId      String
+  workspaceId       String
+  sequence          Int
+  previousStatus    ComplianceStatus
+  currentStatus     ComplianceStatus
+  completedAtBefore DateTime?
+  completedAtAfter  DateTime?
+  reason            String?
+  actorUserId       String
+  occurredAt        DateTime         @default(now())
+
+  obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  actor      User                 @relation("ComplianceStatusSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([obligationId, sequence])
+  @@index([workspaceId, occurredAt])
+  @@index([obligationId, occurredAt])
 }
 
 enum PartnershipInquiryType {

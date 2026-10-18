@@ -52,6 +52,7 @@ const statusKeys: Record<string, MessageKey> = {
 const evidenceReviewStatusKeys: Record<string, MessageKey> = {
   VERIFIED: "app.compliance.verified",
   CHANGES_REQUESTED: "app.compliance.changesRequested",
+  REVOKED: "app.compliance.revoked",
 };
 const obligationTypeKeys: Record<string, MessageKey> = {
   FORMATION: "app.compliance.typeFormation",
@@ -225,7 +226,8 @@ export function ComplianceWorkflow({
     }
   }
 
-  async function reviewEvidence(obligation: Obligation, evidenceId: string, reviewStatus: "VERIFIED" | "CHANGES_REQUESTED") {
+  async function reviewEvidence(obligation: Obligation, evidenceId: string, reviewStatus: "VERIFIED" | "CHANGES_REQUESTED" | "REVOKED") {
+    if (reviewStatus === "REVOKED" && !window.confirm(t("app.compliance.revokeEvidenceConfirm"))) return;
     const note = evidenceReviewNotes[evidenceId]?.trim();
     if (!note) {
       setMessage(t("app.compliance.addReviewNote"));
@@ -350,7 +352,7 @@ export function ComplianceWorkflow({
                   <div className="mt-2 space-y-3">
                     {obligation.evidence.map((item) => (
                       <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 p-3">
-                        <span className={`status-badge ${item.validThrough && currentTime !== null && new Date(item.validThrough).getTime() < currentTime ? "status-danger" : item.reviewStatus === "VERIFIED" ? "status-success" : item.reviewStatus === "CHANGES_REQUESTED" ? "status-danger" : "status-info"}`}>
+                        <span className={`status-badge ${item.validThrough && currentTime !== null && new Date(item.validThrough).getTime() < currentTime ? "status-danger" : item.reviewStatus === "VERIFIED" ? "status-success" : item.reviewStatus === "CHANGES_REQUESTED" || item.reviewStatus === "REVOKED" ? "status-danger" : "status-info"}`}>
                           {item.evidenceClass} · {item.validThrough && currentTime !== null && new Date(item.validThrough).getTime() < currentTime ? t("app.compliance.expired") : evidenceReviewStatusKeys[item.reviewStatus] ? t(evidenceReviewStatusKeys[item.reviewStatus]) : item.reviewStatus.replaceAll("_", " ")}
                         </span>
                         {item.sourceReference ? <span>{t("app.compliance.source", { source: item.sourceReference })}</span> : <span>{t("app.compliance.sourceMissing")}</span>}
@@ -358,7 +360,7 @@ export function ComplianceWorkflow({
                           ? <span>{t("app.compliance.validThrough", { date: formatDate(new Date(item.validThrough), locale, { dateStyle: "medium" }) })}</span>
                           : <span>{t("app.compliance.validityMissing")}</span>}
                         {item.reviewNote ? <span>{t("app.compliance.reviewNote", { note: item.reviewNote })}</span> : null}
-                        {canReview ? (
+                        {canReview && item.reviewStatus !== "REVOKED" ? (
                           <>
                             <label className="sr-only" htmlFor={`evidence-review-${item.id}`}>{t("app.compliance.reviewNoteLabel")}</label>
                             <input
@@ -374,6 +376,9 @@ export function ComplianceWorkflow({
                             </button>
                             <button className="icon-button" type="button" disabled={busyId === obligation.id} onClick={() => reviewEvidence(obligation, item.id, "CHANGES_REQUESTED")}>
                               {t("app.compliance.requestChanges")}
+                            </button>
+                            <button className="icon-button" type="button" disabled={busyId === obligation.id} onClick={() => reviewEvidence(obligation, item.id, "REVOKED")}>
+                              {t("app.compliance.revokeEvidence")}
                             </button>
                           </>
                         ) : null}
