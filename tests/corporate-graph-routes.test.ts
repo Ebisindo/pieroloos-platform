@@ -69,6 +69,14 @@ describe("corporate graph and compliance API boundaries", () => {
     graphNodeFindManyMock.mockResolvedValue([]);
     graphEdgeFindManyMock.mockResolvedValue([]);
     complianceRuleFindManyMock.mockResolvedValue([]);
+    authorizedTransactionMock.mockImplementation(async (_principal, _permission, operation) =>
+      operation({
+        corporateGraphNode: { findMany: graphNodeFindManyMock },
+        corporateGraphEdge: { findMany: graphEdgeFindManyMock },
+        corporateGraphAuditEvent: { findMany: graphAuditFindManyMock },
+        corporateComplianceRule: { findMany: complianceRuleFindManyMock },
+      }),
+    );
   });
 
   it("rejects unauthenticated graph reads before querying data", async () => {
