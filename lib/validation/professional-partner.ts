@@ -3,11 +3,29 @@ import { ProfessionalPartnerCapability, ProfessionalPartnerGrantPurpose, Profess
 
 const nullableDate = z.preprocess((value) => value === null ? null : value, z.coerce.date().nullable());
 
+// Only capabilities backed by submitted partner endpoints can be granted. Enum
+// values for graph, document metadata and report access remain reserved until the
+// corresponding scoped endpoint and authorization tests are delivered.
+const currentlySupportedCapabilities = new Set<ProfessionalPartnerCapability>([
+  ProfessionalPartnerCapability.CLIENT_PROFILE_READ,
+  ProfessionalPartnerCapability.COMPLIANCE_READ,
+  ProfessionalPartnerCapability.EVIDENCE_ATTACH,
+]);
+
 const capabilitiesSchema = z.array(z.nativeEnum(ProfessionalPartnerCapability)).min(1).max(6)
   .superRefine((values, context) => {
     if (new Set(values).size !== values.length) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: "Capabilities must not contain duplicates." });
     }
+    values.forEach((capability, index) => {
+      if (!currentlySupportedCapabilities.has(capability)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index],
+          message: "This capability is reserved until its protected partner endpoint is implemented and reviewed.",
+        });
+      }
+    });
   });
 
 export const createProfessionalPartnerIdentitySchema = z.object({
