@@ -3,7 +3,14 @@ import { z } from "zod";
 const factSchema = z.object({
   id: z.string().trim().min(1).max(80),
   statement: z.string().trim().min(2).max(1600),
-  sourceUrl: z.string().url().max(2000).optional(),
+  sourceUrl: z.string().url().max(2000).refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password;
+    } catch {
+      return false;
+    }
+  }, "Source references must use HTTPS and must not contain embedded credentials.").optional(),
   // Intake submissions are unverified claims. A caller must not self-assert
   // secondary, primary, cross-verified, or retrieval provenance.
   evidenceClass: z.enum(["E0", "E1"]).default("E1"),
