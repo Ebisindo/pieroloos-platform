@@ -673,7 +673,6 @@ model Evidence {
   documents      Document[]
   businessIntentReferences BusinessIntentEvidenceReference[]
 
-  @@unique([id, jurisdictionId], map: "Evidence_id_jurisdictionId_key")
   @@index([evidenceClass])
   @@index([jurisdictionId])
 }
@@ -1802,6 +1801,7 @@ model ComplianceRuleVersion {
   createdBy User          @relation("ComplianceRuleVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   obligations ComplianceObligation[]
   deadlineSnapshots ComplianceDeadlineSnapshot[]
+  sourceRuleActivities ComplianceRuleActivity[]
   reviewer  User?         @relation("ComplianceRuleVersionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
 
   @@unique([ruleId, version])
@@ -1871,6 +1871,7 @@ model ComplianceRuleActivity {
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workspace    Workspace             @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
   rule         ComplianceRule        @relation(fields: [ruleId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  ruleVersion  ComplianceRuleVersion? @relation(fields: [ruleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   actor        User                  @relation("ComplianceRuleActivityActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, workspaceId, occurredAt])
