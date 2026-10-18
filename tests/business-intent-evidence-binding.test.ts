@@ -116,7 +116,7 @@ describe("business-intent trusted evidence binding", () => {
     mocks.evidenceFindMany.mockResolvedValue([evidence("evidence-1")]);
     const response = await POST(request([{ statement: "A statement from the user.", evidenceId: "evidence-1" }], "client-1"));
     expect(response.status).toBe(201);
-    expect(mocks.evidenceFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.evidenceFindMany).toHaveBeenCalledTimes(2);
     expect(mocks.analyzeBusinessIntent).toHaveBeenCalledTimes(1);
     const providerInput = mocks.analyzeBusinessIntent.mock.calls[0]?.[0];
     expect(providerInput.knownFacts[0]).toMatchObject({
@@ -190,4 +190,37 @@ describe("business-intent trusted evidence binding", () => {
     expect(mocks.analyzeBusinessIntent).not.toHaveBeenCalled();
     expect(mocks.proposalCreate).not.toHaveBeenCalled();
   });
+
+  it("requires workspace-wide evidence for proposals without a selected client", async () => {
+    mocks.evidenceFindMany.mockResolvedValue([evidence("evidence-1")]);
+    const response = await POST(request([{ statement: "Workspace-level claim.", evidenceId: "evidence-1" }]));
+    expect(response.status).toBe(422);
+    expect(mocks.evidenceFindMany.mock.calls[0]?.[0].where.documents.some.clientId).toBeNull();
+    expect(mocks.evidenceFindMany.mock.calls[0]?.[0].select.documents.where.clientId).toBeNull();
+    expect(mocks.analyzeBusinessIntent).not.toHaveBeenCalled();
+    expect(mocks.proposalCreate).not.toHaveBeenCalled();
+  });
+
+  it("revalidates evidence after the provider call and rejects a revoked or unavailable record", async () => {
+    mocks.evidenceFindMany
+      .mockResolvedValueOnce([evidence("evidence-1")])
+      .mockResolvedValueOnce([]);
+    const response = await POST(request([{ statement: "A claim tied to a source.", evidenceId: "evidence-1" }], "client-1"));
+    expect(response.status).toBe(422);
+    expect(mocks.evidenceFindMany).toHaveBeenCalledTimes(2);
+    expect(mocks.analyzeBusinessIntent).toHaveBeenCalledTimes(1);
+    expect(mocks.proposalCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a source snapshot that changes between preflight and persistence", async () => {
+    mocks.evidenceFindMany
+      .mockResolvedValueOnce([evidence("evidence-1")])
+      .mockResolvedValueOnce([evidence("evidence-1", { source: "https://registry.example.gov/changed" })]);
+    const response = await POST(request([{ statement: "A claim tied to a source.", evidenceId: "evidence-1" }], "client-1"));
+    expect(response.status).toBe(409);
+    expect(mocks.evidenceFindMany).toHaveBeenCalledTimes(2);
+    expect(mocks.analyzeBusinessIntent).toHaveBeenCalledTimes(1);
+    expect(mocks.proposalCreate).not.toHaveBeenCalled();
+  });
+
 });
