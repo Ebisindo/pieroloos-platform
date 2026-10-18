@@ -1697,7 +1697,6 @@ model BillingWebhookEvent {
   @@index([organizationId, receivedAt])
 }
 
-
 enum ComplianceRuleReviewState {
   UNREVIEWED
   VERIFIED
@@ -1904,24 +1903,6 @@ enum CorporateGraphRelationType {
   RELATED_TO
 }
 
-enum CorporateRuleSeverity {
-  INFO
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum LegacyCorporateRuleReviewStatus {
-  UNREVIEWED
-  IN_REVIEW
-  VERIFIED
-  REJECTED
-  SUPERSEDED
-
-  @@map("CorporateRuleReviewStatus")
-}
-
 enum CorporateGraphAuditAction {
   NODE_CREATED
   NODE_UPDATED
@@ -1999,35 +1980,4 @@ model CorporateGraphAuditEvent {
 
   @@index([organizationId, workspaceId, occurredAt])
   @@index([subjectType, subjectId, occurredAt])
-}
-
-model LegacyCorporateComplianceRule {
-  id                         String                       @id @default(cuid())
-  jurisdictionCode           String
-  entityType                 String
-  ruleKey                    String
-  title                      String
-  description                String?
-  frequency                  String?
-  severity                   CorporateRuleSeverity        @default(MEDIUM)
-  sourceTitle                String?
-  sourceUrl                  String?
-  sourceAuthority            String?
-  sourceRetrievedAt          DateTime?
-  effectiveFrom              DateTime?
-  effectiveTo                DateTime?
-  evidenceClass              EvidenceClass                @default(E0)
-  reviewStatus               LegacyCorporateRuleReviewStatus @default(UNREVIEWED)
-  reviewedByUserId           String?
-  reviewedAt                 DateTime?
-  version                    Int                          @default(1)
-  requiresProfessionalReview Boolean                      @default(true)
-  active                     Boolean                      @default(false)
-  createdAt                  DateTime                     @default(now())
-  updatedAt                  DateTime                     @updatedAt
-
-  @@unique([jurisdictionCode, entityType, ruleKey, version], map: "CorporateComplianceRule_jurisdictionCode_entityType_ruleKey_key")
-  @@index([jurisdictionCode, entityType, active, reviewStatus], map: "CorporateComplianceRule_jurisdictionCode_entityType_active__idx")
-  @@index([sourceRetrievedAt], map: "CorporateComplianceRule_sourceRetrievedAt_idx")
-  @@map("CorporateComplianceRule")
 }
