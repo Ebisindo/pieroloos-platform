@@ -14,7 +14,7 @@ export async function WorkspaceAccessState({
 }) {
   const t = await getRequestTranslator();
   return (
-    <section className="glass-panel max-w-2xl p-7">
+    <main className="glass-panel max-w-2xl p-7">
       <p className="eyebrow">{t("access.eyebrow")}</p>
       <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="mt-3 text-sm leading-6 text-slate-400">{description}</p>
@@ -23,6 +23,6 @@ export async function WorkspaceAccessState({
           {action}
         </Link>
       ) : null}
-    </section>
+    </main>
   );
 }

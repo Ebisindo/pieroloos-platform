@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const select = (page: import("@playwright/test").Page) => page.locator("select.language-select");
+const cookieOrigin = process.env.NEXTAUTH_URL ?? "http://localhost:3100";
 
 test("language selection updates lang attribute and persists across routes", async ({ page }) => {
   await page.goto("/");
@@ -25,7 +26,7 @@ test("partner form state survives a language switch", async ({ page }) => {
 for (const [name, size] of [["mobile", { width: 375, height: 812 }], ["tablet", { width: 768, height: 1024 }], ["desktop", { width: 1440, height: 900 }]] as const) {
   for (const locale of ["en", "fr", "pt", "es"]) {
     test(`no horizontal overflow: ${name} ${locale}`, async ({ page, context }) => {
-      await context.addCookies([{ name: "pieroloos-locale", value: locale, url: "http://127.0.0.1:3100" }]);
+      await context.addCookies([{ name: "pieroloos-locale", value: locale, url: cookieOrigin }]);
       await page.setViewportSize(size);
       for (const route of ["/", "/partners"]) {
         await page.goto(route);
@@ -84,14 +85,14 @@ test("locale preference does not leak between browser contexts", async ({ browse
 });
 
 test("unknown cookie value falls back to English", async ({ page, context }) => {
-  await context.addCookies([{ name: "pieroloos-locale", value: "xx<script>", url: "http://127.0.0.1:3100" }]);
+  await context.addCookies([{ name: "pieroloos-locale", value: "xx<script>", url: cookieOrigin }]);
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });
 
 for (const locale of ["fr", "pt", "es"]) {
   test(`404 page and signed-out protected route are localized and overflow-free (${locale})`, async ({ page, context }) => {
-    await context.addCookies([{ name: "pieroloos-locale", value: locale, url: "http://127.0.0.1:3100" }]);
+    await context.addCookies([{ name: "pieroloos-locale", value: locale, url: cookieOrigin }]);
     await page.setViewportSize({ width: 375, height: 812 });
     for (const route of ["/this-route-does-not-exist", "/clients"]) {
       await page.goto(route);

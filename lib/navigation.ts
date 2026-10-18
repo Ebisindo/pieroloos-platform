@@ -17,6 +17,7 @@ import {
 export const workspaceNavigation = [
   { href: "/command-center", label: "Business Formation", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: BriefcaseBusiness },
+  { href: "/business-profile", label: "Business Profile", icon: Building2 },
   { href: "/jurisdictions", label: "Jurisdiction Lens", icon: Scale },
   { href: "/expansion", label: "Market Expansion", icon: Globe2 },
   { href: "/cross-border", label: "Cross-border Preparation", icon: ArrowLeftRight },
@@ -54,7 +55,7 @@ export const portalNavigation = [
 
 export const productModules = [
   { key: "clients", label: "Client Intake", href: "/clients", status: "operational" },
-  { key: "business-profile", label: "Business Profile", href: "/clients", status: "foundation" },
+  { key: "business-profile", label: "Business Profile", href: "/business-profile", status: "operational" },
   { key: "jurisdiction", label: "Jurisdiction Lens", href: "/jurisdictions", status: "foundation" },
   { key: "expansion", label: "Market Expansion", href: "/expansion", status: "foundation" },
   { key: "cross-border", label: "Cross-border Preparation", href: "/cross-border", status: "foundation" },
