@@ -36,3 +36,33 @@ This branch is a draft checkpoint. Text-level schema structure has been checked,
 - Establish a definitive null-client policy. When no client is selected, the application must still prove workspace ownership and may not rely on an arbitrary first matching document.
 - Verify source/document immutability, revocation races, and a durable tenant-aware evidence binding constraint. Evidence review status must be rechecked transactionally at binding, and document/evidence relationships must not cross workspace or client boundaries.
 - CI must verify the new Prisma relations/migration and negative tests on this exact branch head. Structural text inspection is not Prisma validation.
+
+## OpenAI API and runtime readiness
+
+The business-intent provider is server-only and reads these runtime variables:
+- `PIEROLOOS_AI_PROVIDER=openai`
+- `OPENAI_API_KEY` — a project-scoped API key supplied through the deployment platform's secret manager.
+- `PIEROLOOS_AI_MODEL` — an explicitly configured model identifier that is available to the selected OpenAI API project and compatible with the code's Chat Completions JSON-response contract.
+
+### Secret handling
+- Never commit an API key to source control, `.env.example`, documentation, browser bundles, PR comments, logs, or issue attachments.
+- Do not use a `NEXT_PUBLIC_*` variable for API credentials.
+- Use separate least-privilege credentials for development, CI smoke tests, and production. Unit tests should mock the provider; only approved, bounded integration tests should call the external API.
+- Store and rotate credentials through the chosen platform's secret-management interface. If a key is exposed, revoke it and replace it; do not merely remove it from the latest commit.
+- Confirm usage limits, billing, access scope, timeout behavior, sanitized failures, and monitoring before enabling live generation.
+
+### Runtime boundary
+This application calls OpenAI from a server-only service. The API key must remain in a trusted server runtime. A static Firebase Hosting site alone must not be treated as proof that Next.js API routes or server-side code are running. Before enabling AI calls, deploy those routes to an approved server-capable runtime (for example, Firebase App Hosting/Cloud Run with managed secrets) or use a separately deployed authenticated backend; then verify server-side route authorization and secret availability without returning the key to the browser.
+
+Official references:
+- OpenAI Platform: https://platform.openai.com/docs/api-reference
+- Firebase App Hosting framework support and runtime: https://firebase.google.com/docs/app-hosting/frameworks-tooling
+
+### Readiness acceptance
+- [ ] Finish the secure OpenAI API-key setup flow and copy the key directly into the intended secret manager; do not paste it into chat or GitHub.
+- [ ] Configure the three runtime variables in the correct server environment.
+- [ ] Confirm the configured model is available and supports the code's API/JSON contract.
+- [ ] Confirm production server routes execute in a server-capable runtime and that the browser never receives the key.
+- [ ] Validate a bounded smoke test against a non-production project and review usage/billing.
+- [ ] Keep CI using mocked credentials and no production secret by default.
+- [ ] Document rollback, key rotation, runtime ownership, and monitoring before enabling production use.
