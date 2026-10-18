@@ -104,13 +104,9 @@ export async function POST(request: Request) {
   }
 
   const inputDigest = createHash("sha256").update(JSON.stringify(parsed.data)).digest("hex");
-  const evidenceReferences = parsed.data.knownFacts.map((fact) => ({
-    id: fact.id,
-    statement: fact.statement,
-    sourceUrl: fact.sourceUrl ?? null,
-    evidenceClass: fact.evidenceClass,
-    retrievedAt: fact.retrievedAt ?? null,
-  }));
+  // Caller-provided claims remain unverified. Evidence references are resolved against
+  // server-owned records inside the authorized write transaction below.
+  const submittedEvidenceIds = [...new Set(parsed.data.knownFacts.map((fact) => fact.evidenceId).filter((id): id is string => Boolean(id)))];
 
   try {
     const proposal = await withAuthorizedWorkspaceTransaction(
@@ -132,6 +128,15 @@ export async function POST(request: Request) {
           if (!client) throw new Error("INTENT_CLIENT_NOT_FOUND");
         }
 
+        const trustedEvidence = submittedEvidenceIds.length === 0 ? [] : await transaction.evidence.findMany({
+          where: { id: { in: submittedEvidenceIds }, reviewStatus: "VERIFIED", evidenceClass: { in: ["E3", "E4", "E3_PRIMARY", "E4_CROSS_VERIFIED"] }, documents: { some: { workspaceId: principal.workspaceId, ...(parsed.data.clientId ? { clientId: parsed.data.clientId } : {}), status: "AVAILABLE", scanStatus: "CLEAN", reviewStatus: "VERIFIED", deletedAt: null } } },
+          select: { id: true, title: true, source: true, sourceType: true, publicationDate: true, retrievedAt: true, evidenceClass: true, reviewStatus: true, jurisdictionId: true, documents: { where: { workspaceId: principal.workspaceId, ...(parsed.data.clientId ? { clientId: parsed.data.clientId } : {}), status: "AVAILABLE", scanStatus: "CLEAN", reviewStatus: "VERIFIED", deletedAt: null }, select: { id: true, clientId: true, workspaceId: true, checksum: true }, take: 1 } },
+        });
+        if (trustedEvidence.length !== submittedEvidenceIds.length || trustedEvidence.some((evidence) => !evidence.retrievedAt || !evidence.source?.trim() || !evidence.documents.length)) {
+          throw new Error("INTENT_EVIDENCE_NOT_TRUSTED");
+        }
+        const trustedEvidenceReferences = trustedEvidence.map((evidence) => ({ id: evidence.id, title: evidence.title, source: evidence.source, sourceType: evidence.sourceType, publicationDate: evidence.publicationDate?.toISOString() ?? null, retrievedAt: evidence.retrievedAt?.toISOString() ?? null, evidenceClass: evidence.evidenceClass, reviewStatus: evidence.reviewStatus, jurisdictionId: evidence.jurisdictionId, documentId: evidence.documents[0]?.id ?? null, documentChecksum: evidence.documents[0]?.checksum ?? null }));
+        const submittedClaims = parsed.data.knownFacts.map((fact) => ({ statement: fact.statement, evidenceId: fact.evidenceId ?? null, verificationState: fact.evidenceId ? (trustedEvidenceReferences.some((evidence) => evidence.id === fact.evidenceId) ? "SOURCE_VERIFIED_RECORD" : "UNVERIFIED") : "UNVERIFIED" }));
         const created = await transaction.businessIntentProposal.create({
           data: {
             organizationId: principal.organizationId,
@@ -142,7 +147,7 @@ export async function POST(request: Request) {
             version: 1,
             inputDigest,
             proposal: analysis.proposal as unknown as Prisma.InputJsonValue,
-            evidenceReferences: evidenceReferences as unknown as Prisma.InputJsonValue,
+            evidenceReferences: { claims: submittedClaims, trustedSources: trustedEvidenceReferences } as unknown as Prisma.InputJsonValue,
             provider: analysis.provider,
             providerModel: analysis.model,
           },
@@ -214,6 +219,9 @@ function entitlementOrClientError(error: unknown): NextResponse | null {
   }
   if (error instanceof Error && error.message === "INTENT_CLIENT_NOT_FOUND") {
     return NextResponse.json({ error: "Client not found in the active workspace." }, { status: 404 });
+  }
+  if (error instanceof Error && error.message === "INTENT_EVIDENCE_NOT_TRUSTED") {
+    return NextResponse.json({ error: "One or more evidence references are unknown, unverified, revoked, or outside the active workspace/client. Submit claims as unverified or attach eligible evidence first." }, { status: 422 });
   }
   return null;
 }
