@@ -362,8 +362,8 @@ describe("professional partner grant lifecycle and privilege boundaries", () => 
       partnerIdentity: { userId: "partner-1", status: "VERIFIED" },
     });
     const response = await amendGrant(routeRequest({
-      capabilities: ["CLIENT_PROFILE_READ", "REPORT_READ"],
-      reason: "Additional reporting scope is required for the engagement.",
+      capabilities: ["CLIENT_PROFILE_READ", "EVIDENCE_ATTACH"],
+      reason: "Evidence submission scope is required for the engagement.",
       expectedUpdatedAt: "2026-10-10T10:00:00.000Z",
     }, "/api/professional-partner-grants/grant-1", "PATCH"), grantContext);
     expect(response.status).toBe(200);
