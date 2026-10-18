@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
-import { prisma } from "@/lib/db/prisma";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 
@@ -258,16 +257,32 @@ export async function POST(request: Request, routeContext: RouteContext) {
     if (error instanceof Error && error.message === "COMPLIANCE_RULE_VERSION_NOT_FOUND") return NextResponse.json({ error: "Rule version not found in the active workspace." }, { status: 404 });
     if (error instanceof Error && error.message === "COMPLIANCE_CLIENT_NOT_FOUND") return NextResponse.json({ error: "Client not found in the active workspace." }, { status: 404 });
     if (typeof error === "object" && error !== null && "code" in error && ["P2002", "P2034"].includes(String((error as { code?: unknown }).code))) {
-      const existing = await prisma.complianceObligation.findFirst({
-        where: {
-          organizationId: principal.organizationId,
-          workspaceId: principal.workspaceId,
-          clientId: input.clientId,
-          sourceRuleVersionId: versionId,
-          generationKey,
-        },
-      });
-      if (existing) return NextResponse.json({ data: existing, alreadyExists: true }, { status: 200 });
+      try {
+        // A unique-key race must not bypass the live workspace authorization check.
+        // Re-read the winner only inside a fresh authorized transaction.
+        const existing = await withAuthorizedWorkspaceTransaction(principal, "compliance:write", async (transaction) =>
+          transaction.complianceObligation.findFirst({
+            where: {
+              organizationId: principal.organizationId,
+              workspaceId: principal.workspaceId,
+              clientId: input.clientId,
+              sourceRuleVersionId: versionId,
+              generationKey,
+            },
+          }),
+        );
+        if (existing) return NextResponse.json({ data: existing, alreadyExists: true }, { status: 200 });
+      } catch (recoveryError) {
+        if (recoveryError instanceof Error && recoveryError.message === "WORKSPACE_AUTHORIZATION_STALE") {
+          return NextResponse.json({ error: "Workspace authorization changed. Refresh and retry." }, { status: 409 });
+        }
+        if (typeof recoveryError === "object" && recoveryError !== null && "code" in recoveryError &&
+            String((recoveryError as { code?: unknown }).code) === "P2034") {
+          return NextResponse.json({ error: "Concurrent obligation generation conflicted. Retry the request." }, { status: 409 });
+        }
+        console.error("Compliance obligation race recovery failed.");
+        return NextResponse.json({ error: "Unable to safely confirm the generated obligation. Retry the request." }, { status: 409 });
+      }
       return NextResponse.json({ error: "Concurrent obligation generation conflicted. Retry the request." }, { status: 409 });
     }
     console.error("Compliance obligation generation failed.");
