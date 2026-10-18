@@ -2008,8 +2008,3 @@ model CorporateGraphAuditEvent {
   @@index([organizationId, workspaceId, occurredAt])
   @@index([subjectType, subjectId, occurredAt])
 }
-
-
-
-}
-
