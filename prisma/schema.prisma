@@ -1054,7 +1054,7 @@ model BusinessIntentProposal {
   @@index([organizationId, workspaceId, status, createdAt], map: "BusinessIntentProposal_tenant_status_created_idx")
   @@index([clientId, createdAt], map: "BusinessIntentProposal_client_created_idx")
   reviews BusinessIntentProposalReview[]
-  evidenceReferences BusinessIntentEvidenceReference[]
+  evidenceReferenceLinks BusinessIntentEvidenceReference[]
 }
 
 model BusinessIntentProposalReview {
