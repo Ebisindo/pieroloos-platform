@@ -250,6 +250,24 @@ describe("professional partner grant lifecycle and privilege boundaries", () => 
     }));
   });
 
+  it("refuses grants containing capability enum values without implemented partner endpoints", async () => {
+    for (const capability of ["GRAPH_READ", "DOCUMENT_METADATA_READ", "REPORT_READ"]) {
+      const response = await createGrant(routeRequest({
+        clientId: "client-1",
+        partnerIdentityId: "identity-1",
+        purpose: "LEGAL_REVIEW",
+        capabilities: [capability],
+        idempotencyKey: `unsupported-capability-${capability.toLowerCase()}`,
+      }, "/api/professional-partner-grants"));
+
+      expect(response.status).toBe(422);
+    }
+
+    expect(grantCreateMock).not.toHaveBeenCalled();
+    expect(grantAuditCreateMock).not.toHaveBeenCalled();
+  });
+
+
   it("rejects non-owner unlimited grants and accepts them only when explicitly owner-authorized", async () => {
     getWorkspaceContextMock.mockResolvedValueOnce({
       userId: principal.userId,
