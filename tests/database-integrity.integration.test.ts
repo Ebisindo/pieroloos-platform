@@ -26,11 +26,22 @@ async function createWorkspace(organizationId: string, slug: string) {
 describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
   afterEach(async () => {
     if (organizationIds.length > 0) {
+      const workspaces = await prisma.workspace.findMany({
+        where: { organizationId: { in: organizationIds } },
+        select: { id: true },
+      });
+      if (workspaces.length > 0) {
+        // Delete append-only source links before deleting documents/workspaces because
+        // links deliberately restrict hard deletion of their evidence document.
+        await prisma.businessIntentEvidenceReference.deleteMany({
+          where: { workspaceId: { in: workspaces.map((workspace) => workspace.id) } },
+        });
+      }
       await prisma.organization.deleteMany({ where: { id: { in: organizationIds } } });
       organizationIds.length = 0;
     }
     // Evidence is a legacy global model, so clean up explicitly after workspace-owned
-    // documents and proposal references have cascaded away with their organizations.
+    // documents and proposal references are removed.
     if (evidenceIds.length > 0) {
       await prisma.evidence.deleteMany({ where: { id: { in: evidenceIds } } });
       evidenceIds.length = 0;
