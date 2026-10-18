@@ -198,6 +198,8 @@ export async function POST(request: Request) {
         select: trustedEvidenceSelect,
       });
       if (selected.length !== submittedEvidenceIds.length || selected.some((evidence) =>
+        evidence.reviewStatus !== "VERIFIED" ||
+        !["E3", "E4", "E3_PRIMARY", "E4_CROSS_VERIFIED"].includes(evidence.evidenceClass) ||
         !evidence.retrievedAt ||
         !isSafeHttpsSource(evidence.source) ||
         !evidence.documents.length ||
@@ -303,6 +305,8 @@ export async function POST(request: Request) {
           : [];
         if (currentTrustedEvidence.length !== submittedEvidenceIds.length ||
             currentTrustedEvidence.some((evidence) =>
+              evidence.reviewStatus !== "VERIFIED" ||
+              !["E3", "E4", "E3_PRIMARY", "E4_CROSS_VERIFIED"].includes(evidence.evidenceClass) ||
               !evidence.retrievedAt ||
               !isSafeHttpsSource(evidence.source) ||
               !evidence.documents.length ||
