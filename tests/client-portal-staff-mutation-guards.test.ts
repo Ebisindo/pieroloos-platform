@@ -23,7 +23,7 @@ vi.mock("@/lib/auth/workspace-context", () => ({ getWorkspaceContext: getWorkspa
 vi.mock("@/lib/auth/request-origin", () => ({ hasInvalidRequestOrigin: invalidOriginMock }));
 vi.mock("@/lib/http/rate-limit", () => ({
   enforceRateLimit: enforceRateLimitMock,
-  CLIENT_PORTAL_STAFF_MUTATION_LIMIT: { name: "test-client-portal-staff-mutation", limit: 30, windowMs: 60_000 },
+  WORKSPACE_STAFF_MUTATION_LIMIT: { name: "test-client-portal-staff-mutation", limit: 30, windowMs: 60_000 },
 }));
 vi.mock("@/lib/services/client-portal-service", () => ({
   createClientPortalGrant: createGrantMock,
