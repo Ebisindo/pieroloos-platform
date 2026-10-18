@@ -500,27 +500,46 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       vi.doUnmock("@/lib/auth/request-origin");
       if (routePrisma) await routePrisma.$disconnect();
 
-      const obligationRows = await prisma.complianceObligation.findMany({
-        where: { workspaceId: workspace.id },
-        select: { id: true },
-      });
-      const obligationIds = obligationRows.map((item) => item.id);
-      await prisma.complianceDeadlineSnapshot.deleteMany({
-        where: { obligationId: { in: obligationIds } },
-      });
-      await prisma.complianceStatusSnapshot.deleteMany({
-        where: { obligationId: { in: obligationIds } },
-      });
-      await prisma.complianceActivity.deleteMany({
-        where: { obligationId: { in: obligationIds } },
-      });
-      await prisma.complianceRuleActivity.deleteMany({ where: { ruleId: rule.id } });
-      await prisma.complianceObligation.deleteMany({ where: { workspaceId: workspace.id } });
-      await prisma.organization.deleteMany({ where: { id: organization.id } });
-      await prisma.jurisdiction.deleteMany({ where: { id: jurisdiction.id } });
-      await prisma.user.deleteMany({ where: { id: { in: [owner.id, reviewer.id] } } });
-      const organizationIndex = organizationIds.indexOf(organization.id);
-      if (organizationIndex >= 0) organizationIds.splice(organizationIndex, 1);
+      // The disposable integration database installs append-only triggers. Disable
+      // user-defined triggers only while removing this test's own fixture records,
+      // then restore them even if teardown fails.
+      const triggerTables = [
+        '"ComplianceDeadlineSnapshot"',
+        '"ComplianceStatusSnapshot"',
+        '"ComplianceRuleActivity"',
+        '"ComplianceRuleVersion"',
+        '"ComplianceEvidence"',
+      ];
+      for (const table of triggerTables) {
+        await prisma.$executeRawUnsafe(`ALTER TABLE ${table} DISABLE TRIGGER USER`);
+      }
+      try {
+        const obligationRows = await prisma.complianceObligation.findMany({
+          where: { workspaceId: workspace.id },
+          select: { id: true },
+        });
+        const obligationIds = obligationRows.map((item) => item.id);
+        await prisma.complianceDeadlineSnapshot.deleteMany({
+          where: { obligationId: { in: obligationIds } },
+        });
+        await prisma.complianceStatusSnapshot.deleteMany({
+          where: { obligationId: { in: obligationIds } },
+        });
+        await prisma.complianceActivity.deleteMany({
+          where: { obligationId: { in: obligationIds } },
+        });
+        await prisma.complianceRuleActivity.deleteMany({ where: { ruleId: rule.id } });
+        await prisma.complianceObligation.deleteMany({ where: { workspaceId: workspace.id } });
+        await prisma.organization.deleteMany({ where: { id: organization.id } });
+        await prisma.jurisdiction.deleteMany({ where: { id: jurisdiction.id } });
+        await prisma.user.deleteMany({ where: { id: { in: [owner.id, reviewer.id] } } });
+        const organizationIndex = organizationIds.indexOf(organization.id);
+        if (organizationIndex >= 0) organizationIds.splice(organizationIndex, 1);
+      } finally {
+        for (const table of [...triggerTables].reverse()) {
+          await prisma.$executeRawUnsafe(`ALTER TABLE ${table} ENABLE TRIGGER USER`);
+        }
+      }
       vi.resetModules();
     }
   });
