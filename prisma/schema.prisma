@@ -326,8 +326,6 @@ model Organization {
   clientPortalGrants   ClientPortalGrant[]
   clientPortalEvents   ClientPortalAuditEvent[]
   clientPortalInteractions ClientPortalInteraction[]
-  corporateGraphNodes CorporateGraphNode[]
-  corporateGraphAuditEvents CorporateGraphAuditEvent[]
 }
   corporateGraphNodes CorporateGraphNode[]
   corporateGraphAuditEvents CorporateGraphAuditEvent[]
@@ -361,7 +359,6 @@ model User {
   complianceDeadlineSnapshots         ComplianceDeadlineSnapshot[]      @relation("ComplianceDeadlineSnapshotActor")
   complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
   complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
-  corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
 }
   corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
 
@@ -472,8 +469,6 @@ model Workspace {
   billingCreditEntries       BillingCreditEntry[]
   businessIntentProposals    BusinessIntentProposal[]
 
-  corporateGraphNodes CorporateGraphNode[]
-  corporateGraphAuditEvents CorporateGraphAuditEvent[]
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
   @@index([organizationId])
@@ -510,7 +505,6 @@ model Client {
   portalEvents          ClientPortalAuditEvent[]
   portalInteractions    ClientPortalInteraction[]
 
-  corporateGraphNodes CorporateGraphNode[]
   @@unique([id, workspaceId])
   @@index([workspaceId])
 }
