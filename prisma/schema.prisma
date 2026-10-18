@@ -316,6 +316,8 @@ model Organization {
   complianceObligations ComplianceObligation[]
   complianceRules             ComplianceRule[]
   complianceRuleActivities    ComplianceRuleActivity[]
+  complianceRules             ComplianceRule[]
+  complianceRuleActivities    ComplianceRuleActivity[]
   marketEntryPlans      MarketEntryPlan[]
   billingSubscriptions  BillingSubscription[]
   billingUsageEvents    BillingUsageEvent[]
@@ -351,6 +353,12 @@ model User {
   businessIntentProposalsCreated BusinessIntentProposal[] @relation("BusinessIntentProposalCreator")
   businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
   businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
+  complianceRulesCreated             ComplianceRule[]                  @relation("ComplianceRuleCreatedBy")
+  complianceRuleVersionsCreated      ComplianceRuleVersion[]           @relation("ComplianceRuleVersionCreatedBy")
+  complianceRulesReviewed             ComplianceRuleVersion[]           @relation("ComplianceRuleVersionReviewer")
+  complianceDeadlineSnapshots         ComplianceDeadlineSnapshot[]      @relation("ComplianceDeadlineSnapshotActor")
+  complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
+  complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
   complianceRulesCreated             ComplianceRule[]                  @relation("ComplianceRuleCreatedBy")
   complianceRuleVersionsCreated      ComplianceRuleVersion[]           @relation("ComplianceRuleVersionCreatedBy")
   complianceRulesReviewed             ComplianceRuleVersion[]           @relation("ComplianceRuleVersionReviewer")
@@ -445,6 +453,11 @@ model Workspace {
   formationPlans             FormationPlan[]
   workingDecisions           WorkingJurisdictionDecision[]
   complianceObligations      ComplianceObligation[]
+  complianceRules              ComplianceRule[]
+  complianceRuleVersions       ComplianceRuleVersion[]
+  complianceDeadlineSnapshots  ComplianceDeadlineSnapshot[]
+  complianceStatusSnapshots    ComplianceStatusSnapshot[]
+  complianceRuleActivities     ComplianceRuleActivity[]
   complianceRules              ComplianceRule[]
   complianceRuleVersions       ComplianceRuleVersion[]
   complianceDeadlineSnapshots  ComplianceDeadlineSnapshot[]
@@ -583,6 +596,7 @@ model Jurisdiction {
   workingDecisions               WorkingJurisdictionDecision[]
   formationPlans                 FormationPlan[]
   complianceObligations          ComplianceObligation[]
+  complianceRules                 ComplianceRule[]
   marketEntryPlans               MarketEntryPlan[]
   crossBorderDossiersOrigin      CrossBorderDossier[]          @relation("CrossBorderOrigin")
   crossBorderDossiersDestination CrossBorderDossier[]          @relation("CrossBorderDestination")
@@ -663,6 +677,7 @@ model Evidence {
   jurisdiction   Jurisdiction?   @relation(fields: [jurisdictionId], references: [id], onDelete: SetNull)
   complianceItem ComplianceItem? @relation(fields: [complianceItemId], references: [id], onDelete: SetNull)
   documents      Document[]
+  businessIntentReferences BusinessIntentEvidenceReference[]
 
   @@index([evidenceClass])
   @@index([jurisdictionId])
@@ -709,6 +724,7 @@ model Document {
   nextVersions               Document[]                   @relation("DocumentPreviousVersion")
   accessEvents               DocumentAccessEvent[]
   complianceEvidence         ComplianceEvidence[]
+  businessIntentEvidenceReferences BusinessIntentEvidenceReference[]
   crossBorderControlEvidence CrossBorderControlEvidence[]
 
   @@unique([rootDocumentId, version])
@@ -1004,6 +1020,8 @@ model ComplianceObligation {
   activities    ComplianceActivity[]
   reminders     ComplianceReminder[]
   evidence      ComplianceEvidence[]
+  deadlineSnapshots ComplianceDeadlineSnapshot[]
+  statusSnapshots ComplianceStatusSnapshot[]
   documents     Document[]
 
   @@unique([id, workspaceId])
@@ -1040,6 +1058,7 @@ model BusinessIntentProposal {
   @@index([organizationId, workspaceId, status, createdAt], map: "BusinessIntentProposal_tenant_status_created_idx")
   @@index([clientId, createdAt], map: "BusinessIntentProposal_client_created_idx")
   reviews BusinessIntentProposalReview[]
+  evidenceReferences BusinessIntentEvidenceReference[]
 }
 
 model BusinessIntentProposalReview {
@@ -1851,4 +1870,24 @@ model ComplianceRuleActivity {
   @@index([organizationId, workspaceId, occurredAt])
   @@index([ruleId, occurredAt])
   @@index([ruleVersionId, occurredAt])
+model BusinessIntentEvidenceReference {
+  id                String   @id @default(cuid())
+  proposalId        String
+  workspaceId       String
+  evidenceId        String
+  documentId        String
+  clientId          String?
+  claimStatement    String
+  verificationState String   @default("SOURCE_VERIFIED_RECORD")
+  createdAt         DateTime @default(now())
+
+  proposal BusinessIntentProposal @relation(fields: [proposalId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  document Document @relation(fields: [documentId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+
+  @@unique([proposalId, evidenceId])
+  @@index([workspaceId, evidenceId])
+  @@index([clientId, evidenceId])
+}
+
 }
