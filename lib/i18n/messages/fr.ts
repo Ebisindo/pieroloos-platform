@@ -37,6 +37,7 @@ const fr = {
   "navigation.marketExpansion": "Expansion de marché",
   "navigation.crossBorder": "Préparation transfrontalière",
   "navigation.formation": "Création",
+  "navigation.businessIntent": "Objectif commercial et revue IA",
   "navigation.compliance": "Conformité",
   "navigation.reports": "Rapports",
   "navigation.engagements": "Missions",

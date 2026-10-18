@@ -62,6 +62,9 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
         if (existing.status === "APPROVED" || existing.status === "REJECTED") {
           throw new Error("INTENT_PROPOSAL_FINAL");
         }
+        if (existing.createdByUserId === principal.userId) {
+          throw new Error("INTENT_PROPOSAL_SELF_REVIEW");
+        }
         if (existing.version !== parsed.data.expectedVersion) {
           throw new Error("INTENT_PROPOSAL_VERSION_CONFLICT");
         }
@@ -136,6 +139,9 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
     }
     if (error instanceof Error && error.message === "INTENT_PROPOSAL_FINAL") {
       return NextResponse.json({ error: "Approved or rejected proposals are immutable. Create a new proposal to reconsider the decision." }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "INTENT_PROPOSAL_SELF_REVIEW") {
+      return NextResponse.json({ error: "A different authorized reviewer must review this proposal." }, { status: 403 });
     }
     if (error instanceof Error && error.message === "INTENT_PROPOSAL_VERSION_CONFLICT") {
       return NextResponse.json({ error: "Proposal changed during review. Refresh it and submit the decision against the latest version." }, { status: 409 });

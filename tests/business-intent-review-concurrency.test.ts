@@ -118,4 +118,18 @@ describe("business-intent proposal review concurrency", () => {
     expect(reviewCreateMock).not.toHaveBeenCalled();
     expect(activityCreateMock).not.toHaveBeenCalled();
   });
+  it("prevents the proposal creator from reviewing their own proposal", async () => {
+    proposalFindFirstMock.mockResolvedValueOnce({
+      id: "proposal-1",
+      status: "PROPOSED",
+      version: 3,
+      createdByUserId: principal.userId,
+    });
+    const response = await PATCH(request(body({ decision: "APPROVED" })), routeContext);
+    expect(response.status).toBe(403);
+    expect(proposalUpdateManyMock).not.toHaveBeenCalled();
+    expect(reviewCreateMock).not.toHaveBeenCalled();
+    expect(activityCreateMock).not.toHaveBeenCalled();
+  });
+
 });
