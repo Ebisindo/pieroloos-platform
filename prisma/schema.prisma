@@ -1019,6 +1019,10 @@ model ComplianceObligation {
   jurisdiction  Jurisdiction?        @relation(fields: [jurisdictionId], references: [id], onDelete: SetNull)
   activities    ComplianceActivity[]
   reminders     ComplianceReminder[]
+  sourceRuleVersionId String?
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  deadlineSnapshots ComplianceDeadlineSnapshot[]
+  statusSnapshots ComplianceStatusSnapshot[]
   evidence      ComplianceEvidence[]
   deadlineSnapshots ComplianceDeadlineSnapshot[]
   statusSnapshots ComplianceStatusSnapshot[]
@@ -1802,6 +1806,8 @@ model ComplianceRuleVersion {
   rule      ComplianceRule @relation(fields: [ruleId, workspaceId, jurisdictionId], references: [id, workspaceId, jurisdictionId], onDelete: Cascade)
   workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User          @relation("ComplianceRuleVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  obligations ComplianceObligation[]
+  deadlineSnapshots ComplianceDeadlineSnapshot[]
   reviewer  User?         @relation("ComplianceRuleVersionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
 
   @@unique([ruleId, version])
@@ -1824,6 +1830,8 @@ model ComplianceDeadlineSnapshot {
   actorUserId        String
   createdAt          DateTime                     @default(now())
 
+  obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  sourceRuleVersion ComplianceRuleVersion? @relation(fields: [sourceRuleVersionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   actor     User      @relation("ComplianceDeadlineSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
@@ -1842,6 +1850,7 @@ model ComplianceStatusSnapshot {
   actorUserId  String
   createdAt    DateTime @default(now())
 
+  obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   actor     User      @relation("ComplianceStatusSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
@@ -1890,4 +1899,3 @@ model BusinessIntentEvidenceReference {
   @@index([clientId, evidenceId])
 }
 
-}
