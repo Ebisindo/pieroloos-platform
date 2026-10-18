@@ -209,12 +209,12 @@ describe("reviewed compliance rule obligation generation", () => {
       .mockReset()
       .mockResolvedValueOnce(generated)
       .mockRejectedValueOnce({ code: "P2002" });
-    globalObligationFindFirstMock.mockReset().mockResolvedValue(generated);
-    // Each transaction performs its initial scoped read before creation. Only the
-    // losing request reaches the global recovery lookup after P2002 is raised.
+    // The two initial reads see no obligation; the losing request's fresh
+    // authorized recovery transaction must then see the winner.
     obligationFindFirstMock.mockReset()
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(generated);
 
     const responses = await Promise.all([
       POST(request(payload()), routeContext),
@@ -236,15 +236,13 @@ describe("reviewed compliance rule obligation generation", () => {
 
   it("rechecks a unique-key race and returns the scoped existing obligation", async () => {
     obligationCreateMock.mockRejectedValueOnce({ code: "P2002" });
-    globalObligationFindFirstMock.mockResolvedValueOnce({ id: "obligation-raced", workspaceId: principal.workspaceId, clientId: "client-1" });
-    obligationFindFirstMock.mockReset().mockResolvedValue(null);
-    globalObligationFindFirstMock.mockReset().mockResolvedValue({
-      id: "obligation-raced", workspaceId: principal.workspaceId, clientId: "client-1",
-    });
+    obligationFindFirstMock.mockReset()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ id: "obligation-raced", workspaceId: principal.workspaceId, clientId: "client-1" });
     const response = await POST(request(payload()), routeContext);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { id: "obligation-raced" }, alreadyExists: true });
-    expect(globalObligationFindFirstMock).toHaveBeenCalledWith({
+    expect(obligationFindFirstMock).toHaveBeenCalledWith({
       where: expect.objectContaining({
         organizationId: principal.organizationId,
         workspaceId: principal.workspaceId,
