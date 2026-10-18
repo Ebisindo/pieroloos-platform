@@ -186,6 +186,7 @@ describe("corporate graph read authorization revalidation", () => {
         corporateGraphNode: { findMany: graphNodeFindManyMock },
         corporateGraphEdge: { findMany: graphEdgeFindManyMock },
         corporateGraphAuditEvent: { findMany: graphAuditFindManyMock },
+        corporateComplianceRule: { findMany: complianceRuleFindManyMock },
       }),
     );
   });
