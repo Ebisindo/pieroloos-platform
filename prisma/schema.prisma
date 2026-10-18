@@ -1834,22 +1834,25 @@ model ComplianceDeadlineSnapshot {
 }
 
 model ComplianceStatusSnapshot {
-  id           String   @id @default(cuid())
-  obligationId String
-  workspaceId  String
-  sequence     Int
-  status       ComplianceStatus
-  reason       String
-  actorUserId  String
-  createdAt    DateTime @default(now())
+  id                String           @id @default(cuid())
+  obligationId      String
+  workspaceId       String
+  sequence          Int
+  previousStatus    ComplianceStatus
+  currentStatus     ComplianceStatus
+  completedAtBefore DateTime?
+  completedAtAfter  DateTime?
+  reason            String?
+  actorUserId       String
+  occurredAt        DateTime         @default(now())
 
   obligation ComplianceObligation @relation(fields: [obligationId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  actor     User      @relation("ComplianceStatusSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  actor      User                 @relation("ComplianceStatusSnapshotActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@unique([obligationId, sequence])
-  @@index([workspaceId, createdAt])
-  @@index([obligationId, createdAt])
+  @@index([workspaceId, occurredAt])
+  @@index([obligationId, occurredAt])
 }
 
 model ComplianceRuleActivity {
