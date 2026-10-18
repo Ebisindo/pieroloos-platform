@@ -31,7 +31,7 @@ export default async function BusinessIntentPage() {
 
   let linkedClients: ClientRecord[] = [];
   let clientOptions: ClientRecord[] = [];
-  if (principal.permissions.includes("clients:read")) {
+  if (principal.permissions.includes("client:read")) {
     const linkedIds = [...new Set(records.flatMap((record) => record.clientId ? [record.clientId] : []))];
     [linkedClients, clientOptions] = await Promise.all([
       linkedIds.length ? prisma.client.findMany({
