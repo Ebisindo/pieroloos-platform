@@ -23,6 +23,15 @@ Status: implementation specification accompanying PR #36. Production activation 
 
 A grant does not imply another capability; the backend requires the exact capability for each operation. Do not add wildcard, admin, write-all, user-management or grant-management capabilities. Partner identities cannot approve their own identity/grant, change their own authorization or receive a parallel tenant-staff role in the same organization.
 
+### Grantable capability allowlist in this increment
+
+Only these capability enum values may currently be issued or amended into a grant:
+- `CLIENT_PROFILE_READ` — partner client summary endpoint.
+- `COMPLIANCE_READ` — partner compliance overview endpoint.
+- `EVIDENCE_ATTACH` — partner evidence attachment submission endpoint.
+
+The enum values `DOCUMENT_METADATA_READ`, `GRAPH_READ`, and `REPORT_READ` are reserved and rejected by create/amend validation until their dedicated tenant-scoped endpoints, download/export controls where relevant, audit behavior, and authorization tests are implemented and reviewed. Declaring an enum value is not authorization to issue it.
+
 ## Audit and evidence integrity
 
 Identity lifecycle events, grant creation/review/amendment/revocation and successful partner operations create append-only audit records. Denied attempts are returned without grant business-data or success-audit side effects; edge/security telemetry may separately record redacted denials. Do not put secret tokens, complete document contents or unnecessary personal data in metadata. Use stable record IDs, actor IDs, action names, timestamps, reason hashes where suitable and prior/new state summaries.
