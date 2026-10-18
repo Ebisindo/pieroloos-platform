@@ -1,6 +1,6 @@
 import type {
   CorporateGraphRelationType,
-  CorporateRuleReviewStatus,
+  ComplianceRuleReviewState,
   EvidenceClass,
 } from "@prisma/client";
 
@@ -28,7 +28,7 @@ export type ComplianceRuleRecord = {
   effectiveFrom: Date | null;
   effectiveTo: Date | null;
   evidenceClass: EvidenceClass;
-  reviewStatus: CorporateRuleReviewStatus;
+  reviewStatus: ComplianceRuleReviewState;
   requiresProfessionalReview: boolean;
   active: boolean;
   version: number;
