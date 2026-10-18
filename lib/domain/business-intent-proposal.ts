@@ -1,11 +1,10 @@
 import { z } from "zod";
 
 const factSchema = z.object({
-  id: z.string().trim().min(1).max(80),
+  // Statement is an unverified user claim, not trusted evidence.
   statement: z.string().trim().min(2).max(1600),
-  sourceUrl: z.string().url().max(2000).optional(),
-  evidenceClass: z.enum(["E0", "E1", "E2", "E3", "E4"]).default("E0"),
-  retrievedAt: z.string().datetime().optional(),
+  // References are resolved to server-owned records and tenant-checked by the API.
+  evidenceId: z.string().trim().min(1).max(120).optional(),
 }).strict();
 
 export const businessIntentInputSchema = z.object({
