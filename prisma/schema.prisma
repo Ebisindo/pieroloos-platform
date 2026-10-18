@@ -673,6 +673,7 @@ model Evidence {
   businessIntentReferences BusinessIntentEvidenceReference[]
   corporateGraphRuleAssessments CorporateGraphRuleAssessment[]
 
+  @@unique([id, jurisdictionId], map: "Evidence_id_jurisdictionId_key")
   @@index([evidenceClass])
   @@index([jurisdictionId])
 }
