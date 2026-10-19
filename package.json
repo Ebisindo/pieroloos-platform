@@ -24,32 +24,33 @@
     "@aws-sdk/client-s3": "^3.1146.0",
     "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "@prisma/client": "6.19.3",
-    "lucide-react": "latest",
-    "next": "latest",
+    "lucide-react": "1.48.0",
+    "next": "16.4.2",
     "next-auth": "^4.24.15",
     "nodemailer": "^10.0.15",
-    "react": "latest",
-    "react-dom": "latest",
-    "zod": "latest"
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@eslint/eslintrc": "latest",
-    "@playwright/test": "latest",
-    "@tailwindcss/postcss": "latest",
-    "@types/node": "latest",
+    "@eslint/eslintrc": "3.3.7",
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "26.6.3",
     "@types/nodemailer": "^8.0.2",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "eslint": "latest",
-    "eslint-config-next": "latest",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.2",
     "prisma": "6.19.3",
-    "tailwindcss": "latest",
-    "typescript": "latest",
-    "vitest": "latest"
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vitest": "5.0.2"
   },
   "overrides": {
-    "nodemailer": "^10.0.15"
+    "nodemailer": "^10.0.15",
+    "deepmerge-ts": "8.0.0"
   },
   "description": "PieroloOS Corporate Intelligence & Formation Platform",
   "repository": {
