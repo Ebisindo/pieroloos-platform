@@ -468,12 +468,12 @@ model Workspace {
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
   businessIntentProposals    BusinessIntentProposal[]
+  corporateGraphNodes CorporateGraphNode[]
+  corporateGraphAuditEvents CorporateGraphAuditEvent[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
   @@index([organizationId])
-  corporateGraphNodes CorporateGraphNode[]
-  corporateGraphAuditEvents CorporateGraphAuditEvent[]
 }
 
 model Client {
@@ -506,10 +506,10 @@ model Client {
   portalAccessGrants    ClientPortalGrant[]
   portalEvents          ClientPortalAuditEvent[]
   portalInteractions    ClientPortalInteraction[]
+  corporateGraphNodes CorporateGraphNode[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
-  corporateGraphNodes CorporateGraphNode[]
 }
 
 model BusinessProfile {
@@ -1697,6 +1697,7 @@ model BillingWebhookEvent {
   @@index([organizationId, receivedAt])
 }
 
+
 enum ComplianceRuleReviewState {
   UNREVIEWED
   VERIFIED
@@ -1879,7 +1880,6 @@ model PartnershipInquiry {
   @@index([status, createdAt])
   @@index([createdAt])
 }
-
 enum CorporateGraphNodeType {
   COMPANY
   PERSON
