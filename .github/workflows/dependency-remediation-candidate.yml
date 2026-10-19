@@ -71,14 +71,14 @@ jobs:
           const fs = require('fs');
           const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           for (const group of ['dependencies', 'devDependencies', 'optionalDependencies']) {
-            for (const name of ['eslint-config-next', '@next/eslint-plugin-next', 'eslint-plugin-jsx-a11y', 'eslint-plugin-react']) {
+            for (const name of ['eslint-config-next', '@next/eslint-plugin-next', '@eslint/js', '@eslint-react/eslint-plugin', 'eslint-plugin-jsx-a11y', 'eslint-plugin-react', 'eslint-plugin-react-hooks', 'globals']) {
               if (p[group]) delete p[group][name];
             }
           }
           fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
           NODE
           npm install --save-exact next@16.4.2 --no-audit --no-fund
-          npm install --save-dev --save-exact eslint@10.13.0 @eslint/js typescript-eslint @eslint-react/eslint-plugin eslint-plugin-react-hooks globals --no-audit --no-fund
+          npm install --save-dev --save-exact eslint@10.13.0 eslint-config-next@16.4.2 typescript-eslint --no-audit --no-fund
 
       - name: Pin latest declarations and test Prisma deepmerge-ts 8 override
         run: |
@@ -133,7 +133,7 @@ jobs:
 
       - name: Record candidate package versions and pinning coverage
         run: |
-          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint','@eslint/js','typescript-eslint','@eslint-react/eslint-plugin','eslint-plugin-react-hooks','globals','react','react-dom','prisma','@prisma/client','deepmerge-ts']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies,overrides:p.overrides},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
+          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint','eslint-config-next','@next/eslint-plugin-next','typescript-eslint','eslint-plugin-react','eslint-plugin-react-hooks','eslint-plugin-jsx-a11y','react','react-dom','prisma','@prisma/client','deepmerge-ts']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies,overrides:p.overrides},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
           cp package.json package-lock.json dependency-candidate/
 
       - name: Create disposable shadow database
@@ -210,14 +210,19 @@ jobs:
           const full = read('npm-audit-summary.json');
           const prod = read('npm-audit-production-summary.json');
           if (p.dependencies?.next !== '16.4.2') throw new Error('Candidate Next.js version is not 16.4.2');
-          if (p.devDependencies?.['eslint-config-next'] || p.dependencies?.['eslint-config-next']) throw new Error('Vulnerable eslint-config-next chain must be removed');
+          if (p.devDependencies?.['eslint-config-next'] !== '16.4.2') throw new Error('Candidate must use official eslint-config-next 16.4.2 compatible with ESLint 10');
+          if (p.devDependencies?.eslint !== '10.13.0') throw new Error('Candidate must pin ESLint 10.13.0');
           if (p.overrides?.['deepmerge-ts'] !== '8.0.0') throw new Error('Expected tested deepmerge-ts 8.0.0 override missing');
           if (l.packages?.['node_modules/next']?.version !== '16.4.2') throw new Error('Lockfile Next.js version mismatch');
-          if (l.packages?.['node_modules/eslint-config-next'] || l.packages?.['node_modules/@next/eslint-plugin-next']) throw new Error('Vulnerable Next ESLint plugin chain remains in lockfile');
+          if (l.packages?.['node_modules/eslint-config-next']?.version !== '16.4.2') throw new Error('Lockfile official Next ESLint config version mismatch');
+          if (l.packages?.['node_modules/@next/eslint-plugin-next']?.version !== '16.4.2') throw new Error('Lockfile Next ESLint plugin version mismatch');
           if (l.packages?.['node_modules/deepmerge-ts']?.version !== '8.0.0') throw new Error('Lockfile deepmerge-ts override mismatch');
-          for (const name of ['@eslint/js','typescript-eslint','@eslint-react/eslint-plugin','eslint-plugin-react-hooks','globals']) {
-            if (!p.devDependencies?.[name] || p.devDependencies[name] === 'latest') throw new Error('Alternative lint dependency missing or unpinned: '+name);
-            if (!l.packages?.['node_modules/'+name]?.version) throw new Error('Alternative lint dependency missing from lockfile: '+name);
+          for (const name of ['eslint-config-next','typescript-eslint']) {
+            if (!p.devDependencies?.[name] || p.devDependencies[name] === 'latest') throw new Error('Official ESLint dependency missing or unpinned: '+name);
+            if (!l.packages?.['node_modules/'+name]?.version) throw new Error('ESLint dependency missing from lockfile: '+name);
+          }
+          for (const name of ['eslint-plugin-react','eslint-plugin-react-hooks','eslint-plugin-jsx-a11y','@next/eslint-plugin-next']) {
+            if (Object.hasOwn(p.devDependencies||{},name) || Object.hasOwn(p.dependencies||{},name)) throw new Error('Next.js plugin should be supplied by the pinned official config, not independently overridden: '+name);
           }
           for (const group of ['dependencies','devDependencies','optionalDependencies']) {
             const a=p[group]||{}, b=l.packages[''][group]||{};
