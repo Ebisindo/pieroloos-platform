@@ -1,9 +1,10 @@
-name: Next and ESLint security patch candidate
+name: Next and vulnerability-free ESLint toolchain candidate
 
 on:
   pull_request:
     paths:
       - ".github/workflows/dependency-remediation-candidate.yml"
+      - "eslint.config.mjs"
       - "package.json"
       - "package-lock.json"
   push:
@@ -20,7 +21,7 @@ concurrency:
 
 jobs:
   candidate:
-    name: Generate and validate pinned Next 16 candidate with Prisma override experiment
+    name: Generate and validate Next 16 candidate with alternate ESLint toolchain
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -64,8 +65,11 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Generate patched Next and matching ESLint versions using npm
-        run: npm install --save-exact next@16.4.2 eslint-config-next@16.4.2 --no-audit --no-fund
+      - name: Replace vulnerable Next ESLint plugin chain with a maintained general-purpose toolchain
+        run: |
+          npm uninstall --save-dev eslint-config-next --no-audit --no-fund
+          npm install --save-exact next@16.4.2 --no-audit --no-fund
+          npm install --save-dev --save-exact typescript-eslint eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y globals --no-audit --no-fund
 
       - name: Pin latest declarations and test Prisma deepmerge-ts 8 override
         run: |
@@ -119,7 +123,7 @@ jobs:
 
       - name: Record candidate package versions and pinning coverage
         run: |
-          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint-config-next','@next/eslint-plugin-next','react','react-dom','prisma','@prisma/client','deepmerge-ts']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies,overrides:p.overrides},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
+          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','typescript-eslint','eslint-plugin-react','eslint-plugin-react-hooks','eslint-plugin-jsx-a11y','globals','react','react-dom','prisma','@prisma/client','deepmerge-ts']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies,overrides:p.overrides},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
           cp package.json package-lock.json dependency-candidate/
 
       - name: Create disposable shadow database
@@ -195,23 +199,24 @@ jobs:
           const l = read('package-lock.json');
           const full = read('npm-audit-summary.json');
           const prod = read('npm-audit-production-summary.json');
-          const allowed = new Set(['@next/eslint-plugin-next','braces','eslint-config-next','fast-glob','micromatch']);
           if (p.dependencies?.next !== '16.4.2') throw new Error('Candidate Next.js version is not 16.4.2');
-          if (p.devDependencies?.['eslint-config-next'] !== '16.4.2') throw new Error('Next ESLint config does not match Next 16.4.2');
+          if (p.devDependencies?.['eslint-config-next'] || p.dependencies?.['eslint-config-next']) throw new Error('Vulnerable eslint-config-next chain must be removed');
           if (p.overrides?.['deepmerge-ts'] !== '8.0.0') throw new Error('Expected tested deepmerge-ts 8.0.0 override missing');
           if (l.packages?.['node_modules/next']?.version !== '16.4.2') throw new Error('Lockfile Next.js version mismatch');
-          if (l.packages?.['node_modules/eslint-config-next']?.version !== '16.4.2') throw new Error('Lockfile eslint-config-next mismatch');
+          if (l.packages?.['node_modules/eslint-config-next'] || l.packages?.['node_modules/@next/eslint-plugin-next']) throw new Error('Vulnerable Next ESLint plugin chain remains in lockfile');
           if (l.packages?.['node_modules/deepmerge-ts']?.version !== '8.0.0') throw new Error('Lockfile deepmerge-ts override mismatch');
+          for (const name of ['typescript-eslint','eslint-plugin-react','eslint-plugin-react-hooks','eslint-plugin-jsx-a11y','globals']) {
+            if (!p.devDependencies?.[name] || p.devDependencies[name] === 'latest') throw new Error('Alternative lint dependency missing or unpinned: '+name);
+            if (!l.packages?.['node_modules/'+name]?.version) throw new Error('Alternative lint dependency missing from lockfile: '+name);
+          }
           for (const group of ['dependencies','devDependencies','optionalDependencies']) {
             const a=p[group]||{}, b=l.packages[''][group]||{};
             for (const name of new Set([...Object.keys(a),...Object.keys(b)])) if (a[name] !== b[name]) throw new Error('Manifest/lock mismatch: '+group+'.'+name);
             for (const [name,v] of Object.entries(a)) if (v === 'latest') throw new Error('Unpinned direct dependency remains: '+name);
           }
           if ((prod.metadata?.vulnerabilities?.high ?? 0) !== 0 || (prod.metadata?.vulnerabilities?.critical ?? 0) !== 0) throw new Error('Production-only audit is not clean');
-          if ((full.metadata?.vulnerabilities?.critical ?? 0) !== 0) throw new Error('Candidate full audit contains critical findings');
-          const unexpected = (full.advisories||[]).filter(a => !allowed.has(a.name));
-          if (unexpected.length) throw new Error('Unexpected full-audit advisory package(s): '+unexpected.map(a=>a.name).join(', '));
-          console.log('Candidate validated. Remaining findings are limited to the known braces/Next ESLint tooling chain; full npm audit remains a release blocker.');
+          if ((full.metadata?.vulnerabilities?.high ?? 0) !== 0 || (full.metadata?.vulnerabilities?.critical ?? 0) !== 0) throw new Error('Full audit must have zero high/critical findings before candidate publication');
+          console.log('Candidate validated with no high or critical findings in the full or production-only dependency audit.');
           console.log(JSON.stringify({fullAudit:full.metadata?.vulnerabilities,productionAudit:prod.metadata?.vulnerabilities},null,2));
           NODE
 
