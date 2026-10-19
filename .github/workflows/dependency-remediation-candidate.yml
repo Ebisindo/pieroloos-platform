@@ -65,11 +65,11 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Replace vulnerable Next ESLint plugin chain with a maintained general-purpose toolchain
+      - name: Replace vulnerable Next ESLint plugin chain with an ESLint 9-compatible general-purpose toolchain
         run: |
           npm uninstall --save-dev eslint-config-next --no-audit --no-fund
           npm install --save-exact next@16.4.2 --no-audit --no-fund
-          npm install --save-dev --save-exact typescript-eslint eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y globals --no-audit --no-fund
+          npm install --save-dev --save-exact eslint@9.39.5 typescript-eslint eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y globals --no-audit --no-fund
 
       - name: Pin latest declarations and test Prisma deepmerge-ts 8 override
         run: |
