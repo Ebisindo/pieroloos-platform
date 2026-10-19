@@ -1935,6 +1935,7 @@ model CorporateGraphNode {
   outgoing     CorporateGraphEdge[] @relation("CorporateGraphFrom")
   incoming     CorporateGraphEdge[] @relation("CorporateGraphTo")
 
+  @@unique([id, organizationId, workspaceId])
   @@index([organizationId, workspaceId])
   @@index([clientId, workspaceId])
   @@index([jurisdictionCode, entityType])
@@ -1955,8 +1956,8 @@ model CorporateGraphEdge {
   archivedAt       DateTime?
   archivedByUserId String?
 
-  fromNode CorporateGraphNode @relation("CorporateGraphFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
-  toNode   CorporateGraphNode @relation("CorporateGraphTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+  fromNode CorporateGraphNode @relation("CorporateGraphFrom", fields: [fromNodeId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Cascade)
+  toNode   CorporateGraphNode @relation("CorporateGraphTo", fields: [toNodeId, organizationId, workspaceId], references: [id, organizationId, workspaceId], onDelete: Cascade)
 
   @@unique([organizationId, workspaceId, fromNodeId, toNodeId, relation])
   @@index([organizationId, workspaceId, fromNodeId])
