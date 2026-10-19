@@ -33,3 +33,8 @@ Remaining support concern: npm emits a deprecation/unsupported warning for the r
 ## Merge control
 
 PR #69 remains a draft and open. PR #62 and PR #64 remain drafts and open. Green CI does not authorize a merge by itself. No merge, deployment, production migration, payment, filing or other external business action is authorized by this record. Merge only after the candidate head is final, all mandatory checks are green on that exact head, ESLint support is conclusively resolved, independent security and database/schema reviews approve, and the base/overlapping-PR plan is reviewed.
+
+
+## ESLint 10 resolution attempt — 19 October 2026
+
+Official ESLint policy lists v10.x as Current and v9.0.0–v9.39.5 as EOL from 6 August 2026. The ESLint 10 candidate therefore replaces the outdated `eslint-plugin-jsx-a11y` package, whose published peer range ends at ESLint 9, with `@eslint-react/eslint-plugin` and retains the Playwright axe accessibility checks. No peer-dependency bypass is permitted. This candidate is exploratory until npm lockfile generation, `npm ci`, lint, typecheck, tests, PostgreSQL checks, production build, browser tests, audits, CodeQL, and secret scanning all pass on the exact final head. References: https://eslint.org/version-support/ and https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/issues/1075.
