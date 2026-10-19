@@ -45,8 +45,8 @@ jobs:
       - name: Record installed versions
         run: |
           mkdir -p dependency-evidence
-          npm ls next eslint eslint-config-next @next/eslint-plugin-next typescript-eslint eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y prisma @prisma/client @prisma/config deepmerge-ts braces micromatch fast-glob --all > dependency-evidence/npm-ls.txt 2>&1 || true
-          node -e "for (const n of ['next','eslint','eslint-config-next','@next/eslint-plugin-next','typescript-eslint','eslint-plugin-react','eslint-plugin-react-hooks','eslint-plugin-jsx-a11y','prisma','@prisma/client','@prisma/config','deepmerge-ts','braces','micromatch','fast-glob']) { try { const p=require(n+'/package.json'); console.log(n+'='+p.version) } catch(e) { console.log(n+'=not directly resolvable') } }" > dependency-evidence/installed-versions.txt
+          npm ls next eslint @eslint/js @eslint-react/eslint-plugin typescript-eslint eslint-plugin-react-hooks globals prisma @prisma/client @prisma/config deepmerge-ts braces micromatch fast-glob --all > dependency-evidence/npm-ls.txt 2>&1 || true
+          node -e "for (const n of ['next','eslint','@eslint/js','@eslint-react/eslint-plugin','typescript-eslint','eslint-plugin-react-hooks','globals','prisma','@prisma/client','@prisma/config','deepmerge-ts','braces','micromatch','fast-glob']) { try { const p=require(n+'/package.json'); console.log(n+'='+p.version) } catch(e) { console.log(n+'=not directly resolvable') } }" > dependency-evidence/installed-versions.txt
 
       - name: Capture full npm audit report
         continue-on-error: true
@@ -80,7 +80,7 @@ jobs:
             for (const [name, version] of Object.entries(p[group] || {})) if (version === 'latest') latest.push({group,name});
           }
           const resolved = {};
-          for (const name of ['eslint','eslint-config-next','@next/eslint-plugin-next','typescript-eslint','eslint-plugin-react','eslint-plugin-react-hooks','eslint-plugin-jsx-a11y','next','prisma','@prisma/client','deepmerge-ts']) {
+          for (const name of ['eslint','@eslint/js','@eslint-react/eslint-plugin','typescript-eslint','eslint-plugin-react-hooks','globals','next','prisma','@prisma/client','deepmerge-ts']) {
             const entry = l.packages?.['node_modules/' + name];
             resolved[name] = entry?.version ?? null;
           }
@@ -95,13 +95,13 @@ jobs:
             process.exitCode = 1;
           }
           const eslintMajor = Number.parseInt(resolved.eslint || '0', 10);
-          const requiredToolchain = ['eslint-config-next','@next/eslint-plugin-next','typescript-eslint'];
+          const requiredToolchain = ['@eslint/js','@eslint-react/eslint-plugin','typescript-eslint','eslint-plugin-react-hooks','globals'];
           const missingToolchain = requiredToolchain.filter(name => !resolved[name]);
           const direct = {...(p.dependencies || {}), ...(p.devDependencies || {}), ...(p.optionalDependencies || {})};
-          const legacyDirect = ['@next/eslint-plugin-next','eslint-plugin-jsx-a11y','eslint-plugin-react','eslint-plugin-react-hooks','globals','@eslint/js','@eslint-react/eslint-plugin'].filter(name => Object.hasOwn(direct,name));
-          if (eslintMajor < 10 || resolved['eslint-config-next'] !== '16.4.2' || resolved['@next/eslint-plugin-next'] !== '16.4.2' || !p.devDependencies?.['eslint-config-next'] || missingToolchain.length || legacyDirect.length) {
-            console.error(JSON.stringify({eslintMajor,eslintConfigNext:resolved['eslint-config-next'],nextEslintPlugin:resolved['@next/eslint-plugin-next'],missingToolchain,legacyDirect}, null, 2));
-            console.error('Expected ESLint 10 with the official Next.js 16.4.2 ESLint config and plugin; do not override its plugin dependency chain independently.');
+          const legacyDirect = ['eslint-config-next','@next/eslint-plugin-next','eslint-plugin-jsx-a11y','eslint-plugin-react'].filter(name => Object.hasOwn(direct,name));
+          if (eslintMajor < 10 || missingToolchain.length || legacyDirect.length) {
+            console.error(JSON.stringify({eslintMajor,missingToolchain,legacyDirect}, null, 2));
+            console.error('Expected ESLint 10 with the maintained React toolchain; do not reintroduce legacy plugins with incompatible peer ranges.');
             process.exitCode = 1;
           }
           NODE
