@@ -38,7 +38,7 @@ The workflow may publish candidate package files only to this isolated branch af
 - Candidate full and production-only audits reported 0 vulnerabilities each (0 info, low, moderate, high or critical).
 - Candidate validation passed reproducible `npm ci`, PostgreSQL schema/migration and integrity checks, lint, typecheck, unit tests (448 passed, 10 skipped), production build and Playwright (32 passed).
 - Lint has 24 existing-source warnings and no lint errors.
-- npm reported that ESLint `9.39.5` is no longer supported. This remains an explicit dependency-maintenance follow-up: select a supported ESLint version and rerun all gates without hiding lint debt.
+- ESLint `9.39.5` is end-of-life under the official support policy (https://eslint.org/version-support/). An isolated trial of ESLint `10.13.0` failed at npm dependency resolution: `eslint-plugin-jsx-a11y@6.10.2` declares ESLint peer support only through v9. The workflow was restored to the last peer-resolvable candidate; no `--force` or `--legacy-peer-deps` bypass was used. This remains a release blocker until the lint stack is migrated to versions that explicitly support ESLint 10 or an equivalent compatible configuration is independently validated.
 
 ### Latest exact-head automation evidence
 
@@ -50,6 +50,14 @@ All runs below correspond to current head `2326dc3f0e98a9950b7942d6757e76865682f
 - Standard CI on PR: https://github.com/Ebisindo/pieroloos-platform/actions/runs/39260093811 — passed.
 - Security checks (audit, Gitleaks, CodeQL): https://github.com/Ebisindo/pieroloos-platform/actions/runs/39260093783 — passed.
 - Dependency diagnostics: https://github.com/Ebisindo/pieroloos-platform/actions/runs/39260094104 — passed.
+
+### ESLint 10 compatibility trial — 19 October 2026
+
+- Official policy lists ESLint 9.x as end-of-life and ESLint 10.x as the current release line: https://eslint.org/version-support/.
+- The candidate workflow trialled an exact ESLint `10.13.0` install.
+- npm rejected the dependency tree with `ERESOLVE`: `eslint-plugin-jsx-a11y@6.10.2` declares its ESLint peer range through v9 only.
+- The proposed upgrade was not forced. The candidate workflow was restored to the prior peer-resolvable setup; candidate validation on the current workflow branch must complete again before any further claims.
+- Follow-up: wait for compatible official plugin releases or evaluate a replacement lint stack in a separate candidate; retain accessibility test coverage, and rerun lint, TypeScript, tests, build and Playwright.
 
 ### PR overlap and review policy
 
