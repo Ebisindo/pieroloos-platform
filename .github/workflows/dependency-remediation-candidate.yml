@@ -1,0 +1,113 @@
+name: Next and ESLint security patch candidate
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/dependency-remediation-candidate.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: next-eslint-candidate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    name: Generate and validate patched Next 16 candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pieroloos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pieroloos_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_ENV: ci
+      NEXTAUTH_SECRET: ci-only-not-a-deployment-secret
+      DATABASE_URL_CI: postgresql://postgres:postgres@localhost:5432/pieroloos_ci?schema=public
+      SHADOW_DATABASE_URL_CI: postgresql://postgres:postgres@localhost:5432/pieroloos_shadow?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pieroloos_ci?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Generate candidate package manifest and lockfile using npm
+        run: npm install --save-exact next@16.4.2 eslint-config-next@16.4.2 --no-audit --no-fund
+
+      - name: Verify generated lockfile is reproducible
+        run: npm ci --no-audit --no-fund
+
+      - name: Capture candidate audit report (known remaining advisories are expected at this stage)
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p dependency-candidate
+          set +e
+          npm audit --json > dependency-candidate/npm-audit.json
+          code=$?
+          set -e
+          printf 'npm_audit_exit_code=%s\n' "$code" > dependency-candidate/npm-audit-exit-code.txt
+          node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('dependency-candidate/npm-audit.json','utf8')); const report={metadata:a.metadata?.vulnerabilities ?? null, advisories:Object.entries(a.vulnerabilities ?? {}).map(([name,v])=>({name,severity:v.severity,isDirect:v.isDirect,range:v.range,via:v.via,fixAvailable:v.fixAvailable,nodes:v.nodes}))}; fs.writeFileSync('dependency-candidate/npm-audit-summary.json',JSON.stringify(report,null,2)); console.log(JSON.stringify(report.metadata,null,2))"
+
+      - name: Record candidate package versions
+        run: |
+          mkdir -p dependency-candidate
+          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint-config-next','@next/eslint-plugin-next','react','react-dom','prisma','@prisma/client']; const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null]))}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out.resolved,null,2))"
+          cp package.json package-lock.json dependency-candidate/
+
+      - name: Create disposable shadow database
+        run: psql "${DATABASE_URL_CI%%\?*}" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE pieroloos_shadow;'
+
+      - name: Validate, migrate, and verify PostgreSQL
+        run: npm run db:deploy -- ci
+
+      - name: Test PostgreSQL data integrity
+        run: npm run test:db
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Playwright browser and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:e2e
+
+      - name: Upload generated candidate and npm audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: next-eslint-patch-candidate
+          path: dependency-candidate/
+          if-no-files-found: error
+          retention-days: 30
