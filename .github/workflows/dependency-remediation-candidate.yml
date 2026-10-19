@@ -53,6 +53,8 @@ jobs:
       - name: Integrate current schema repair for branch-push validation
         if: github.event_name == 'push'
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin fix/main-prisma-graph-schema-clean-repair
           git merge --no-edit --no-ff origin/fix/main-prisma-graph-schema-clean-repair
 
