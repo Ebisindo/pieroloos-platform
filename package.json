@@ -33,7 +33,7 @@
     "zod": "latest"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/eslintrc": "latest",
     "@playwright/test": "latest",
     "@tailwindcss/postcss": "latest",
@@ -43,7 +43,7 @@
     "@types/react-dom": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
-    "prisma": "6.19.3",
+    "prisma": "7.10.1",
     "tailwindcss": "latest",
     "typescript": "latest",
     "vitest": "latest"
