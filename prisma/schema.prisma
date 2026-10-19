@@ -468,12 +468,12 @@ model Workspace {
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
   businessIntentProposals    BusinessIntentProposal[]
+  corporateGraphNodes        CorporateGraphNode[]
+  corporateGraphAuditEvents  CorporateGraphAuditEvent[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
   @@index([organizationId])
-  corporateGraphNodes CorporateGraphNode[]
-  corporateGraphAuditEvents CorporateGraphAuditEvent[]
 }
 
 model Client {
