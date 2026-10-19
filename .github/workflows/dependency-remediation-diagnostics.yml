@@ -1,0 +1,92 @@
+name: Dependency remediation diagnostics
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/dependency-remediation-diagnostics.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-remediation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-diagnostics:
+    name: Node 22 dependency, audit and reproducibility diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Record toolchain and manifest ranges
+        run: |
+          node --version
+          npm --version
+          node -e "const p=require('./package.json'); console.log(JSON.stringify({dependencies:p.dependencies,devDependencies:p.devDependencies,overrides:p.overrides},null,2))"
+
+      - name: Verify lockfile reproducibility
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Record installed versions
+        run: |
+          npm ls next eslint-config-next @next/eslint-plugin-next prisma @prisma/client @prisma/config deepmerge-ts braces micromatch fast-glob --all || true
+          node -e "for (const n of ['next','eslint-config-next','@next/eslint-plugin-next','prisma','@prisma/client','@prisma/config','deepmerge-ts','braces','micromatch','fast-glob']) { try { const p=require(n+'/package.json'); console.log(n+'='+p.version) } catch(e) { console.log(n+'=not directly resolvable') } }"
+
+      - name: Capture full npm audit report
+        id: audit
+        continue-on-error: true
+        run: |
+          mkdir -p dependency-evidence
+          npm audit --json > dependency-evidence/npm-audit.json
+          code=$?
+          echo "npm_audit_exit_code=$code" > dependency-evidence/npm-audit-exit-code.txt
+          node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('dependency-evidence/npm-audit.json','utf8')); const report={metadata:a.metadata?.vulnerabilities ?? null, advisories:Object.entries(a.vulnerabilities ?? {}).map(([name,v])=>({name,severity:v.severity,isDirect:v.isDirect,range:v.range,via:v.via,fixAvailable:v.fixAvailable,nodes:v.nodes}))}; fs.writeFileSync('dependency-evidence/npm-audit-summary.json',JSON.stringify(report,null,2)); console.log(JSON.stringify(report.metadata,null,2))"
+          exit 0
+
+      - name: Check manifest and lockfile root consistency
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const l = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const root = l.packages?.[''];
+          if (!root) throw new Error('package-lock.json lacks packages[""] root entry');
+          const differences = [];
+          for (const group of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+            const a = p[group] || {};
+            const b = root[group] || {};
+            for (const name of new Set([...Object.keys(a), ...Object.keys(b)])) {
+              if (a[name] !== b[name]) differences.push({group, name, manifest:a[name] ?? null, lock:b[name] ?? null});
+            }
+          }
+          const latest = [];
+          for (const group of ['dependencies','devDependencies','optionalDependencies']) {
+            for (const [name, version] of Object.entries(p[group] || {})) if (version === 'latest') latest.push({group,name});
+          }
+          fs.writeFileSync('dependency-evidence/manifest-lock-consistency.json', JSON.stringify({differences, directDependenciesUsingLatest:latest}, null, 2));
+          console.log(JSON.stringify({differences, directDependenciesUsingLatest:latest}, null, 2));
+          if (differences.length) process.exitCode = 1;
+          NODE
+
+      - name: Upload audit and dependency evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dependency-remediation-evidence
+          path: dependency-evidence/
+          if-no-files-found: warn
+          retention-days: 30
