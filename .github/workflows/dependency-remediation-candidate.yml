@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   candidate:
-    name: Generate and validate pinned Next 16 security candidate
+    name: Generate and validate pinned Next 16 candidate with Prisma override experiment
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -55,7 +55,7 @@ jobs:
       - name: Generate patched Next and matching ESLint versions using npm
         run: npm install --save-exact next@16.4.2 eslint-config-next@16.4.2 --no-audit --no-fund
 
-      - name: Pin direct dependencies declared latest to their currently locked resolved versions
+      - name: Pin latest declarations and test Prisma deepmerge-ts 8 override
         run: |
           node <<'NODE'
           const fs = require('fs');
@@ -71,10 +71,12 @@ jobs:
               changed.push({group, name, from:spec, to:locked});
             }
           }
+          manifest.overrides = {...(manifest.overrides || {}), 'deepmerge-ts':'8.0.0'};
           fs.writeFileSync('package.json', JSON.stringify(manifest, null, 2) + '\n');
           fs.mkdirSync('dependency-candidate', {recursive:true});
           fs.writeFileSync('dependency-candidate/pinned-latest-direct-dependencies.json', JSON.stringify(changed,null,2));
-          console.log(JSON.stringify(changed,null,2));
+          fs.writeFileSync('dependency-candidate/prisma-deepmerge-override.json', JSON.stringify({package:'deepmerge-ts',version:'8.0.0',purpose:'isolated compatibility experiment; accept only if full tests pass'},null,2));
+          console.log(JSON.stringify({pinnedDirectDependencies:changed,experimentalOverride:manifest.overrides['deepmerge-ts']},null,2));
           NODE
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
@@ -105,7 +107,7 @@ jobs:
 
       - name: Record candidate package versions and pinning coverage
         run: |
-          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint-config-next','@next/eslint-plugin-next','react','react-dom','prisma','@prisma/client']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
+          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint-config-next','@next/eslint-plugin-next','react','react-dom','prisma','@prisma/client','deepmerge-ts']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies,overrides:p.overrides},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
           cp package.json package-lock.json dependency-candidate/
 
       - name: Create disposable shadow database
@@ -139,7 +141,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: next-eslint-patch-candidate
+          name: next-eslint-prisma-override-candidate
           path: dependency-candidate/
           if-no-files-found: error
           retention-days: 30
