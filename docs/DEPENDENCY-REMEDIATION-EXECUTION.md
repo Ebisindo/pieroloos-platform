@@ -72,3 +72,12 @@ All runs below correspond to current head `2326dc3f0e98a9950b7942d6757e76865682f
 PR #69 remains draft and unmerged. No production deployment, production migration, external filing or payment action was performed or authorized.
 
 Related: #62 #63 #64 #65 #66 #67
+
+
+## ESLint support resolution — 19 October 2026
+
+The exact-head candidate run exposed a peer-dependency conflict when attempting ESLint 10.13.0: `eslint-plugin-jsx-a11y@6.10.2` declares an ESLint peer range through 9.x, so npm correctly rejected the tree. Do not bypass peer validation with `--force` or `--legacy-peer-deps`. The current remediation path keeps the replacement general-purpose ESLint flat-config stack but uses the supported ESLint 9 major line and pins the direct version exactly from a currently supported 9.x release in the candidate workflow. The candidate must then regenerate the lockfile, run `npm ci`, lint, typecheck, unit tests, PostgreSQL checks, production build, Playwright, and full + production audit on the exact head. This resolves the false assumption that ESLint 10 is currently compatible; it does not waive the requirement to check official ESLint support status at execution time. Existing lint warnings remain visible and must be triaged rather than suppressed.
+
+## Review status
+
+As of this checkpoint, PR #69 has no independent review submissions. An automated scan is not a substitute for independent security review or database/schema review. Keep PR #69, PR #62 and PR #64 as drafts until eligible reviewers other than the PR author submit their findings and all final-head checks pass. No merge, deployment or production migration is authorized by this evidence update.
