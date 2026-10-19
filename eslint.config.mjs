@@ -1,7 +1,8 @@
 import { defineConfig } from "eslint/config";
+import eslintJs from "@eslint/js";
 import tseslint from "typescript-eslint";
-import reactHooks from "eslint-plugin-react-hooks";
 import eslintReact from "@eslint-react/eslint-plugin";
+import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 
 export default defineConfig([
@@ -15,9 +16,13 @@ export default defineConfig([
       "test-results/**"
     ]
   },
-  ...tseslint.configs.recommended,
   {
     files: ["**/*.{js,mjs,cjs,jsx,ts,tsx}"],
+    extends: [
+      eslintJs.configs.recommended,
+      tseslint.configs.recommended,
+      eslintReact.configs.recommended
+    ],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -28,13 +33,9 @@ export default defineConfig([
       }
     },
     plugins: {
-      "react-hooks": reactHooks,
-      "@eslint-react": eslintReact
+      "react-hooks": reactHooks
     },
     rules: {
-      // The current @eslint-react plugin exposes the recommended-typescript preset.
-      // Register its plugin namespace explicitly so its rules resolve under flat config.
-      ...eslintReact.configs["recommended-typescript"].rules,
       // Keep existing repository debt visible without making this dependency patch
       // depend on unrelated source cleanup. These warnings can be promoted separately.
       "@typescript-eslint/no-unused-vars": "warn",
