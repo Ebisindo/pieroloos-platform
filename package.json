@@ -33,6 +33,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@axe-core/playwright": "^4.13.0",
     "@eslint/eslintrc": "3.3.7",
     "@playwright/test": "1.63.0",
