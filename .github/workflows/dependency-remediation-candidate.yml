@@ -69,6 +69,14 @@ jobs:
         run: |
           npm uninstall --save-dev eslint-config-next --no-audit --no-fund
           npm install --save-exact next@16.4.2 --no-audit --no-fund
+          node <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          delete p.devDependencies?.['eslint-plugin-jsx-a11y'];
+          delete p.devDependencies?.['eslint-plugin-react'];
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          NODE
+          npm install --save-exact next@16.4.2 --no-audit --no-fund
           npm install --save-dev --save-exact eslint@10.13.0 typescript-eslint @eslint-react/eslint-plugin eslint-plugin-react-hooks globals --no-audit --no-fund
 
       - name: Pin latest declarations and test Prisma deepmerge-ts 8 override
