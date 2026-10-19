@@ -25,7 +25,7 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     corporateGraphNode: { findMany: graphNodeFindManyMock },
     corporateGraphEdge: { findMany: graphEdgeFindManyMock },
-    corporateComplianceRule: { findMany: complianceRuleFindManyMock },
+    complianceRule: { findMany: complianceRuleFindManyMock },
     corporateGraphAuditEvent: { findMany: graphAuditFindManyMock },
   },
 }));
@@ -74,7 +74,7 @@ describe("corporate graph and compliance API boundaries", () => {
         corporateGraphNode: { findMany: graphNodeFindManyMock },
         corporateGraphEdge: { findMany: graphEdgeFindManyMock },
         corporateGraphAuditEvent: { findMany: graphAuditFindManyMock },
-        corporateComplianceRule: { findMany: complianceRuleFindManyMock },
+        complianceRule: { findMany: complianceRuleFindManyMock },
       }),
     );
   });
@@ -194,7 +194,7 @@ describe("corporate graph read authorization revalidation", () => {
         corporateGraphNode: { findMany: graphNodeFindManyMock },
         corporateGraphEdge: { findMany: graphEdgeFindManyMock },
         corporateGraphAuditEvent: { findMany: graphAuditFindManyMock },
-        corporateComplianceRule: { findMany: complianceRuleFindManyMock },
+        complianceRule: { findMany: complianceRuleFindManyMock },
       }),
     );
   });
