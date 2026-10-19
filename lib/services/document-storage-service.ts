@@ -355,7 +355,7 @@ async function storeUpload(
         throw new AggregateError(
           [error, cleanupError],
           "Document persistence failed and the uploaded object could not be cleaned up.",
-          { cause: error },
+          { cause: cleanupError },
         );
       }
     }
