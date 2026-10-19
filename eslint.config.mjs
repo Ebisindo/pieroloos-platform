@@ -29,12 +29,12 @@ export default defineConfig([
     },
     plugins: {
       "react-hooks": reactHooks,
-    },
-    settings: {
-      react: { version: "detect" }
+      "@eslint-react": eslintReact
     },
     rules: {
-      ...eslintReact.configs["recommended-type-checked"].rules,
+      // The current @eslint-react plugin exposes the recommended-typescript preset.
+      // Register its plugin namespace explicitly so its rules resolve under flat config.
+      ...eslintReact.configs["recommended-typescript"].rules,
       // Keep existing repository debt visible without making this dependency patch
       // depend on unrelated source cleanup. These warnings can be promoted separately.
       "@typescript-eslint/no-unused-vars": "warn",
