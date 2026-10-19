@@ -16,16 +16,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dependency-review:
+  dependency-audit:
+    name: Dependency vulnerability audit
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
     steps:
-      - name: Review dependency changes
-        uses: actions/dependency-review-action@v4
-
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Audit locked dependency tree
+        run: npm audit --audit-level=high
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
