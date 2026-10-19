@@ -1,24 +1,43 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import { defineConfig } from "eslint/config";
+import eslintJs from "@eslint/js";
+import tseslint from "typescript-eslint";
+import eslintReact from "@eslint-react/eslint-plugin";
+import reactHooks from "eslint-plugin-react-hooks";
+import globals from "globals";
 
 export default defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  globalIgnores([
-    ".next/**",
-    "out/**",
-    "build/**",
-    "coverage/**",
-    "dist/**",
-    "playwright-report/**",
-    "test-results/**",
-    "next-env.d.ts"
-  ]),
   {
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "coverage/**",
+      "dist/**",
+      "playwright-report/**",
+      "test-results/**"
+    ]
+  },
+  {
+    files: ["**/*.{js,mjs,cjs,jsx,ts,tsx}"],
+    extends: [
+      eslintJs.configs.recommended,
+      tseslint.configs.recommended,
+      eslintReact.configs.recommended
+    ],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node
+      },
+      parserOptions: {
+        ecmaFeatures: { jsx: true }
+      }
+    },
+    plugins: {
+      "react-hooks": reactHooks
+    },
     rules: {
-      // Preserve the repository's current technical-debt visibility without
-      // disabling the Next.js, React, hooks, accessibility, or TypeScript rules.
+      // Keep existing repository debt visible without making this dependency patch
+      // depend on unrelated source cleanup. These warnings can be promoted separately.
       "@typescript-eslint/no-unused-vars": "warn",
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-empty-object-type": "warn",
