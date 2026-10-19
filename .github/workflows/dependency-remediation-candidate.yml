@@ -6,6 +6,9 @@ on:
       - ".github/workflows/dependency-remediation-candidate.yml"
       - "package.json"
       - "package-lock.json"
+  push:
+    branches:
+      - "security/npm-dependency-remediation-diagnostics"
   workflow_dispatch:
 
 permissions:
@@ -45,6 +48,12 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
+
+      - name: Integrate current schema repair for branch-push validation
+        if: github.event_name == 'push'
+        run: |
+          git fetch origin fix/main-prisma-graph-schema-clean-repair
+          git merge --no-edit --no-ff origin/fix/main-prisma-graph-schema-clean-repair
 
       - name: Set up Node.js 22
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -145,3 +154,73 @@ jobs:
           path: dependency-candidate/
           if-no-files-found: error
           retention-days: 30
+
+  publish-tested-candidate:
+    name: Commit tested candidate files to the isolated branch
+    needs: candidate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/security/npm-dependency-remediation-diagnostics' && github.repository == 'Ebisindo/pieroloos-platform'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout isolated remediation branch
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: security/npm-dependency-remediation-diagnostics
+          fetch-depth: 0
+
+      - name: Integrate current schema repair
+        run: |
+          git fetch origin fix/main-prisma-graph-schema-clean-repair
+          git merge --no-edit --no-ff origin/fix/main-prisma-graph-schema-clean-repair
+
+      - name: Download tested candidate artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: next-eslint-prisma-override-candidate
+          path: candidate-artifact
+
+      - name: Verify candidate provenance and audit boundaries
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const read = p => JSON.parse(fs.readFileSync(path.join('candidate-artifact', p), 'utf8'));
+          const p = read('package.json');
+          const l = read('package-lock.json');
+          const full = read('npm-audit-summary.json');
+          const prod = read('npm-audit-production-summary.json');
+          const allowed = new Set(['@next/eslint-plugin-next','braces','eslint-config-next','fast-glob','micromatch']);
+          if (p.dependencies?.next !== '16.4.2') throw new Error('Candidate Next.js version is not 16.4.2');
+          if (p.devDependencies?.['eslint-config-next'] !== '16.4.2') throw new Error('Next ESLint config does not match Next 16.4.2');
+          if (p.overrides?.['deepmerge-ts'] !== '8.0.0') throw new Error('Expected tested deepmerge-ts 8.0.0 override missing');
+          if (l.packages?.['node_modules/next']?.version !== '16.4.2') throw new Error('Lockfile Next.js version mismatch');
+          if (l.packages?.['node_modules/eslint-config-next']?.version !== '16.4.2') throw new Error('Lockfile eslint-config-next mismatch');
+          if (l.packages?.['node_modules/deepmerge-ts']?.version !== '8.0.0') throw new Error('Lockfile deepmerge-ts override mismatch');
+          for (const group of ['dependencies','devDependencies','optionalDependencies']) {
+            const a=p[group]||{}, b=l.packages[''][group]||{};
+            for (const name of new Set([...Object.keys(a),...Object.keys(b)])) if (a[name] !== b[name]) throw new Error('Manifest/lock mismatch: '+group+'.'+name);
+            for (const [name,v] of Object.entries(a)) if (v === 'latest') throw new Error('Unpinned direct dependency remains: '+name);
+          }
+          if ((prod.metadata?.vulnerabilities?.high ?? 0) !== 0 || (prod.metadata?.vulnerabilities?.critical ?? 0) !== 0) throw new Error('Production-only audit is not clean');
+          if ((full.metadata?.vulnerabilities?.critical ?? 0) !== 0) throw new Error('Candidate full audit contains critical findings');
+          const unexpected = (full.advisories||[]).filter(a => !allowed.has(a.name));
+          if (unexpected.length) throw new Error('Unexpected full-audit advisory package(s): '+unexpected.map(a=>a.name).join(', '));
+          console.log('Candidate validated. Remaining findings are limited to the known braces/Next ESLint tooling chain; full npm audit remains a release blocker.');
+          console.log(JSON.stringify({fullAudit:full.metadata?.vulnerabilities,productionAudit:prod.metadata?.vulnerabilities},null,2));
+          NODE
+
+      - name: Apply candidate manifest and lockfile
+        run: |
+          cp candidate-artifact/package.json package.json
+          cp candidate-artifact/package-lock.json package-lock.json
+          git diff --check
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Candidate package files are already committed."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "fix(deps): apply tested Next and Prisma security candidate"
+            git push origin HEAD:security/npm-dependency-remediation-diagnostics
+          fi
