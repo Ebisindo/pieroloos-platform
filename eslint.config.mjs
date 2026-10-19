@@ -31,7 +31,6 @@ export default defineConfig([
     plugins: {
       react,
       "react-hooks": reactHooks,
-      "jsx-a11y": jsxA11y
     },
     settings: {
       react: { version: "detect" }
