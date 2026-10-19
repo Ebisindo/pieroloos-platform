@@ -65,11 +65,11 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Replace vulnerable Next ESLint chain and pin supported ESLint 10.13.0
+      - name: Replace vulnerable Next ESLint plugin chain with a maintained general-purpose toolchain
         run: |
           npm uninstall --save-dev eslint-config-next --no-audit --no-fund
           npm install --save-exact next@16.4.2 --no-audit --no-fund
-          npm install --save-dev --save-exact eslint@10.13.0 typescript-eslint eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y globals --no-audit --no-fund
+          npm install --save-dev --save-exact typescript-eslint eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y globals --no-audit --no-fund
 
       - name: Pin latest declarations and test Prisma deepmerge-ts 8 override
         run: |
@@ -201,8 +201,6 @@ jobs:
           const prod = read('npm-audit-production-summary.json');
           if (p.dependencies?.next !== '16.4.2') throw new Error('Candidate Next.js version is not 16.4.2');
           if (p.devDependencies?.['eslint-config-next'] || p.dependencies?.['eslint-config-next']) throw new Error('Vulnerable eslint-config-next chain must be removed');
-          if (p.devDependencies?.eslint !== '10.13.0') throw new Error('Candidate ESLint must be pinned to supported version 10.13.0');
-          if (l.packages?.['node_modules/eslint']?.version !== '10.13.0') throw new Error('Lockfile ESLint version mismatch');
           if (p.overrides?.['deepmerge-ts'] !== '8.0.0') throw new Error('Expected tested deepmerge-ts 8.0.0 override missing');
           if (l.packages?.['node_modules/next']?.version !== '16.4.2') throw new Error('Lockfile Next.js version mismatch');
           if (l.packages?.['node_modules/eslint-config-next'] || l.packages?.['node_modules/@next/eslint-plugin-next']) throw new Error('Vulnerable Next ESLint plugin chain remains in lockfile');
