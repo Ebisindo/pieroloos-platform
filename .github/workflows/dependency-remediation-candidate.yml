@@ -104,6 +104,7 @@ jobs:
           console.log(JSON.stringify({pinnedDirectDependencies:changed,experimentalOverride:manifest.overrides['deepmerge-ts']},null,2));
           NODE
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Verify generated lockfile is reproducible
         run: npm ci --no-audit --no-fund
