@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   candidate:
-    name: Generate and validate patched Next 16 candidate
+    name: Generate and validate pinned Next 16 security candidate
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -52,17 +52,39 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Generate candidate package manifest and lockfile using npm
+      - name: Generate patched Next and matching ESLint versions using npm
         run: npm install --save-exact next@16.4.2 eslint-config-next@16.4.2 --no-audit --no-fund
+
+      - name: Pin direct dependencies declared latest to their currently locked resolved versions
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const changed = [];
+          for (const group of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+            for (const [name, spec] of Object.entries(manifest[group] || {})) {
+              if (spec !== 'latest') continue;
+              const locked = lock.packages?.['node_modules/' + name]?.version;
+              if (!locked) throw new Error('No root lockfile version for ' + name);
+              manifest[group][name] = locked;
+              changed.push({group, name, from:spec, to:locked});
+            }
+          }
+          fs.writeFileSync('package.json', JSON.stringify(manifest, null, 2) + '\n');
+          fs.mkdirSync('dependency-candidate', {recursive:true});
+          fs.writeFileSync('dependency-candidate/pinned-latest-direct-dependencies.json', JSON.stringify(changed,null,2));
+          console.log(JSON.stringify(changed,null,2));
+          NODE
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Verify generated lockfile is reproducible
         run: npm ci --no-audit --no-fund
 
-      - name: Capture candidate audit report (known remaining advisories are expected at this stage)
+      - name: Capture full dependency audit (dev and runtime dependencies)
         continue-on-error: true
         shell: bash
         run: |
-          mkdir -p dependency-candidate
           set +e
           npm audit --json > dependency-candidate/npm-audit.json
           code=$?
@@ -70,10 +92,20 @@ jobs:
           printf 'npm_audit_exit_code=%s\n' "$code" > dependency-candidate/npm-audit-exit-code.txt
           node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('dependency-candidate/npm-audit.json','utf8')); const report={metadata:a.metadata?.vulnerabilities ?? null, advisories:Object.entries(a.vulnerabilities ?? {}).map(([name,v])=>({name,severity:v.severity,isDirect:v.isDirect,range:v.range,via:v.via,fixAvailable:v.fixAvailable,nodes:v.nodes}))}; fs.writeFileSync('dependency-candidate/npm-audit-summary.json',JSON.stringify(report,null,2)); console.log(JSON.stringify(report.metadata,null,2))"
 
-      - name: Record candidate package versions
+      - name: Capture production-only dependency audit
+        continue-on-error: true
+        shell: bash
         run: |
-          mkdir -p dependency-candidate
-          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint-config-next','@next/eslint-plugin-next','react','react-dom','prisma','@prisma/client']; const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null]))}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out.resolved,null,2))"
+          set +e
+          npm audit --omit=dev --json > dependency-candidate/npm-audit-production.json
+          code=$?
+          set -e
+          printf 'npm_audit_production_exit_code=%s\n' "$code" > dependency-candidate/npm-audit-production-exit-code.txt
+          node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('dependency-candidate/npm-audit-production.json','utf8')); const report={metadata:a.metadata?.vulnerabilities ?? null, advisories:Object.entries(a.vulnerabilities ?? {}).map(([name,v])=>({name,severity:v.severity,range:v.range,via:v.via,fixAvailable:v.fixAvailable,nodes:v.nodes}))}; fs.writeFileSync('dependency-candidate/npm-audit-production-summary.json',JSON.stringify(report,null,2)); console.log('Production-only npm audit:',JSON.stringify(report.metadata,null,2))"
+
+      - name: Record candidate package versions and pinning coverage
+        run: |
+          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint-config-next','@next/eslint-plugin-next','react','react-dom','prisma','@prisma/client']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
           cp package.json package-lock.json dependency-candidate/
 
       - name: Create disposable shadow database
@@ -103,7 +135,7 @@ jobs:
       - name: Browser tests
         run: npm run test:e2e
 
-      - name: Upload generated candidate and npm audit evidence
+      - name: Upload generated candidate and audit evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
