@@ -39,7 +39,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Create disposable shadow database
         # psql rejects Prisma's "?schema=" query parameter, so strip it for the admin connection.
@@ -83,7 +83,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Install Playwright browser and system dependencies
         run: npx playwright install --with-deps chromium
