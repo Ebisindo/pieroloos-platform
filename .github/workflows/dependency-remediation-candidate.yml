@@ -65,11 +65,11 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Replace vulnerable Next ESLint plugin chain with an ESLint 9-compatible general-purpose toolchain
+      - name: Replace vulnerable Next ESLint plugin chain with a maintained ESLint 10-compatible toolchain
         run: |
           npm uninstall --save-dev eslint-config-next --no-audit --no-fund
           npm install --save-exact next@16.4.2 --no-audit --no-fund
-          npm install --save-dev --save-exact eslint@9.39.5 typescript-eslint eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y globals --no-audit --no-fund
+          npm install --save-dev --save-exact eslint@10.13.0 typescript-eslint @eslint-react/eslint-plugin eslint-plugin-react-hooks globals --no-audit --no-fund
 
       - name: Pin latest declarations and test Prisma deepmerge-ts 8 override
         run: |
@@ -123,7 +123,7 @@ jobs:
 
       - name: Record candidate package versions and pinning coverage
         run: |
-          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','typescript-eslint','eslint-plugin-react','eslint-plugin-react-hooks','eslint-plugin-jsx-a11y','globals','react','react-dom','prisma','@prisma/client','deepmerge-ts']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies,overrides:p.overrides},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
+          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint','typescript-eslint','@eslint-react/eslint-plugin','eslint-plugin-react-hooks','globals','react','react-dom','prisma','@prisma/client','deepmerge-ts']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies,overrides:p.overrides},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
           cp package.json package-lock.json dependency-candidate/
 
       - name: Create disposable shadow database
@@ -205,7 +205,7 @@ jobs:
           if (l.packages?.['node_modules/next']?.version !== '16.4.2') throw new Error('Lockfile Next.js version mismatch');
           if (l.packages?.['node_modules/eslint-config-next'] || l.packages?.['node_modules/@next/eslint-plugin-next']) throw new Error('Vulnerable Next ESLint plugin chain remains in lockfile');
           if (l.packages?.['node_modules/deepmerge-ts']?.version !== '8.0.0') throw new Error('Lockfile deepmerge-ts override mismatch');
-          for (const name of ['typescript-eslint','eslint-plugin-react','eslint-plugin-react-hooks','eslint-plugin-jsx-a11y','globals']) {
+          for (const name of ['typescript-eslint','@eslint-react/eslint-plugin','eslint-plugin-react-hooks','globals']) {
             if (!p.devDependencies?.[name] || p.devDependencies[name] === 'latest') throw new Error('Alternative lint dependency missing or unpinned: '+name);
             if (!l.packages?.['node_modules/'+name]?.version) throw new Error('Alternative lint dependency missing from lockfile: '+name);
           }
