@@ -119,21 +119,22 @@ describe("corporate graph and compliance API boundaries", () => {
     }));
   });
 
-  it("reports an empty compliance registry as unknown, not as proof of no obligations", async () => {
+  it("returns the canonical workspace-scoped compliance registry", async () => {
     const response = await getComplianceRules();
-    const payload = await response.json() as { notice: string; rules: unknown[] };
+    const payload = await response.json() as { data: unknown[] };
 
     expect(response.status).toBe(200);
     expect(complianceRuleFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        jurisdictionCode: "NG",
-        entityType: { equals: "COMPANY", mode: "insensitive" },
-      }),
+      where: {
+        organizationId: "org-1",
+        workspaceId: "workspace-1",
+      },
+      include: {
+        versions: { orderBy: { version: "desc" }, take: 1 },
+      },
     }));
-    expect(payload.rules).toEqual([]);
-    expect(payload.notice).toContain("This does not mean no obligations exist.");
+    expect(payload.data).toEqual([]);
   });
-
   it("rejects ownership percentages on non-ownership relationships before a database transaction", async () => {
     const response = await createGraphEdge(writeRequest("/api/corporate-graph/edges", {
       fromNodeId: validNodeId,
