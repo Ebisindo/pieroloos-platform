@@ -67,13 +67,14 @@ jobs:
 
       - name: Replace vulnerable Next ESLint plugin chain with a maintained ESLint 10-compatible toolchain
         run: |
-          npm uninstall --save-dev eslint-config-next --no-audit --no-fund
-          npm install --save-exact next@16.4.2 --no-audit --no-fund
           node <<'NODE'
           const fs = require('fs');
           const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          delete p.devDependencies?.['eslint-plugin-jsx-a11y'];
-          delete p.devDependencies?.['eslint-plugin-react'];
+          for (const group of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+            for (const name of ['eslint-config-next', '@next/eslint-plugin-next', 'eslint-plugin-jsx-a11y', 'eslint-plugin-react']) {
+              if (p[group]) delete p[group][name];
+            }
+          }
           fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
           NODE
           npm install --save-exact next@16.4.2 --no-audit --no-fund
