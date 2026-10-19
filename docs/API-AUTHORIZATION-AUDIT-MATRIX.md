@@ -129,12 +129,16 @@ For every GET, POST, PATCH, PUT, DELETE, HEAD or OPTIONS handler, record:
 - [ ] `app/api/reports/[id]/evidence/route.ts` — enumerate methods; record policy, scope predicate, transaction revalidation, tests and reviewer.
 - [ ] `app/api/workers/documents/scan-results/route.ts` — enumerate methods; record policy, scope predicate, transaction revalidation, tests and reviewer.
 
-## Verification status
+## Verification status — latest stacked work checked 2026-10-19
 
-- Automated CI on the PR #38 targeted graph authorization branch: latest-head run [#39171073665](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39171073665) passed, including quality and e2e. This does not make the application-wide audit complete.
-- PR #40 evidence-binding branch: latest-head run [#39173090235](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39173090235) passed quality and e2e; branch still diverges from current `main`, so reconcile and rerun integrated CI.
-- No independent review submissions are currently recorded for PRs #21, #35, #37, #38, #39 or #40. Reviewer requests to the available placeholder accounts were rejected by GitHub because they are not eligible collaborators.
-- No merge, production migration or deployment is authorized by this matrix. Keep Issues #24/#25 and release gate #32 open pending code changes, integrated CI, named independent security/database reviews and verified backup/restore evidence.
+- **PR #42 — schema repair:** head `7af899110b4bf9c4b7f584b8ee32b3db0445b9b8`; CI [#39177412556](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39177412556) passed quality and E2E. It restores corporate graph models/enums while keeping the governed ComplianceRule/ComplianceRuleVersion registry canonical and does not recreate CorporateComplianceRule.
+- **PR #43 — AI evidence and graph validation:** head `a3f94f49c897027f21a77671179b5eff2c3d485b`; CI [#39177934949](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39177934949) passed quality and E2E. Submitted IDs are resolved against eligible scoped documents before provider invocation; scope/status/version are rechecked before persistence; claims remain unverified; proposed graph structures are validated but not promoted.
+- **PR #44 — fail-closed compliance evidence fixture:** head `3c4e9db0b5e0e7ba3028acfded527eb3d76ce181`; CI [#39178236006](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39178236006) passed quality and E2E. Hard-coded example data is unavailable; route returns 501 until a real scoped evidence feature is implemented. This is a safety stub, not feature completion.
+- **PR #38** remains a targeted graph-read authorization change on the older #21 branch and needs integration/merge-order review, despite its own branch checks.
+- **PR #40** also passed at checked head `a17dfecf6c970d73415222e94caab1b2945f8a20` in run [#39173090235](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39173090235), but branch comparison was 12 ahead / 3 behind main. Prefer the stacked #42/#43 path for continued integrated testing; do not merge both alternate AI implementations.
+- **PR #39** remains a draft with migration/schema and data-model tenant-isolation questions; text-level inspection is not a substitute for full CI.
+- Independent review submissions remain empty for the affected PRs. Placeholder reviewer accounts were ineligible collaborators. A real independent security/database reviewer must be added by the repository owner.
+- No merge, production migration or deployment is authorized by this matrix. Keep Issues #24/#25 and release gate #32 open until the method-by-method audit, independent review, backup/restore verification and release approvals are evidenced.
 
 
 ## Additional findings from source-level spot checks (2026-10-19)
