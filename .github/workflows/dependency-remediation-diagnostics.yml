@@ -80,12 +80,21 @@ jobs:
             for (const [name, version] of Object.entries(p[group] || {})) if (version === 'latest') latest.push({group,name});
           }
           const resolved = {};
-          for (const name of ['eslint','@eslint/js','@eslint-react/eslint-plugin','typescript-eslint','eslint-plugin-react-hooks','globals','next','prisma','@prisma/client','deepmerge-ts']) {
-            const entry = l.packages?.['node_modules/' + name];
-            resolved[name] = entry?.version ?? null;
+          for (const name of ['eslint','eslint-config-next','@next/eslint-plugin-next','typescript-eslint','eslint-plugin-react','eslint-plugin-react-hooks','eslint-plugin-jsx-a11y','next','prisma','@prisma/client','deepmerge-ts']) {
+            resolved[name] = l.packages?.['node_modules/' + name]?.version ?? null;
           }
-          fs.writeFileSync('dependency-evidence/manifest-lock-consistency.json', JSON.stringify({differences, directDependenciesUsingLatest:latest, resolvedVersions:resolved}, null, 2));
-          console.log(JSON.stringify({differences, directDependenciesUsingLatest:latest, resolvedVersions:resolved}, null, 2));
+          const direct = {...(p.dependencies || {}), ...(p.devDependencies || {}), ...(p.optionalDependencies || {})};
+          const versions = {
+            eslint: resolved.eslint,
+            next: resolved.next,
+            nextConfig: resolved['eslint-config-next'],
+            nextPlugin: resolved['@next/eslint-plugin-next'],
+            tsEslint: resolved['typescript-eslint']
+          };
+          fs.writeFileSync('dependency-evidence/manifest-lock-consistency.json', JSON.stringify({
+            differences, directDependenciesUsingLatest:latest, resolvedVersions:resolved, officialToolchain:versions
+          }, null, 2));
+          console.log(JSON.stringify({differences, directDependenciesUsingLatest:latest, resolvedVersions:resolved, officialToolchain:versions}, null, 2));
           if (differences.length) {
             console.error('The package-lock root dependency declarations must match package.json ranges exactly.');
             process.exitCode = 1;
@@ -94,14 +103,26 @@ jobs:
             console.error('Pin direct dependency declarations instead of using latest.');
             process.exitCode = 1;
           }
-          const eslintMajor = Number.parseInt(resolved.eslint || '0', 10);
-          const requiredToolchain = ['@eslint/js','@eslint-react/eslint-plugin','typescript-eslint','eslint-plugin-react-hooks','globals'];
-          const missingToolchain = requiredToolchain.filter(name => !resolved[name]);
-          const direct = {...(p.dependencies || {}), ...(p.devDependencies || {}), ...(p.optionalDependencies || {})};
-          const legacyDirect = ['eslint-config-next','@next/eslint-plugin-next','eslint-plugin-jsx-a11y','eslint-plugin-react'].filter(name => Object.hasOwn(direct,name));
-          if (eslintMajor < 10 || missingToolchain.length || legacyDirect.length) {
-            console.error(JSON.stringify({eslintMajor,missingToolchain,legacyDirect}, null, 2));
-            console.error('Expected ESLint 10 with the maintained React toolchain; do not reintroduce legacy plugins with incompatible peer ranges.');
+
+          // The official Next.js flat config owns @next/eslint-plugin-next transitively.
+          // Do not require that plugin to be declared directly or reject the maintained
+          // config merely because it carries supported React/hooks dependencies.
+          const required = ['eslint', 'eslint-config-next', 'typescript-eslint'];
+          const missing = required.filter(name => !resolved[name]);
+          const unsupported = [];
+          if (!p.devDependencies?.['eslint-config-next']) unsupported.push('eslint-config-next must be a direct devDependency');
+          if (!p.devDependencies?.['typescript-eslint']) unsupported.push('typescript-eslint must be a direct devDependency');
+          if (resolved.eslint !== '10.13.0') unsupported.push('expected eslint 10.13.0');
+          if (resolved.next !== '16.4.2') unsupported.push('expected next 16.4.2');
+          if (resolved['eslint-config-next'] !== '16.4.2') unsupported.push('expected eslint-config-next 16.4.2');
+          if (resolved['@next/eslint-plugin-next'] !== '16.4.2') unsupported.push('expected transitively resolved @next/eslint-plugin-next 16.4.2');
+          if (Object.hasOwn(direct, '@next/eslint-plugin-next')) unsupported.push('do not declare @next/eslint-plugin-next directly; use the official Next ESLint config');
+          for (const name of ['eslint-plugin-react', 'eslint-plugin-jsx-a11y']) {
+            if (Object.hasOwn(direct, name)) unsupported.push('legacy peer-incompatible plugin must not be a direct dependency: ' + name);
+          }
+          if (missing.length || unsupported.length) {
+            console.error(JSON.stringify({missing, unsupported}, null, 2));
+            console.error('Dependency policy must match the tested official Next.js ESLint 10 toolchain; do not force peer dependencies.');
             process.exitCode = 1;
           }
           NODE
