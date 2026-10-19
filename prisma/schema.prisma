@@ -326,6 +326,8 @@ model Organization {
   clientPortalGrants   ClientPortalGrant[]
   clientPortalEvents   ClientPortalAuditEvent[]
   clientPortalInteractions ClientPortalInteraction[]
+  corporateGraphNodes CorporateGraphNode[]
+  corporateGraphAuditEvents CorporateGraphAuditEvent[]
 }
 
 model User {
@@ -357,6 +359,7 @@ model User {
   complianceDeadlineSnapshots         ComplianceDeadlineSnapshot[]      @relation("ComplianceDeadlineSnapshotActor")
   complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
   complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
+  corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
 }
 
 model PlatformAdministrator {
@@ -465,6 +468,8 @@ model Workspace {
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
   businessIntentProposals    BusinessIntentProposal[]
+  corporateGraphNodes CorporateGraphNode[]
+  corporateGraphAuditEvents CorporateGraphAuditEvent[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
@@ -501,6 +506,7 @@ model Client {
   portalAccessGrants    ClientPortalGrant[]
   portalEvents          ClientPortalAuditEvent[]
   portalInteractions    ClientPortalInteraction[]
+  corporateGraphNodes CorporateGraphNode[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -1873,4 +1879,105 @@ model PartnershipInquiry {
 
   @@index([status, createdAt])
   @@index([createdAt])
+}
+enum CorporateGraphNodeType {
+  COMPANY
+  PERSON
+  TRUST
+  PARTNERSHIP
+  BRANCH
+  BANKING_RELATIONSHIP
+  LICENSE
+  TAX_REGISTRATION
+  OTHER
+}
+
+enum CorporateGraphRelationType {
+  OWNS
+  CONTROLS
+  SUBSIDIARY_OF
+  BRANCH_OF
+  BANKS_WITH
+  LICENSED_BY
+  TAX_REGISTERED_WITH
+  RELATED_TO
+}
+
+enum CorporateGraphAuditAction {
+  NODE_CREATED
+  NODE_UPDATED
+  NODE_ARCHIVED
+  EDGE_CREATED
+  EDGE_ARCHIVED
+}
+
+model CorporateGraphNode {
+  id                 String                 @id @default(cuid())
+  organizationId     String
+  workspaceId        String
+  clientId           String?
+  name               String
+  nodeType           CorporateGraphNodeType @default(COMPANY)
+  jurisdictionCode   String?
+  entityType         String?
+  registrationNumber String?
+  metadata           Json?
+  createdByUserId    String
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  archivedAt         DateTime?
+  archivedByUserId   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  client       Client?      @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  outgoing     CorporateGraphEdge[] @relation("CorporateGraphFrom")
+  incoming     CorporateGraphEdge[] @relation("CorporateGraphTo")
+
+  @@index([organizationId, workspaceId])
+  @@index([clientId, workspaceId])
+  @@index([jurisdictionCode, entityType])
+  @@index([organizationId, workspaceId, archivedAt])
+}
+
+model CorporateGraphEdge {
+  id               String                     @id @default(cuid())
+  organizationId   String
+  workspaceId      String
+  fromNodeId       String
+  toNodeId         String
+  relation         CorporateGraphRelationType
+  ownershipPercent Decimal?                   @db.Decimal(5, 2)
+  notes            String?
+  createdByUserId  String
+  createdAt        DateTime                   @default(now())
+  archivedAt       DateTime?
+  archivedByUserId String?
+
+  fromNode CorporateGraphNode @relation("CorporateGraphFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode   CorporateGraphNode @relation("CorporateGraphTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, workspaceId, fromNodeId, toNodeId, relation])
+  @@index([organizationId, workspaceId, fromNodeId])
+  @@index([organizationId, workspaceId, toNodeId])
+  @@index([organizationId, workspaceId, archivedAt])
+}
+
+model CorporateGraphAuditEvent {
+  id             String                   @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  actorUserId    String
+  action         CorporateGraphAuditAction
+  subjectType    String
+  subjectId      String
+  details        Json?
+  occurredAt     DateTime                 @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  actor        User         @relation("CorporateGraphAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([subjectType, subjectId, occurredAt])
 }

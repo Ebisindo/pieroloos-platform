@@ -88,7 +88,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Install Playwright browser and system dependencies
         run: npx playwright install --with-deps chromium

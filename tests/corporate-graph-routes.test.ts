@@ -25,7 +25,7 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     corporateGraphNode: { findMany: graphNodeFindManyMock },
     corporateGraphEdge: { findMany: graphEdgeFindManyMock },
-    corporateComplianceRule: { findMany: complianceRuleFindManyMock },
+    complianceRule: { findMany: complianceRuleFindManyMock },
     corporateGraphAuditEvent: { findMany: graphAuditFindManyMock },
   },
 }));
@@ -74,7 +74,7 @@ describe("corporate graph and compliance API boundaries", () => {
         corporateGraphNode: { findMany: graphNodeFindManyMock },
         corporateGraphEdge: { findMany: graphEdgeFindManyMock },
         corporateGraphAuditEvent: { findMany: graphAuditFindManyMock },
-        corporateComplianceRule: { findMany: complianceRuleFindManyMock },
+        complianceRule: { findMany: complianceRuleFindManyMock },
       }),
     );
   });
@@ -119,21 +119,17 @@ describe("corporate graph and compliance API boundaries", () => {
     }));
   });
 
-  it("reports an empty compliance registry as unknown, not as proof of no obligations", async () => {
-    const response = await getComplianceRules(
-      new Request("http://localhost/api/compliance/rules?jurisdiction=NG&entityType=COMPANY"),
-    );
-    const payload = await response.json() as { notice: string; rules: unknown[] };
+  it("lists canonical compliance rules for the active workspace", async () => {
+    const response = await getComplianceRules();
+    const payload = await response.json() as { data: unknown[] };
 
     expect(response.status).toBe(200);
     expect(complianceRuleFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        jurisdictionCode: "NG",
-        entityType: { equals: "COMPANY", mode: "insensitive" },
-      }),
+      where: { organizationId: "org-1", workspaceId: "workspace-1" },
+      include: { versions: { orderBy: { version: "desc" }, take: 1 } },
+      orderBy: [{ active: "desc" }, { ruleKey: "asc" }],
     }));
-    expect(payload.rules).toEqual([]);
-    expect(payload.notice).toContain("This does not mean no obligations exist.");
+    expect(payload.data).toEqual([]);
   });
 
   it("rejects ownership percentages on non-ownership relationships before a database transaction", async () => {
@@ -194,7 +190,7 @@ describe("corporate graph read authorization revalidation", () => {
         corporateGraphNode: { findMany: graphNodeFindManyMock },
         corporateGraphEdge: { findMany: graphEdgeFindManyMock },
         corporateGraphAuditEvent: { findMany: graphAuditFindManyMock },
-        corporateComplianceRule: { findMany: complianceRuleFindManyMock },
+        complianceRule: { findMany: complianceRuleFindManyMock },
       }),
     );
   });
