@@ -100,7 +100,7 @@ For every GET, POST, PATCH, PUT, DELETE, HEAD or OPTIONS handler, record:
 - [ ] `app/api/compliance/control-center/route.ts` — enumerate methods; record policy, scope predicate, transaction revalidation, tests and reviewer.
 - [ ] `app/api/compliance/dashboard/route.ts` — enumerate methods; record policy, scope predicate, transaction revalidation, tests and reviewer.
 - [ ] `app/api/compliance/escalations/route.ts` — enumerate methods; record policy, scope predicate, transaction revalidation, tests and reviewer.
-- [ ] `app/api/compliance/evidence/route.ts` — enumerate methods; record policy, scope predicate, transaction revalidation, tests and reviewer.
+- [x] `app/api/compliance/evidence/route.ts` — unauthenticated hard-coded fixture removed on PR #44; controlled 501 until the authenticated, workspace-scoped repository contract and route tests are implemented. Not a completed evidence feature.
 - [ ] `app/api/compliance/obligations/[id]/assignment/route.ts` — enumerate methods; record policy, scope predicate, transaction revalidation, tests and reviewer.
 - [ ] `app/api/compliance/obligations/[id]/deadline/route.ts` — enumerate methods; record policy, scope predicate, transaction revalidation, tests and reviewer.
 - [ ] `app/api/compliance/obligations/[id]/evidence/[evidenceId]/review/route.ts` — enumerate methods; record policy, scope predicate, transaction revalidation, tests and reviewer.
@@ -139,6 +139,16 @@ For every GET, POST, PATCH, PUT, DELETE, HEAD or OPTIONS handler, record:
 - **PR #39** remains a draft with migration/schema and data-model tenant-isolation questions; text-level inspection is not a substitute for full CI.
 - Independent review submissions remain empty for the affected PRs. Placeholder reviewer accounts were ineligible collaborators. A real independent security/database reviewer must be added by the repository owner.
 - No merge, production migration or deployment is authorized by this matrix. Keep Issues #24/#25 and release gate #32 open until the method-by-method audit, independent review, backup/restore verification and release approvals are evidenced.
+
+
+## Updated verification (2026-10-19, stacked sequence)
+
+- PR #42 schema reconciliation passed exact-head CI run [#39177412556](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39177412556) at `7af899110b4bf9c4b7f584b8ee32b3db0445b9b8`.
+- PR #43 AI evidence and graph validation passed exact-head CI run [#39177934949](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39177934949) at `a3f94f49c897027f21a77671179b5eff2c3d485b`. Evidence is resolved to eligible workspace/client-scoped documents before provider invocation and rechecked before persistence; user claims stay E1/unverified. Graph validation checks the proposed structure only; no operational promotion is performed.
+- PR #44 safe shutdown of the compliance evidence fixture passed exact-head CI run [#39178236006](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39178236006) at `3c4e9db0b5e0e7ba3028acfded527eb3d76ce181`. The endpoint is unavailable (501) until implemented with genuine authorization and persistence.
+- PR #42, #43 and #44 are open, draft, unmerged; #43/#44 depend on #42. Isolated green CI does not replace a final integrated run or independent review.
+- Current PR review lists are empty. The GitHub placeholder identities tried are not eligible collaborators. Repository owner must add/request a named qualified independent reviewer; automated checks cannot sign off their own changes.
+- Do not merge the alternate #39 integration branch or duplicate #40 evidence branch alongside the #42/#43 chain without an explicit reconciliation plan. Avoid duplicate schema, migrations or proposal route changes.
 
 
 ## Additional findings from source-level spot checks (2026-10-19)
