@@ -79,9 +79,25 @@ jobs:
           for (const group of ['dependencies','devDependencies','optionalDependencies']) {
             for (const [name, version] of Object.entries(p[group] || {})) if (version === 'latest') latest.push({group,name});
           }
-          fs.writeFileSync('dependency-evidence/manifest-lock-consistency.json', JSON.stringify({differences, directDependenciesUsingLatest:latest}, null, 2));
-          console.log(JSON.stringify({differences, directDependenciesUsingLatest:latest}, null, 2));
-          if (differences.length) process.exitCode = 1;
+          const resolved = {};
+          for (const name of ['eslint','eslint-plugin-jsx-a11y','typescript-eslint','eslint-plugin-react','eslint-plugin-react-hooks','globals','next','prisma','@prisma/client','deepmerge-ts']) {
+            const entry = l.packages?.['node_modules/' + name];
+            resolved[name] = entry?.version ?? null;
+          }
+          fs.writeFileSync('dependency-evidence/manifest-lock-consistency.json', JSON.stringify({differences, directDependenciesUsingLatest:latest, resolvedVersions:resolved}, null, 2));
+          console.log(JSON.stringify({differences, directDependenciesUsingLatest:latest, resolvedVersions:resolved}, null, 2));
+          if (differences.length) {
+            console.error('The package-lock root dependency declarations must match package.json ranges exactly.');
+            process.exitCode = 1;
+          }
+          if (latest.length) {
+            console.error('Pin direct dependency declarations instead of using latest.');
+            process.exitCode = 1;
+          }
+          if (!resolved.eslint || !resolved['eslint-plugin-jsx-a11y']) {
+            console.error('Required ESLint toolchain dependency is absent from the lockfile.');
+            process.exitCode = 1;
+          }
           NODE
 
       - name: Upload audit and dependency evidence
