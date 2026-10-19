@@ -1,41 +1,69 @@
 # Dependency Remediation Execution Record
 
-Updated: 2026-10-19  
-Canonical pull request: [#69](https://github.com/Ebisindo/pieroloos-platform/pull/69)  
+Updated: 2026-10-19
+Canonical pull request: [#69](https://github.com/Ebisindo/pieroloos-platform/pull/69)
 Canonical branch: `security/npm-dependency-remediation-diagnostics`
+Current verified head at this record: `da9fada9b64655312d8acf74d44fc5bf52064732`
+Schema baseline: [PR #62](https://github.com/Ebisindo/pieroloos-platform/pull/62), branch `fix/main-prisma-graph-schema-clean-repair`
 
-## Latest verified PR-head evidence
+## Current disposition
 
-Latest PR #69 head at this update: `da9fada9b64655312d8acf74d44fc5bf52064732`.
+Keep PR #69, PR #62 and PR #64 open and in draft. No merge, deployment or production migration has been performed. The dependency candidate and required automated checks have now passed on the exact head listed above, but merge readiness is still blocked by missing independent security and database/schema approvals and by the need to reconcile overlapping security-workflow alternatives.
 
-- [CI — PR run #39267604934](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267604934): success. Both quality/database and E2E jobs passed.
-- [Security checks — run #39267604895](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267604895): success. npm dependency audit, CodeQL and Gitleaks jobs passed.
-- [Dependency diagnostics — run #39267604884](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267604884): success.
-- [ESLint 10 candidate validation — run #39267604880](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267604880): success. Candidate-generation, reproducible `npm ci`, PostgreSQL schema/migration and integrity checks, lint, typecheck, unit tests, production build and Playwright tests passed.
-- The candidate artifact is [`next-eslint-prisma-override-candidate`](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267604880). It is generated evidence, not proof that the candidate manifest/lockfile has already been applied to the PR branch.
-- Full dependency audit and production-only audit each reported 0 vulnerabilities in the candidate artifact. The candidate lint step completed with 32 warnings and no errors; existing lint debt remains visible.
+## Exact-head checks
 
-## ESLint support concern — candidate validated, branch application pending
+The following pull-request workflow runs completed successfully on `da9fada9b64655312d8acf74d44fc5bf52064732`:
 
-The official [ESLint version-support policy](https://eslint.org/version-support/) lists ESLint 10.x as the current line and ESLint 9.39.5 as EOL beginning 2026-08-06. Therefore, the earlier ESLint 9.39.5 candidate was not acceptable for a maintained-support requirement even though its tests passed.
+- [CI — run #39267604934](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267604934) — quality and E2E jobs passed.
+- [Security checks — run #39267604895](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267604895) — npm audit, CodeQL and Gitleaks passed.
+- [Dependency remediation diagnostics — run #39267604884](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267604884) — passed, including clean lockfile reproducibility and manifest/lock consistency.
+- [Candidate validation — run #39267604880](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267604880) — passed.
+- [Candidate validation and tested-candidate publication — push run #39267595212](https://github.com/Ebisindo/pieroloos-platform/actions/runs/39267595212) — passed on the same head; no extra package-file commit was required.
 
-The updated candidate uses ESLint `10.13.0`, `@eslint/js`, `typescript-eslint`, `@eslint-react/eslint-plugin`, `eslint-plugin-react-hooks` and `globals`. It removes the Next-specific ESLint plugin chain and the old `eslint-plugin-jsx-a11y` package whose declared peer range caused npm to reject ESLint 10. Runtime accessibility coverage still includes the existing `@axe-core/playwright` browser tests. This is a deliberate lint-toolchain change and needs independent review of rule coverage; it should not be represented as identical coverage to the removed plugin.
+Candidate validation reported:
+- Full npm dependency audit: 0 findings across info, low, moderate, high and critical severity.
+- Production-only npm audit: 0 findings across all severity levels.
+- npm-generated lockfile is reproducible with `npm ci`; direct dependency declarations previously set to `latest` are pinned.
+- PostgreSQL schema/migration validation and data-integrity tests passed; the database suite passed 10/10 checks.
+- ESLint 10.13.0 completed with 0 errors and 32 warnings. Warnings remain visible and should be addressed as technical debt; lint rules were not disabled to manufacture a pass.
+- TypeScript typecheck passed.
+- Unit tests: 448 passed, 10 skipped.
+- Production build passed.
+- Playwright: 32 passed.
 
-The ESLint 10 candidate has passed the complete isolated workflow on the current PR head. However, the workflow was run for the pull-request event, so its publish job was skipped by design. The candidate manifest and lockfile are currently artifact output and must be applied to the isolated branch through the workflow's tested push/publish path. Then every required check must be reverified on the resulting new commit.
+These checks validate the candidate and tested repository code at the recorded head. Re-run the required checks on any subsequent commit or base-branch change before merging.
 
-## Outstanding independent reviews
+## ESLint support and compatibility
 
-Review submissions queried on 2026-10-19 returned no reviews for PRs #62, #64 or #69. CI and self-authored evidence do not constitute independent approval.
+The official [ESLint support matrix](https://eslint.org/version-support/) marks v10.x as current and v9.0.0–v9.39.5 as end-of-life from 6 August 2026. The candidate uses ESLint `10.13.0`, Next.js `16.4.2`, and the ESLint 10-compatible flat-config stack `@eslint/js`, `typescript-eslint`, `@eslint-react/eslint-plugin`, `eslint-plugin-react-hooks` and `globals`.
 
-Required before merge:
-1. Independent security review of the full dependency manifest/lockfile diff, both audit reports, GitHub Actions permissions, pinned actions and candidate-publishing workflow.
-2. Independent database/schema review of Prisma graph models, inverse relations, migration history, referential integrity and data-integrity checks, including PR #62's schema baseline and the integrated candidate.
-3. Independent review of the ESLint 10 configuration/rule coverage and the removal/replacement of `eslint-plugin-jsx-a11y`.
-4. Reconcile overlapping security workflow alternatives in PRs #63, #64, #66 and #67. Do not merge competing implementations independently.
-5. Re-run and verify all mandatory checks on the final resulting commit, then verify mergeability, approvals and branch-protection requirements.
+The older `eslint-config-next` / `@next/eslint-plugin-next` chain and the React plugins whose declared peer ranges rejected ESLint 10 were removed from this candidate. The generated manifest/lockfile passed npm reproducibility checks; npm was not run with `--force` or `--legacy-peer-deps`, and the lockfile was not manually edited.
 
-No independent reviewers are currently recorded. Request qualified reviewers who are not the author; do not self-approve or fabricate review results.
+One code error surfaced under the new rules in document-storage cleanup error handling. The code was adjusted to preserve the original persistence failure as the aggregate error's cause while retaining the cleanup failure in `AggregateError.errors`. The current exact-head lint run passes with 32 warnings and no errors. Separately track and resolve the warnings, particularly the security-relevant `dangerouslySetInnerHTML` warning and un-aborted browser fetches, using appropriately scoped tests and review.
+
+## Independent review requirements
+
+No independent review submissions are recorded for PR #69, PR #62 or PR #64. Formal review requests and scopes have been recorded in the PR conversations:
+- [PR #62 database/schema review request](https://github.com/Ebisindo/pieroloos-platform/pull/62#issuecomment-6269472365)
+- [PR #64 security-workflow consolidation request](https://github.com/Ebisindo/pieroloos-platform/pull/64#issuecomment-6269473647)
+- [PR #69 independent security review request](https://github.com/Ebisindo/pieroloos-platform/pull/69#issuecomment-6269474890)
+
+These comments are requests, not completed reviews or approvals. A qualified reviewer independent of the implementation author must submit an actual GitHub review.
+
+Security review scope: the complete dependency manifest/lockfile diff, full and production audit artifacts, pinned third-party action references, workflow permissions, audit fallback, candidate-artifact publishing/provenance, and whether untrusted workflow output could alter production code without review.
+
+Database/schema review scope: PR #62 corporate-graph models and inverse relations, canonical ComplianceRule/ComplianceRuleVersion registry compatibility, tenant/workspace boundaries, migrations, unique/index constraints, referential integrity, and the exact tested corporate-graph and compliance-generation transaction/idempotency behavior. Reviewers should explicitly approve or request changes and cite evidence.
+
+## Consolidation and merge order
+
+- PR #62 is the schema baseline and must receive independent database/schema approval before it is integrated into `main`.
+- PRs #63, #64, #66 and #67 overlap on CI/security workflow changes. PR #69 currently carries the dependency candidate and the integrated audit/Action-pinning workflow path. Compare the remaining workflow diffs and retain each unique control once; do not merge the competing alternatives independently.
+- After PR #62 is reviewed and accepted, retarget/rebase the canonical PR #69 to the accepted base, then regenerate/reverify as needed. A base or head change invalidates the old exact-head evidence.
+- PR #64 remains a draft as requested while its unique controls are reconciled.
+- Keep the 32 current lint warnings visible; prioritize potentially security-sensitive warnings and create separately tested fixes rather than broadly relaxing lint rules.
 
 ## Merge control
 
-PR #69 remains open and draft, based on PR #62's schema branch. PR #62 and PR #64 also remain open drafts. Green CI is necessary but not sufficient. No merge, deployment, production migration, payment, filing or other external business action is authorized by this record.
+Do not merge until (1) all required checks pass on the final exact head and current base, (2) ESLint 10 and the generated lockfile remain reproducible, (3) independent security and database/schema approvals are recorded, (4) overlapping workflow changes are reconciled, and (5) GitHub's required-review/branch-protection rules are satisfied.
+
+No merge, deployment, production migration, payment, filing or other external business action is authorized by this record.
