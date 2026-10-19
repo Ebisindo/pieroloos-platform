@@ -1,0 +1,246 @@
+name: Next and vulnerability-free ESLint toolchain candidate
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/dependency-remediation-candidate.yml"
+      - "eslint.config.mjs"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - "security/npm-dependency-remediation-diagnostics"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: next-eslint-candidate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    name: Generate and validate Next 16 candidate with alternate ESLint toolchain
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pieroloos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pieroloos_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_ENV: ci
+      NEXTAUTH_SECRET: ci-only-not-a-deployment-secret
+      DATABASE_URL_CI: postgresql://postgres:postgres@localhost:5432/pieroloos_ci?schema=public
+      SHADOW_DATABASE_URL_CI: postgresql://postgres:postgres@localhost:5432/pieroloos_shadow?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pieroloos_ci?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Integrate current schema repair for branch-push validation
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin fix/main-prisma-graph-schema-clean-repair
+          git merge --no-edit --no-ff origin/fix/main-prisma-graph-schema-clean-repair
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Replace vulnerable Next ESLint plugin chain with a maintained ESLint 10-compatible toolchain
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          for (const group of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+            for (const name of ['eslint-config-next', '@next/eslint-plugin-next', 'eslint-plugin-jsx-a11y', 'eslint-plugin-react']) {
+              if (p[group]) delete p[group][name];
+            }
+          }
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          NODE
+          npm install --save-exact next@16.4.2 --no-audit --no-fund
+          npm install --save-dev --save-exact eslint@10.13.0 @eslint/js typescript-eslint @eslint-react/eslint-plugin eslint-plugin-react-hooks globals --no-audit --no-fund
+
+      - name: Pin latest declarations and test Prisma deepmerge-ts 8 override
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const changed = [];
+          for (const group of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+            for (const [name, spec] of Object.entries(manifest[group] || {})) {
+              if (spec !== 'latest') continue;
+              const locked = lock.packages?.['node_modules/' + name]?.version;
+              if (!locked) throw new Error('No root lockfile version for ' + name);
+              manifest[group][name] = locked;
+              changed.push({group, name, from:spec, to:locked});
+            }
+          }
+          manifest.overrides = {...(manifest.overrides || {}), 'deepmerge-ts':'8.0.0'};
+          fs.writeFileSync('package.json', JSON.stringify(manifest, null, 2) + '\n');
+          fs.mkdirSync('dependency-candidate', {recursive:true});
+          fs.writeFileSync('dependency-candidate/pinned-latest-direct-dependencies.json', JSON.stringify(changed,null,2));
+          fs.writeFileSync('dependency-candidate/prisma-deepmerge-override.json', JSON.stringify({package:'deepmerge-ts',version:'8.0.0',purpose:'isolated compatibility experiment; accept only if full tests pass'},null,2));
+          console.log(JSON.stringify({pinnedDirectDependencies:changed,experimentalOverride:manifest.overrides['deepmerge-ts']},null,2));
+          NODE
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify generated lockfile is reproducible
+        run: npm ci --no-audit --no-fund
+
+      - name: Capture full dependency audit (dev and runtime dependencies)
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > dependency-candidate/npm-audit.json
+          code=$?
+          set -e
+          printf 'npm_audit_exit_code=%s\n' "$code" > dependency-candidate/npm-audit-exit-code.txt
+          node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('dependency-candidate/npm-audit.json','utf8')); const report={metadata:a.metadata?.vulnerabilities ?? null, advisories:Object.entries(a.vulnerabilities ?? {}).map(([name,v])=>({name,severity:v.severity,isDirect:v.isDirect,range:v.range,via:v.via,fixAvailable:v.fixAvailable,nodes:v.nodes}))}; fs.writeFileSync('dependency-candidate/npm-audit-summary.json',JSON.stringify(report,null,2)); console.log(JSON.stringify(report.metadata,null,2))"
+
+      - name: Capture production-only dependency audit
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          npm audit --omit=dev --json > dependency-candidate/npm-audit-production.json
+          code=$?
+          set -e
+          printf 'npm_audit_production_exit_code=%s\n' "$code" > dependency-candidate/npm-audit-production-exit-code.txt
+          node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('dependency-candidate/npm-audit-production.json','utf8')); const report={metadata:a.metadata?.vulnerabilities ?? null, advisories:Object.entries(a.vulnerabilities ?? {}).map(([name,v])=>({name,severity:v.severity,range:v.range,via:v.via,fixAvailable:v.fixAvailable,nodes:v.nodes}))}; fs.writeFileSync('dependency-candidate/npm-audit-production-summary.json',JSON.stringify(report,null,2)); console.log('Production-only npm audit:',JSON.stringify(report.metadata,null,2))"
+
+      - name: Record candidate package versions and pinning coverage
+        run: |
+          node -e "const fs=require('fs'); const p=require('./package.json'); const l=require('./package-lock.json'); const names=['next','eslint','@eslint/js','typescript-eslint','@eslint-react/eslint-plugin','eslint-plugin-react-hooks','globals','react','react-dom','prisma','@prisma/client','deepmerge-ts']; const remainingLatest=[]; for(const g of ['dependencies','devDependencies','optionalDependencies']) for(const [n,v] of Object.entries(p[g]||{})) if(v==='latest') remainingLatest.push({group:g,name:n}); const out={manifest:{dependencies:p.dependencies,devDependencies:p.devDependencies,overrides:p.overrides},resolved:Object.fromEntries(names.map(n=>[n,l.packages['node_modules/'+n]?.version ?? null])),remainingDirectDependenciesUsingLatest:remainingLatest}; fs.writeFileSync('dependency-candidate/candidate-versions.json',JSON.stringify(out,null,2)); console.log(JSON.stringify(out,null,2))"
+          cp package.json package-lock.json dependency-candidate/
+
+      - name: Create disposable shadow database
+        run: psql "${DATABASE_URL_CI%%\?*}" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE pieroloos_shadow;'
+
+      - name: Validate, migrate, and verify PostgreSQL
+        run: npm run db:deploy -- ci
+
+      - name: Test PostgreSQL data integrity
+        run: npm run test:db
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Playwright browser and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:e2e
+
+      - name: Upload generated candidate and audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: next-eslint-prisma-override-candidate
+          path: dependency-candidate/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-tested-candidate:
+    name: Commit tested candidate files to the isolated branch
+    needs: candidate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/security/npm-dependency-remediation-diagnostics' && github.repository == 'Ebisindo/pieroloos-platform'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout isolated remediation branch
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: security/npm-dependency-remediation-diagnostics
+          fetch-depth: 0
+
+      - name: Integrate current schema repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin fix/main-prisma-graph-schema-clean-repair
+          git merge --no-edit --no-ff origin/fix/main-prisma-graph-schema-clean-repair
+
+      - name: Download tested candidate artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: next-eslint-prisma-override-candidate
+          path: candidate-artifact
+
+      - name: Verify candidate provenance and audit boundaries
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const read = p => JSON.parse(fs.readFileSync(path.join('candidate-artifact', p), 'utf8'));
+          const p = read('package.json');
+          const l = read('package-lock.json');
+          const full = read('npm-audit-summary.json');
+          const prod = read('npm-audit-production-summary.json');
+          if (p.dependencies?.next !== '16.4.2') throw new Error('Candidate Next.js version is not 16.4.2');
+          if (p.devDependencies?.['eslint-config-next'] || p.dependencies?.['eslint-config-next']) throw new Error('Vulnerable eslint-config-next chain must be removed');
+          if (p.overrides?.['deepmerge-ts'] !== '8.0.0') throw new Error('Expected tested deepmerge-ts 8.0.0 override missing');
+          if (l.packages?.['node_modules/next']?.version !== '16.4.2') throw new Error('Lockfile Next.js version mismatch');
+          if (l.packages?.['node_modules/eslint-config-next'] || l.packages?.['node_modules/@next/eslint-plugin-next']) throw new Error('Vulnerable Next ESLint plugin chain remains in lockfile');
+          if (l.packages?.['node_modules/deepmerge-ts']?.version !== '8.0.0') throw new Error('Lockfile deepmerge-ts override mismatch');
+          for (const name of ['@eslint/js','typescript-eslint','@eslint-react/eslint-plugin','eslint-plugin-react-hooks','globals']) {
+            if (!p.devDependencies?.[name] || p.devDependencies[name] === 'latest') throw new Error('Alternative lint dependency missing or unpinned: '+name);
+            if (!l.packages?.['node_modules/'+name]?.version) throw new Error('Alternative lint dependency missing from lockfile: '+name);
+          }
+          for (const group of ['dependencies','devDependencies','optionalDependencies']) {
+            const a=p[group]||{}, b=l.packages[''][group]||{};
+            for (const name of new Set([...Object.keys(a),...Object.keys(b)])) if (a[name] !== b[name]) throw new Error('Manifest/lock mismatch: '+group+'.'+name);
+            for (const [name,v] of Object.entries(a)) if (v === 'latest') throw new Error('Unpinned direct dependency remains: '+name);
+          }
+          if ((prod.metadata?.vulnerabilities?.high ?? 0) !== 0 || (prod.metadata?.vulnerabilities?.critical ?? 0) !== 0) throw new Error('Production-only audit is not clean');
+          if ((full.metadata?.vulnerabilities?.high ?? 0) !== 0 || (full.metadata?.vulnerabilities?.critical ?? 0) !== 0) throw new Error('Full audit must have zero high/critical findings before candidate publication');
+          console.log('Candidate validated with no high or critical findings in the full or production-only dependency audit.');
+          console.log(JSON.stringify({fullAudit:full.metadata?.vulnerabilities,productionAudit:prod.metadata?.vulnerabilities},null,2));
+          NODE
+
+      - name: Apply candidate manifest and lockfile
+        run: |
+          cp candidate-artifact/package.json package.json
+          cp candidate-artifact/package-lock.json package-lock.json
+          git diff --check
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Candidate package files are already committed."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "fix(deps): apply tested Next and Prisma security candidate"
+            git push origin HEAD:security/npm-dependency-remediation-diagnostics
+          fi
