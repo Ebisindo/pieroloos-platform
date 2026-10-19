@@ -120,9 +120,7 @@ describe("corporate graph and compliance API boundaries", () => {
   });
 
   it("reports an empty compliance registry as unknown, not as proof of no obligations", async () => {
-    const response = await getComplianceRules(
-      new Request("http://localhost/api/compliance/rules?jurisdiction=NG&entityType=COMPANY"),
-    );
+    const response = await getComplianceRules();
     const payload = await response.json() as { notice: string; rules: unknown[] };
 
     expect(response.status).toBe(200);
