@@ -85,7 +85,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
               },
             });
           }
-          throw new Error("EXECUTION_AUTHORIZATION_EXPIRED");
+          return { id: authorization.id, status: "EXPIRED" as const, revokedAt: now, expired: true };
         }
 
         const updated = await transaction.aIExecutionAuthorization.updateMany({
@@ -125,20 +125,20 @@ export async function POST(request: Request, routeContext: RouteContext) {
           },
         });
 
-        return { id: authorization.id, status: "REVOKED" as const, revokedAt: now };
+        return { id: authorization.id, status: "REVOKED" as const, revokedAt: now, expired: false };
       },
     );
 
-    return NextResponse.json({ data: { ...result, executionPerformed: false } });
+    if (result.expired) {
+      return NextResponse.json({ error: "Authorization expired and is no longer usable.", data: { id: result.id, status: result.status, executionPerformed: false } }, { status: 409 });
+    }
+    return NextResponse.json({ data: { id: result.id, status: result.status, revokedAt: result.revokedAt, executionPerformed: false } });
   } catch (error) {
     if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
       return NextResponse.json({ error: "Workspace authorization changed. Refresh and retry." }, { status: 409 });
     }
     if (error instanceof Error && error.message === "EXECUTION_AUTHORIZATION_NOT_FOUND") {
       return NextResponse.json({ error: "Execution authorization not found in the active workspace." }, { status: 404 });
-    }
-    if (error instanceof Error && error.message === "EXECUTION_AUTHORIZATION_EXPIRED") {
-      return NextResponse.json({ error: "Authorization expired and is no longer usable." }, { status: 409 });
     }
     if (error instanceof Error && error.message === "EXECUTION_AUTHORIZATION_NOT_ACTIVE") {
       return NextResponse.json({ error: "Only an active authorization can be revoked." }, { status: 409 });
