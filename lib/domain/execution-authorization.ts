@@ -19,7 +19,20 @@ export const executionAuthorizationRequestSchema = z.discriminatedUnion("operati
       targetIds: z.array(identifier).max(20),
       clientId: identifier.optional(),
       changesDigest: digestSchema,
-    }).strict(),
+    }).strict().superRefine((operation, context) => {
+      const expectedTargets = operation.action === "CREATE_NODE" ? 0
+        : operation.action === "CREATE_RELATIONSHIP" ? 2 : 1;
+      if (operation.targetIds.length !== expectedTargets) {
+        context.addIssue({
+          code: "custom",
+          path: ["targetIds"],
+          message: `\${operation.action} requires exactly \${expectedTargets} target IDs.`,
+        });
+      }
+      if (new Set(operation.targetIds).size !== operation.targetIds.length) {
+        context.addIssue({ code: "custom", path: ["targetIds"], message: "Target IDs must be unique." });
+      }
+    }),
   }).strict(),
   z.object({
     ...base,
