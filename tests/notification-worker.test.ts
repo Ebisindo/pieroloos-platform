@@ -127,6 +127,24 @@ describe("notification background worker", () => {
     }));
   });
 
+  it("does not report delivery as finalized when the SMTP acceptance arrives after the worker loses its lease", async () => {
+    notificationUpdateManyMock
+      .mockResolvedValueOnce({ count: 1 }) // claim notification
+      .mockResolvedValueOnce({ count: 1 }) // create attempt under the lease
+      .mockResolvedValueOnce({ count: 0 }); // lease no longer belongs to this worker
+    const result = await runNotificationWorker(new Date("2026-10-06T06:30:00Z"));
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      claimed: 1,
+      delivered: 0,
+      reconciliationRequired: 1,
+    });
+    expect(attemptUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "ACCEPTED", providerMessageId: "<receipt@example.com>" }),
+    }));
+  });
+
   it("uses bounded retry scheduling and records sanitized failures", async () => {
     const timeout = Object.assign(new Error("connection timed out with private server details"), { code: "ETIMEDOUT" });
     sendEmailMock.mockRejectedValueOnce(timeout);
