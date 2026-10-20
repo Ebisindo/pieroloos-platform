@@ -43,7 +43,7 @@ The database enforces workspace/proposal/user foreign keys, positive proposal ve
 
 ## Explicit limitations and required next steps
 
-- **No executor is implemented here.** The endpoint always returns `executionPerformed: false`. It does not call a filing, payment, graph-mutation, notification or privilege-change provider.
+- **No executor is implemented here.** The endpoint always returns `executionPerformed: false`. It does not call a filing, payment, graph-mutation, notification or privilege-change provider. Filing and payment authorization requests are sandbox-only in this slice; production filing/payment consent is rejected until a separately reviewed step-up, account allowlist, recipient/legal-entity confirmation and reconciliation path exists.
 - Do not close Issue #60 yet. Before consequential execution, add a dedicated typed executor/service for each operation family. It must atomically verify current authorization and proposal state, current actor permissions and tenant/client binding, expiry/revocation, exact operation digest and parameter snapshot, provider/environment allowlists, and an operation-level idempotency key; it must consume the authorization once and write the audit result in the same transaction where possible.
 - Prevent two different authorization rows from executing the same operation twice. The current workspace idempotency key prevents retries with the same key, but is not by itself a cross-key duplicate-execution guarantee. The executor must enforce an operation-digest/target uniqueness or equivalent database-backed claim.
 - Implement explicit revocation and expiry transition endpoints/jobs; an expired row is not valid merely because its stored status still says `AUTHORIZED`. Every executor must check `expiresAt` directly.
@@ -55,6 +55,6 @@ The database enforces workspace/proposal/user foreign keys, positive proposal ve
 
 ## API request contract
 
-The endpoint requires `expectedVersion`, `idempotencyKey`, `confirmExactOperation: true`, an allow-listed `operationType`, and the typed `operation` snapshot. Production/sandbox environment, recipient, amount, filing content digest, graph targets or privilege target are part of the digest when relevant. The server issues a 15-minute authorization only after the approved proposal/version is re-read in the authorized transaction.
+The endpoint requires `expectedVersion`, `idempotencyKey`, `confirmExactOperation: true`, an allow-listed `operationType`, and the typed `operation` snapshot. Recipient, amount, filing content digest, graph targets or privilege target are part of the digest when relevant. Filing/payment requests currently accept only `SANDBOX`; production consent is deliberately fail-closed. The server issues a 15-minute authorization only after the approved proposal/version is re-read in the authorized transaction.
 
 The explicit confirmation field is a server-enforced API contract; a production UI must render the material parameters back to the user and require a deliberate confirmation gesture. Do not wire this endpoint to a background agent or call it automatically after proposal approval.
