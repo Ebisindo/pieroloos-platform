@@ -78,7 +78,7 @@ describe("separate AI execution authorization", () => {
     activityCreateMock.mockReset().mockResolvedValue({ id: "activity-1" });
     authorizedTransactionMock.mockReset().mockImplementation(async (_principal, _permission, callback) => callback({
       businessIntentProposal: { findFirst: proposalFindFirstMock },
-      aiExecutionAuthorization: {
+      aIExecutionAuthorization: {
         findUnique: authorizationFindUniqueMock,
         create: authorizationCreateMock,
       },
