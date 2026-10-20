@@ -256,29 +256,33 @@ async function finishAttempt(input: {
 }) {
   const { notification, workerId, attemptId, now } = input;
   if (input.success) {
-    await prisma.$transaction([
-      prisma.notificationDeliveryAttempt.update({
+    const stillOwnsLease = await prisma.$transaction(async (transaction) => {
+      await transaction.notificationDeliveryAttempt.update({
         where: { id: attemptId },
         data: {
           status: "ACCEPTED",
           completedAt: now,
-          providerMessageId: input.success.messageId,
+          providerMessageId: input.success!.messageId,
         },
-      }),
-      prisma.complianceNotification.updateMany({
+      });
+      const updated = await transaction.complianceNotification.updateMany({
         where: { id: notification.id, status: "PROCESSING", lockedBy: workerId },
         data: {
           status: "SENT",
           sentAt: now,
           failureReason: null,
-          providerMessageId: input.success.messageId,
-          deliveryReceipt: input.success.receipt,
+          providerMessageId: input.success!.messageId,
+          deliveryReceipt: input.success!.receipt,
           lockedAt: null,
           lockedBy: null,
         },
-      }),
-    ]);
-    return "delivered" as const;
+      });
+      return updated.count === 1;
+    });
+    // SMTP accepted the message, but a lost lease means this worker cannot
+    // claim that it successfully finalized the queue record. Surface the
+    // ambiguity for reconciliation instead of reporting a false delivery.
+    return stillOwnsLease ? "delivered" as const : "reconciliationRequired" as const;
   }
 
   const code = failureCode(input.error);
@@ -287,8 +291,8 @@ async function finishAttempt(input: {
   const status = deadLetter ? "DEAD_LETTER" : "QUEUED";
   const retryDate = deadLetter ? null : retryAt(now, notification.attemptCount + 1);
   const safeMessage = `Notification delivery failed (${code}).`;
-  await prisma.$transaction([
-    prisma.notificationDeliveryAttempt.update({
+  const stillOwnsLease = await prisma.$transaction(async (transaction) => {
+    await transaction.notificationDeliveryAttempt.update({
       where: { id: attemptId },
       data: {
         status: deadLetter ? "PERMANENT_FAILURE" : "RETRYABLE_FAILURE",
@@ -296,8 +300,8 @@ async function finishAttempt(input: {
         failureCode: code,
         failureMessage: safeMessage,
       },
-    }),
-    prisma.complianceNotification.updateMany({
+    });
+    const updated = await transaction.complianceNotification.updateMany({
       where: { id: notification.id, status: "PROCESSING", lockedBy: workerId },
       data: {
         status,
@@ -307,8 +311,10 @@ async function finishAttempt(input: {
         lockedAt: null,
         lockedBy: null,
       },
-    }),
-  ]);
+    });
+    return updated.count === 1;
+  });
+  if (!stillOwnsLease) return "reconciliationRequired" as const;
   return deadLetter ? "deadLettered" as const : "retried" as const;
 }
 
@@ -327,6 +333,7 @@ export async function runNotificationWorker(
     cancelled: 0,
     deferred: 0,
     failed: 0,
+    reconciliationRequired: 0,
   };
 
   for (const notification of claimed) {
