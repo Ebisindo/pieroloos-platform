@@ -60,9 +60,9 @@ export const executionAuthorizationRequestSchema = z.discriminatedUnion("operati
     ...base,
     operationType: z.literal("PRIVILEGE_CHANGE"),
     operation: z.object({
-      action: z.enum(["GRANT", "REVOKE"]),
+      action: z.enum(["ASSIGN_ROLE", "REVOKE_MEMBERSHIP"]),
       targetUserId: identifier,
-      permission: z.string().trim().min(3).max(100),
+      role: z.enum(["OWNER", "ADMIN", "ADVISOR", "MEMBER", "VIEWER"]),
     }).strict(),
   }).strict(),
 ]);
