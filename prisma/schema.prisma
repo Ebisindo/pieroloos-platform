@@ -1117,10 +1117,10 @@ model AIExecutionAuthorization {
   authorizedBy User                  @relation("AIExecutionAuthorizationActor", fields: [authorizedByUserId], references: [id], onDelete: Restrict)
   consumedBy   User?                 @relation("AIExecutionAuthorizationConsumer", fields: [consumedByUserId], references: [id], onDelete: Restrict)
 
-  @@unique([id, workspaceId])
-  @@unique([workspaceId, idempotencyKey])
-  @@index([organizationId, workspaceId, status, expiresAt])
-  @@index([proposalId, proposalVersion, operationDigest])
+  @@unique([id, workspaceId], map: "AIExecutionAuthorization_id_workspace_key")
+  @@unique([workspaceId, idempotencyKey], map: "AIExecutionAuthorization_workspace_idempotency_key")
+  @@index([organizationId, workspaceId, status, expiresAt], map: "AIExecutionAuthorization_tenant_status_expiry_idx")
+  @@index([proposalId, proposalVersion, operationDigest], map: "AIExecutionAuthorization_proposal_version_digest_idx")
 }
 
 model MarketEntryPlan {
