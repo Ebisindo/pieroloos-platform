@@ -111,7 +111,7 @@ describe("separate AI execution authorization", () => {
         action: "CREATE_NODE",
         targetIds: [],
         clientId: "different-client",
-        changesDigest: "a".repeat(64),
+        node: { name: "Sample Holdings", nodeType: "COMPANY" },
       },
     })), routeContext);
     expect(mismatchedGraph.status).toBe(422);
