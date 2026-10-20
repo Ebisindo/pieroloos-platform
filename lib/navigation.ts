@@ -7,6 +7,7 @@ import {
   GitBranch,
   Globe2,
   LayoutDashboard,
+  Lightbulb,
   ArrowLeftRight,
   Map,
   Scale,
@@ -17,6 +18,7 @@ import {
 export const workspaceNavigation = [
   { href: "/command-center", label: "Business Formation", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: BriefcaseBusiness },
+  { href: "/ai/business-intent", label: "Business Intent & AI Review", icon: Lightbulb },
   { href: "/jurisdictions", label: "Jurisdiction Lens", icon: Scale },
   { href: "/expansion", label: "Market Expansion", icon: Globe2 },
   { href: "/cross-border", label: "Cross-border Preparation", icon: ArrowLeftRight },

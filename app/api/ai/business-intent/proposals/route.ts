@@ -104,14 +104,6 @@ export async function POST(request: Request) {
   }
 
   const inputDigest = createHash("sha256").update(JSON.stringify(parsed.data)).digest("hex");
-  const evidenceReferences = parsed.data.knownFacts.map((fact) => ({
-    id: fact.id,
-    statement: fact.statement,
-    sourceUrl: fact.sourceUrl ?? null,
-    evidenceClass: fact.evidenceClass,
-    retrievedAt: fact.retrievedAt ?? null,
-  }));
-
   try {
     const proposal = await withAuthorizedWorkspaceTransaction(
       principal,
@@ -131,6 +123,48 @@ export async function POST(request: Request) {
           });
           if (!client) throw new Error("INTENT_CLIENT_NOT_FOUND");
         }
+
+        // Evidence IDs must resolve to clean, reviewed server-owned documents
+        // in this exact workspace/client scope. User-supplied URLs are references,
+        // not trusted provenance; claims remain explicitly unverified.
+        const evidenceIds = parsed.data.knownFacts.map((fact) => fact.id);
+        if (new Set(evidenceIds).size !== evidenceIds.length) {
+          throw new Error("INTENT_EVIDENCE_NOT_FOUND");
+        }
+        const evidenceDocuments = evidenceIds.length
+          ? await transaction.document.findMany({
+              where: {
+                id: { in: evidenceIds },
+                workspaceId: principal.workspaceId,
+                clientId: parsed.data.clientId ?? null,
+                status: "AVAILABLE",
+                scanStatus: "CLEAN",
+                reviewStatus: "VERIFIED",
+                deletedAt: null,
+              },
+              select: { id: true, name: true, checksum: true, version: true, updatedAt: true },
+            })
+          : [];
+        if (evidenceDocuments.length !== evidenceIds.length) {
+          throw new Error("INTENT_EVIDENCE_NOT_FOUND");
+        }
+        const documentsById = new Map(evidenceDocuments.map((document) => [document.id, document]));
+        const evidenceReferences = parsed.data.knownFacts.map((fact) => {
+          const document = documentsById.get(fact.id);
+          if (!document) throw new Error("INTENT_EVIDENCE_NOT_FOUND");
+          return {
+            id: document.id,
+            sourceDocumentName: document.name,
+            sourceDocumentChecksum: document.checksum,
+            sourceDocumentVersion: document.version,
+            sourceDocumentUpdatedAt: document.updatedAt.toISOString(),
+            statement: fact.statement,
+            claimStatus: "UNVERIFIED_CLAIM",
+            sourceUrl: null,
+            evidenceClass: "E1",
+            retrievedAt: null,
+          };
+        });
 
         const created = await transaction.businessIntentProposal.create({
           data: {
@@ -214,6 +248,12 @@ function entitlementOrClientError(error: unknown): NextResponse | null {
   }
   if (error instanceof Error && error.message === "INTENT_CLIENT_NOT_FOUND") {
     return NextResponse.json({ error: "Client not found in the active workspace." }, { status: 404 });
+  }
+  if (error instanceof Error && error.message === "INTENT_EVIDENCE_NOT_FOUND") {
+    return NextResponse.json(
+      { error: "Every evidence ID must identify a clean, reviewed document in the active workspace and client scope." },
+      { status: 422 },
+    );
   }
   return null;
 }
