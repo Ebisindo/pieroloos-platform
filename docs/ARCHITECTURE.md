@@ -89,7 +89,6 @@ CI (`.github/workflows/ci.yml`) has separate quality and browser-test jobs. The 
 - Rate-limit policies still need a route-by-route inventory and staging verification of limits, failure behavior, shared-store availability and trusted-proxy configuration.
 - No error tracking, structured logging or worker-failure alerting beyond `/api/health`.
 - No documented backup, restore rehearsal or recovery runbook.
-- No error tracking, structured logging or worker-failure alerting beyond `/api/health`.
 - Audit tables have no tamper evidence.
 - Unpaginated list queries can grow without bound.
 - Fonts download at build time.
