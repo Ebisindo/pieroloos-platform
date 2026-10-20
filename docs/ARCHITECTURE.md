@@ -71,7 +71,7 @@ npm run test:db          # needs PostgreSQL (see scripts/run-db-tests.mjs)
 NEXTAUTH_SECRET=<value> DATABASE_URL=<url> npm run build
 ```
 
-CI (`.github/workflows/ci.yml`) provisions PostgreSQL 16 and runs migrate, DB tests, typecheck, tests and build. CI does not run lint, and `test:e2e` has no Playwright configuration.
+CI (`.github/workflows/ci.yml`) has separate quality and browser-test jobs. The quality job provisions PostgreSQL 16, validates and applies migrations to a disposable CI database, runs database-integrity tests, lint, typecheck, unit/route tests, and a production build. The browser job installs Chromium, builds the app, and runs the Playwright suite against the production server; current public-surface coverage includes accessibility scans and internationalization/responsive checks. These automated checks do not replace manual keyboard, screen-reader, visual, security, or production-environment verification.
 
 ## Deployment requirements
 

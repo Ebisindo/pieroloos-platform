@@ -15,8 +15,8 @@ Command evidence was produced on the working tree on 2026-10-11 with dummy `NEXT
 - `npm run db:validate`: schema valid. `npm run db:inventory`: 14 migrations validated.
 - `npm run db:deploy -- ci` against a disposable PostgreSQL 16 database: all 14 migrations applied; both schema-drift checks report no difference. `npm run test:db`: 7 tests passed.
 - `npm run build`: exit 0 with dummy values; fails without `NEXTAUTH_SECRET` by design.
-- `npm run test:e2e`: exit 1, no Playwright configuration or tests exist ("No tests found").
-- Not run: browser and accessibility checks.
+- `playwright.config.ts`, `e2e/a11y.spec.ts`, and `e2e/i18n.spec.ts` are present in the repository; the CI workflow defines a separate Chromium browser-test job. The 2026-10-11 command evidence below is historical and does not establish the current CI result.
+- Current browser/accessibility execution result: not independently verified during this documentation update. Automated axe checks are not a WCAG conformance claim; manual keyboard, screen-reader, and visual review remain required.
 
 ## Security
 
@@ -54,8 +54,8 @@ Command evidence was produced on the working tree on 2026-10-11 with dummy `NEXT
 | Control | Status | Evidence / gap |
 | --- | --- | --- |
 | Unit and route tests | Passed | See command evidence above. |
-| End-to-end tests | Failed | `test:e2e` script exists; no Playwright configuration or tests. |
-| CI coverage | Failed | CI runs DB tests, typecheck, tests and build but not lint. |
+| End-to-end tests | Configured; latest run not verified | Playwright configuration and public-surface specs exist; CI installs Chromium and runs `npm run test:e2e`. Confirm the latest workflow run and review any failures before changing this to Passed. |
+| CI coverage | Configured; latest run not verified | `.github/workflows/ci.yml` includes PostgreSQL migration/integrity checks, lint, typecheck, unit/route tests, production build, and a separate browser-test job. Confirm current workflow results before treating these gates as Passed. |
 | Documentation | Passed | README, PRODUCT, ARCHITECTURE, PARTNERSHIP, AUTH-SETUP, DESIGN-SYSTEM updated 2026-10-11; reviewed by the author only. |
 
 ## Brand, public site and content
@@ -67,7 +67,7 @@ Command evidence was produced on the working tree on 2026-10-11 with dummy `NEXT
 | Public pages | Not tested | `/` and `/partners` build; never viewed in a browser. |
 | Public content accuracy | Failed | Funding phase ranges (₦40M–₦65M total) do not reconcile to the stated ₦45M–₦81M programme range. The page discloses this; the owner must correct it. |
 | Responsive behaviour | Not tested | Breakpoints written; no device or viewport testing. |
-| Accessibility | Not tested | Fixes applied (focus, labels, alerts, skip link, off-canvas nav); no axe/Lighthouse run, screen-reader test or contrast measurement. |
+| Accessibility | Partially automated; manual review outstanding | `e2e/a11y.spec.ts` runs axe-core scans on `/` and `/partners` across four locales in CI. A passing automated scan is not proof of WCAG conformance; manual keyboard/screen-reader review, contrast measurement, and a verified current run remain outstanding. |
 | SEO (code) | Passed | `tests/seo-metadata.test.ts`; build emits `/robots.txt` and `/sitemap.xml`. |
 | SEO (production values) | Blocked | `SITE_URL` unset everywhere; canonical URLs, sitemap and JSON-LD stay off until set. |
 | Analytics | Not applicable | None installed. |
