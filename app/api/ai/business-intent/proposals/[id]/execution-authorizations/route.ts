@@ -55,6 +55,9 @@ export async function POST(request: Request, routeContext: RouteContext) {
       error: "A typed operation, exact-operation confirmation, expected proposal version and idempotency key are required.",
     }, { status: 422 });
   }
+  if (parsed.data.operationType === "PRIVILEGE_CHANGE" && principal.role !== "owner") {
+    return NextResponse.json({ error: "Only an owner may authorize a membership-role change." }, { status: 403 });
+  }
 
   const { id: proposalId } = await routeContext.params;
   const operationDigest = digestExecutionOperation(parsed.data.operationType, parsed.data.operation);
