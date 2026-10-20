@@ -57,6 +57,14 @@ export async function POST(request: Request) {
 
   const principal = context.principal;
   const now = new Date();
+  const evidenceIds = parsed.data.knownFacts.map((fact) => fact.id);
+  let resolvedEvidenceDocuments: Array<{
+    id: string;
+    name: string;
+    checksum: string;
+    version: number;
+    updatedAt: Date;
+  }> = [];
 
   try {
     await withAuthorizedWorkspaceTransaction(principal, "formation:write", async (transaction) => {
@@ -72,6 +80,30 @@ export async function POST(request: Request) {
         });
         if (!client) throw new Error("INTENT_CLIENT_NOT_FOUND");
       }
+
+      // Resolve all evidence IDs before invoking the provider. The stored document
+      // must be in this exact workspace/client scope, available, clean, reviewed,
+      // and not deleted. This validates the reference, not the truth of the claim.
+      if (new Set(evidenceIds).size !== evidenceIds.length) {
+        throw new Error("INTENT_EVIDENCE_NOT_FOUND");
+      }
+      resolvedEvidenceDocuments = evidenceIds.length
+        ? await transaction.document.findMany({
+            where: {
+              id: { in: evidenceIds },
+              workspaceId: principal.workspaceId,
+              clientId: parsed.data.clientId ?? null,
+              status: "AVAILABLE",
+              scanStatus: "CLEAN",
+              reviewStatus: "VERIFIED",
+              deletedAt: null,
+            },
+            select: { id: true, name: true, checksum: true, version: true, updatedAt: true },
+          })
+        : [];
+      if (resolvedEvidenceDocuments.length !== evidenceIds.length) {
+        throw new Error("INTENT_EVIDENCE_NOT_FOUND");
+      }
     });
   } catch (error) {
     const response = entitlementOrClientError(error);
@@ -83,9 +115,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to authorize business-intent analysis." }, { status: 500 });
   }
 
+  // Keep submitted statements explicitly unverified and exclude caller-supplied
+  // source URLs from provider context. Server-owned document metadata is used
+  // for provenance checks and persisted separately from the user's claim.
+  const providerInput = {
+    ...parsed.data,
+    knownFacts: parsed.data.knownFacts.map((fact) => ({
+      id: fact.id,
+      statement: fact.statement,
+      evidenceClass: "E1" as const,
+    })),
+  };
   let analysis;
   try {
-    analysis = await analyzeBusinessIntent(parsed.data);
+    analysis = await analyzeBusinessIntent(providerInput);
   } catch (error) {
     if (error instanceof BusinessIntentProviderError) {
       if (error.kind === "NOT_CONFIGURED") {
@@ -104,14 +147,6 @@ export async function POST(request: Request) {
   }
 
   const inputDigest = createHash("sha256").update(JSON.stringify(parsed.data)).digest("hex");
-  const evidenceReferences = parsed.data.knownFacts.map((fact) => ({
-    id: fact.id,
-    statement: fact.statement,
-    sourceUrl: fact.sourceUrl ?? null,
-    evidenceClass: fact.evidenceClass,
-    retrievedAt: fact.retrievedAt ?? null,
-  }));
-
   try {
     const proposal = await withAuthorizedWorkspaceTransaction(
       principal,
@@ -131,6 +166,54 @@ export async function POST(request: Request) {
           });
           if (!client) throw new Error("INTENT_CLIENT_NOT_FOUND");
         }
+
+        // Re-read the source records before persistence. Reject revocation,
+        // deletion, reassignment, or document-version changes that occurred while
+        // the provider was running; never attach stale evidence snapshots.
+        const evidenceDocuments = evidenceIds.length
+          ? await transaction.document.findMany({
+              where: {
+                id: { in: evidenceIds },
+                workspaceId: principal.workspaceId,
+                clientId: parsed.data.clientId ?? null,
+                status: "AVAILABLE",
+                scanStatus: "CLEAN",
+                reviewStatus: "VERIFIED",
+                deletedAt: null,
+              },
+              select: { id: true, name: true, checksum: true, version: true, updatedAt: true },
+            })
+          : [];
+        if (evidenceDocuments.length !== evidenceIds.length) {
+          throw new Error("INTENT_EVIDENCE_CHANGED");
+        }
+        const preflightById = new Map(resolvedEvidenceDocuments.map((document) => [document.id, document]));
+        const documentsById = new Map(evidenceDocuments.map((document) => [document.id, document]));
+        for (const document of evidenceDocuments) {
+          const before = preflightById.get(document.id);
+          if (!before ||
+              before.checksum !== document.checksum ||
+              before.version !== document.version ||
+              before.updatedAt.getTime() !== document.updatedAt.getTime()) {
+            throw new Error("INTENT_EVIDENCE_CHANGED");
+          }
+        }
+        const evidenceReferences = parsed.data.knownFacts.map((fact) => {
+          const document = documentsById.get(fact.id);
+          if (!document) throw new Error("INTENT_EVIDENCE_CHANGED");
+          return {
+            id: document.id,
+            sourceDocumentName: document.name,
+            sourceDocumentChecksum: document.checksum,
+            sourceDocumentVersion: document.version,
+            sourceDocumentUpdatedAt: document.updatedAt.toISOString(),
+            statement: fact.statement,
+            claimStatus: "UNVERIFIED_CLAIM",
+            sourceUrl: null,
+            evidenceClass: "E1",
+            retrievedAt: null,
+          };
+        });
 
         const created = await transaction.businessIntentProposal.create({
           data: {
@@ -214,6 +297,18 @@ function entitlementOrClientError(error: unknown): NextResponse | null {
   }
   if (error instanceof Error && error.message === "INTENT_CLIENT_NOT_FOUND") {
     return NextResponse.json({ error: "Client not found in the active workspace." }, { status: 404 });
+  }
+  if (error instanceof Error && error.message === "INTENT_EVIDENCE_NOT_FOUND") {
+    return NextResponse.json(
+      { error: "Every evidence ID must identify a clean, reviewed document in the active workspace and client scope." },
+      { status: 422 },
+    );
+  }
+  if (error instanceof Error && error.message === "INTENT_EVIDENCE_CHANGED") {
+    return NextResponse.json(
+      { error: "An evidence document changed or became unavailable during proposal generation. Refresh the source and retry." },
+      { status: 409 },
+    );
   }
   return null;
 }

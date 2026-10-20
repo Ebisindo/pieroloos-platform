@@ -1,11 +1,20 @@
 import { z } from "zod";
+import { validateGraphEdge, validateOwnershipTotal, wouldCreateOwnershipCycle, type GraphEdgeInput } from "@/lib/domain/corporate-graph";
 
 const factSchema = z.object({
   id: z.string().trim().min(1).max(80),
   statement: z.string().trim().min(2).max(1600),
-  sourceUrl: z.string().url().max(2000).optional(),
-  evidenceClass: z.enum(["E0", "E1", "E2", "E3", "E4"]).default("E0"),
-  retrievedAt: z.string().datetime().optional(),
+  sourceUrl: z.string().url().max(2000).refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password;
+    } catch {
+      return false;
+    }
+  }, "Source references must use HTTPS and must not contain embedded credentials.").optional(),
+  // Intake submissions are unverified claims. A caller must not self-assert
+  // secondary, primary, cross-verified, or retrieval provenance.
+  evidenceClass: z.enum(["E0", "E1"]).default("E1"),
 }).strict();
 
 export const businessIntentInputSchema = z.object({
@@ -73,6 +82,7 @@ export const businessIntentProposalSchema = z.object({
   });
 
   const relationships = new Set<string>();
+  const graphEdges: GraphEdgeInput[] = [];
   proposal.proposedRelationships.forEach((relationship, index) => {
     if (!keys.has(relationship.fromKey) || !keys.has(relationship.toKey)) {
       context.addIssue({
@@ -109,6 +119,47 @@ export const businessIntentProposalSchema = z.object({
       });
     }
     relationships.add(relationshipKey);
+
+    // Validate the AI-proposed relationship against the production graph rules.
+    // The proposal remains provisional; this validation does not create graph rows.
+    const graphRelation: GraphEdgeInput["relation"] =
+      relationship.relationshipType === "OWNS" || relationship.relationshipType === "BENEFICIAL_OWNER"
+        ? "OWNS"
+        : relationship.relationshipType === "CONTROLS"
+          ? "CONTROLS"
+          : "RELATED_TO";
+    const graphEdge: GraphEdgeInput = {
+      fromNodeId: relationship.fromKey,
+      toNodeId: relationship.toKey,
+      relation: graphRelation,
+      ...(relationship.ownershipPercentage === null ? {} : { ownershipPercent: relationship.ownershipPercentage }),
+      notes: relationship.rationale,
+    };
+
+    const edgeError = validateGraphEdge(graphEdge);
+    if (edgeError) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["proposedRelationships", index],
+        message: edgeError,
+      });
+    }
+    const ownershipError = validateOwnershipTotal(graphEdges, graphEdge);
+    if (ownershipError) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["proposedRelationships", index, "ownershipPercentage"],
+        message: ownershipError,
+      });
+    }
+    if (wouldCreateOwnershipCycle(graphEdges, graphEdge)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["proposedRelationships", index],
+        message: "Proposed ownership/control relationships must not create a cycle.",
+      });
+    }
+    graphEdges.push(graphEdge);
   });
 });
 
