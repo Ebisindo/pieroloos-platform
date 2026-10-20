@@ -59,4 +59,42 @@ describe("canonical compliance-rule read boundary", () => {
     const response = await GET();
     expect(response.status).toBe(409);
   });
+  
+  it("rejects unauthenticated requests before opening a transaction", async () => {
+    getWorkspaceContextMock.mockResolvedValueOnce({ userId: null, principal: null });
+    const response = await GET();
+    expect(response.status).toBe(401);
+    expect(authorizedTransactionMock).not.toHaveBeenCalled();
+  });
+
+  it("requires an active workspace before opening a transaction", async () => {
+    getWorkspaceContextMock.mockResolvedValueOnce({ userId: principal.userId, principal: null });
+    const response = await GET();
+    expect(response.status).toBe(409);
+    expect(authorizedTransactionMock).not.toHaveBeenCalled();
+  });
+
+  it("denies callers without compliance read permission", async () => {
+    getWorkspaceContextMock.mockResolvedValueOnce({
+      userId: principal.userId,
+      principal: { ...principal, permissions: ["workspace:read"] },
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(authorizedTransactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a generic server error when listing fails unexpectedly", async () => {
+    authorizedTransactionMock.mockRejectedValueOnce(new Error("database internals must not leak"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await GET();
+      const payload = await response.json() as { error: string };
+      expect(response.status).toBe(500);
+      expect(payload.error).toBe("Unable to list compliance rules.");
+      expect(JSON.stringify(payload)).not.toContain("database internals");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
 });
