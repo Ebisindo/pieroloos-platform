@@ -349,12 +349,21 @@ async function storeUpload(
     return serializeDocument(document);
   } catch (error) {
     if (objectStored) {
+      let cleanupFailed = false;
+      let cleanupFailure: unknown;
       try {
         await storage.delete(key);
-      } catch (cleanupError) {
+      } catch (caughtCleanupError) {
+        cleanupFailed = true;
+        cleanupFailure = caughtCleanupError;
+      }
+      if (cleanupFailed) {
+        // Keep the original persistence failure as the cause; retain the cleanup
+        // failure in AggregateError.errors for complete diagnostics.
         throw new AggregateError(
-          [error, cleanupError],
+          [error, cleanupFailure],
           "Document persistence failed and the uploaded object could not be cleaned up.",
+          { cause: error },
         );
       }
     }
