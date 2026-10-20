@@ -369,6 +369,7 @@ model User {
   businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
   businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
   aiExecutionAuthorizationsCreated AIExecutionAuthorization[] @relation("AIExecutionAuthorizationActor")
+  aiExecutionAuthorizationsConsumed AIExecutionAuthorization[] @relation("AIExecutionAuthorizationConsumer")
   complianceRulesCreated             ComplianceRule[]                  @relation("ComplianceRuleCreatedBy")
   complianceRuleVersionsCreated      ComplianceRuleVersion[]           @relation("ComplianceRuleVersionCreatedBy")
   complianceRulesReviewed             ComplianceRuleVersion[]           @relation("ComplianceRuleVersionReviewer")
