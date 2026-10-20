@@ -58,7 +58,8 @@ export type ExecutionAuthorizationRequest = z.infer<typeof executionAuthorizatio
 export type ExecutionOperationType = ExecutionAuthorizationRequest["operationType"];
 
 function canonicalize(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (value === undefined) return "null";
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
   if (Array.isArray(value)) return "[" + value.map(canonicalize).join(",") + "]";
   const entries = Object.entries(value as Record<string, unknown>)
     .sort(([left], [right]) => left.localeCompare(right));
