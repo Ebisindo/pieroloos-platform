@@ -24,7 +24,44 @@ jobs:
       pull-requests: read
     steps:
       - name: Review dependency changes
+        id: dependency-review
+        continue-on-error: true
         uses: actions/dependency-review-action@v4
+
+      - name: Explain unavailable GitHub Dependency Review support
+        if: steps.dependency-review.outcome == 'failure'
+        run: |
+          echo "::warning::GitHub Dependency Review is unavailable for this repository configuration."
+          echo "The lockfile audit below remains a required fail-closed check for high/critical findings."
+          echo "Restore/verify Dependency Graph in repository Settings > Advanced Security; do not treat this warning as a substitute for the native review."
+
+      - name: Checkout source for lockfile audit
+        if: steps.dependency-review.outcome == 'failure'
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        if: steps.dependency-review.outcome == 'failure'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Require package manifest and lockfile
+        if: steps.dependency-review.outcome == 'failure'
+        run: |
+          test -s package.json
+          test -s package-lock.json
+          node -e "const p=require('./package.json'); const l=require('./package-lock.json'); if (l.lockfileVersion !== 3 || l.name !== p.name) process.exit(1)"
+
+      - name: Audit all dependency scopes for high and critical advisories
+        if: steps.dependency-review.outcome == 'failure'
+        run: npm audit --audit-level=high
+
+      - name: Audit production dependency scope for high and critical advisories
+        if: steps.dependency-review.outcome == 'failure'
+        run: npm audit --omit=dev --audit-level=high
 
   codeql:
     name: CodeQL
