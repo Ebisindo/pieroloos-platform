@@ -203,6 +203,10 @@ export async function POST(request: Request, routeContext: RouteContext) {
       (error as { code?: unknown }).code === "P2034") {
       return NextResponse.json({ error: "Authorization state changed concurrently. Refresh and retry." }, { status: 409 });
     }
+    if (typeof error === "object" && error !== null && "code" in error &&
+      (error as { code?: unknown }).code === "P2002") {
+      return NextResponse.json({ error: "A concurrent request claimed this idempotency key. Retry with the same key to retrieve the recorded authorization." }, { status: 409 });
+    }
     console.error("Execution authorization failed.", safeErrorCode(error));
     return NextResponse.json({ error: "Unable to record execution authorization." }, { status: 500 });
   }
