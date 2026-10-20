@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { enforceRateLimit, WORKSPACE_STAFF_MUTATION_LIMIT } from "@/lib/http/rate-limit";
+import { readBoundedJson } from "@/lib/http/bounded-json";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import {
@@ -41,7 +43,11 @@ export async function POST(request: Request, { params }: RouteContext) {
   if (!context.principal.permissions.includes("client:write")) {
     return NextResponse.json({ error: "Client write permission required." }, { status: 403 });
   }
-  const parsed = clientPortalGrantSchema.safeParse(await request.json().catch(() => null));
+  const limited = await enforceRateLimit(WORKSPACE_STAFF_MUTATION_LIMIT, context.userId);
+  if (limited) return limited;
+  const body = await readBoundedJson(request, 24 * 1024);
+  if (!body.ok) return body.response;
+  const parsed = clientPortalGrantSchema.safeParse(body.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation failed", issues: parsed.error.flatten() }, { status: 422 });
   }
