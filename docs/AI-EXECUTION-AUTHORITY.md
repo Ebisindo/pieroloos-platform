@@ -6,14 +6,31 @@ An AI/provider response, proposal status, evidence label, confidence score, or c
 
 ## Current route inventory
 
-| Entry point | Current responsibility | Must not be treated as |
+The entries below are a source-level inventory of the relevant routes inspected for this slice, not a claim that the repository-wide audit is complete. Interactive routes have their own authenticated human permissions; they are not wired to the AI authorization ledger and must not be repurposed as AI executor endpoints.
+
+| Entry point | Mutation / responsibility | Current disposition |
 | --- | --- | --- |
-| `POST /api/ai/business-intent/proposals` | Creates a workspace-scoped, unapproved proposal snapshot after server-side entitlement and evidence checks | Approval or execution consent |
-| `PATCH /api/ai/business-intent/proposals/:id/review` | Records an independent human decision against `expectedVersion`; conditional update rejects stale/racing reviews | Consent to execute any external action |
-| `POST /api/ai/business-intent/proposals/:id/execution-authorizations` | Records a separate, explicit, short-lived authorization bound to a currently approved proposal version and exact typed operation digest | A command to execute, a provider call, or proof that anything external happened |
-| `POST /api/ai/business-intent/proposals/:id/execution-authorizations/:authorizationId/revoke` | Atomically revokes an active authorization or records its expiry, with an activity event | A substitute for executor-side expiry/revocation checks |
-| `/api/corporate-graph/*` | Existing workspace-authorized graph lifecycle endpoints with their own validation/audit behavior | AI-authorized graph execution; no binding to this ledger is implemented in this slice |
-| Filing/payment/privilege integrations | Must be inventoried and reviewed before any execution adapter is built | Authorized by a proposal or by this ledger without a dedicated adapter |
+| `POST /api/ai/business-intent/proposals` | Creates a workspace-scoped, unapproved proposal snapshot after server-side entitlement and evidence checks | Proposal intake only; no authority to execute |
+| `PATCH /api/ai/business-intent/proposals/:id/review` | Records an independent human decision against `expectedVersion`; stale/racing reviews are rejected | Review only; not execution consent |
+| `POST /api/ai/business-intent/proposals/:id/execution-authorizations` | Records short-lived consent bound to an approved proposal version and typed operation digest | Ledger only; response explicitly says `executionPerformed: false` |
+| `POST /api/ai/business-intent/proposals/:id/execution-authorizations/:authorizationId/revoke` | Revokes an active authorization or records expiry, with an activity event | Revocation only; future executors must independently enforce expiry/revocation |
+| `POST /api/corporate-graph/nodes` | Creates a graph node; checks active workspace, `engagement:write`, client scope and writes an audit event in the authorized transaction | Direct interactive user mutation; not bound to AI authorization ledger |
+| `PATCH /api/corporate-graph/nodes/:id` | Updates an active node scoped to organization/workspace and writes an audit event | Direct interactive user mutation; not bound to AI authorization ledger |
+| `DELETE /api/corporate-graph/nodes/:id` | Archives a node and its active connected edges, with audit events | Direct interactive user mutation; not bound to AI authorization ledger |
+| `POST /api/corporate-graph/edges` | Creates a relationship after endpoint validation, workspace node checks, ownership-total and cycle checks; writes audit event | Direct interactive user mutation; not bound to AI authorization ledger |
+| `DELETE /api/corporate-graph/edges/:id` | Archives an active relationship scoped to organization/workspace and writes an audit event | Direct interactive user mutation; not bound to AI authorization ledger |
+| `GET /api/corporate-graph/audit` | Reads recent workspace-scoped graph audit events | Read-only; not an executor |
+| `PATCH /api/workspaces/memberships` | Changes an organization membership role with owner permission and a transactional activity event | Privilege-changing interactive route; not bound to AI authorization ledger |
+| `DELETE /api/workspaces/memberships` | Removes a membership with owner permission and a transactional activity event | Privilege-changing interactive route; not bound to AI authorization ledger |
+| Filing/payment provider execution | Product documentation says no payment provider is integrated; no dedicated filing executor was verified in this review | No executor found in the inspected code/search; do not infer completeness until full route/service audit finishes |
+| Other privilege, billing, notification and control-plane paths | Related routes/services may mutate access or workflow state independently of this ledger | Repository-wide classification and bypass review remains open |
+
+### Audit scope and disposition
+
+- The graph routes above are authenticated, workspace-scoped interactive mutations with validation and audit events, but they do not consume an AI execution authorization. This is a separation to preserve, not evidence that AI-triggered execution is safe.
+- The membership routes can change privileges through owner-authorized interactive actions; they are not connected to the AI authorization ledger. Any future AI-driven privilege mutation needs a separate typed executor and current-role checks.
+- Repository product documentation states that billing/payment provider integration is not implemented. The authorization schema accepts a sandbox-only payment/filing operation description, which is not a provider integration or evidence of a completed filing/payment.
+- This inventory is deliberately marked incomplete: the remaining audit must search every API route, server action, service, worker and provider integration for graph writes, filing/payment calls, privilege changes, and success-signaling notifications; then classify every path and add route-level negative tests. Issue #60 must remain open until that review and independent sign-off are complete.
 
 ## Authorization state machine
 
