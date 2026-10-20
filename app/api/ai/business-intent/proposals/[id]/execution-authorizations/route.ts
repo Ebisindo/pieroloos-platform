@@ -97,7 +97,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
 
         await assertExecutionTargets(transaction, principal, proposal, parsed.data);
 
-        const existing = await transaction.aiExecutionAuthorization.findUnique({
+        const existing = await transaction.aIExecutionAuthorization.findUnique({
           where: {
             workspaceId_idempotencyKey: {
               workspaceId: principal.workspaceId,
@@ -118,7 +118,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
           return { authorization: existing, replay: true };
         }
 
-        const created = await transaction.aiExecutionAuthorization.create({
+        const created = await transaction.aIExecutionAuthorization.create({
           data: {
             organizationId: principal.organizationId,
             workspaceId: principal.workspaceId,
