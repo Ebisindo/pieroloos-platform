@@ -154,6 +154,20 @@ enum BusinessIntentReviewDecision {
   CHANGES_REQUESTED
 }
 
+enum AIExecutionAuthorizationStatus {
+  AUTHORIZED
+  CONSUMED
+  REVOKED
+  EXPIRED
+}
+
+enum AIExecutionOperationType {
+  CORPORATE_GRAPH_MUTATION
+  FILING_SUBMISSION
+  PAYMENT
+  PRIVILEGE_CHANGE
+}
+
 enum MarketEntryReviewStatus {
   PENDING
   APPROVED
@@ -328,6 +342,7 @@ model Organization {
   clientPortalInteractions ClientPortalInteraction[]
   corporateGraphNodes        CorporateGraphNode[]
   corporateGraphAuditEvents CorporateGraphAuditEvent[]
+  aiExecutionAuthorizations AIExecutionAuthorization[]
 }
 
 model User {
@@ -353,6 +368,7 @@ model User {
   businessIntentProposalsCreated BusinessIntentProposal[] @relation("BusinessIntentProposalCreator")
   businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
   businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
+  aiExecutionAuthorizationsCreated AIExecutionAuthorization[] @relation("AIExecutionAuthorizationActor")
   complianceRulesCreated             ComplianceRule[]                  @relation("ComplianceRuleCreatedBy")
   complianceRuleVersionsCreated      ComplianceRuleVersion[]           @relation("ComplianceRuleVersionCreatedBy")
   complianceRulesReviewed             ComplianceRuleVersion[]           @relation("ComplianceRuleVersionReviewer")
@@ -468,6 +484,7 @@ model Workspace {
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
   businessIntentProposals    BusinessIntentProposal[]
+  aiExecutionAuthorizations AIExecutionAuthorization[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
@@ -1054,6 +1071,7 @@ model BusinessIntentProposal {
   @@index([organizationId, workspaceId, status, createdAt], map: "BusinessIntentProposal_tenant_status_created_idx")
   @@index([clientId, createdAt], map: "BusinessIntentProposal_client_created_idx")
   reviews BusinessIntentProposalReview[]
+  executionAuthorizations AIExecutionAuthorization[]
 }
 
 model BusinessIntentProposalReview {
@@ -1069,6 +1087,39 @@ model BusinessIntentProposalReview {
   reviewer User                   @relation("BusinessIntentProposalReviewActor", fields: [reviewerUserId], references: [id], onDelete: Restrict)
 
   @@index([workspaceId, proposalId, occurredAt], map: "BusinessIntentProposalReview_workspace_proposal_time_idx")
+}
+
+
+model AIExecutionAuthorization {
+  id                 String                         @id @default(cuid())
+  organizationId     String
+  workspaceId        String
+  proposalId         String
+  proposalVersion    Int
+  operationType      AIExecutionOperationType
+  operationDigest    String
+  operationSnapshot  Json
+  idempotencyKey     String
+  status             AIExecutionAuthorizationStatus @default(AUTHORIZED)
+  authorizedByUserId String
+  authorizedAt       DateTime                       @default(now())
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  consumedByUserId   String?
+  revokedAt          DateTime?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace             @relation(fields: [organizationId, workspaceId], references: [organizationId, id], onDelete: Cascade)
+  proposal     BusinessIntentProposal @relation(fields: [proposalId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  authorizedBy User                  @relation("AIExecutionAuthorizationActor", fields: [authorizedByUserId], references: [id], onDelete: Restrict)
+  consumedBy   User?                 @relation("AIExecutionAuthorizationConsumer", fields: [consumedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, idempotencyKey])
+  @@index([organizationId, workspaceId, status, expiresAt])
+  @@index([proposalId, proposalVersion, operationDigest])
 }
 
 model MarketEntryPlan {
