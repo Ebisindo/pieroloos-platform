@@ -42,7 +42,7 @@ export const executionAuthorizationRequestSchema = z.discriminatedUnion("operati
       jurisdictionCode: z.string().trim().min(2).max(16),
       filingType: z.string().trim().min(2).max(100),
       contentDigest: digestSchema,
-      environment: z.enum(["SANDBOX", "PRODUCTION"]),
+      environment: z.literal("SANDBOX"),
     }).strict(),
   }).strict(),
   z.object({
@@ -53,7 +53,7 @@ export const executionAuthorizationRequestSchema = z.discriminatedUnion("operati
       amountMinor: z.string().regex(/^[1-9][0-9]{0,17}$/),
       recipientReference: z.string().trim().min(1).max(200),
       purpose: z.string().trim().min(4).max(500),
-      environment: z.enum(["SANDBOX", "PRODUCTION"]),
+      environment: z.literal("SANDBOX"),
     }).strict(),
   }).strict(),
   z.object({
