@@ -82,11 +82,17 @@ CI (`.github/workflows/ci.yml`) has separate quality and browser-test jobs. The 
 - Configure the scheduler secrets so notification and escalation workers run.
 - Verify security headers on the deployed host. The CSP is minimal (frame, base, form, object only).
 
+## Observability
+
+- `lib/observability/logger.ts` emits a narrow, allow-listed JSON event schema; it must not receive arbitrary request data or exception objects.
+- `GET /api/health` checks PostgreSQL reachability, returns a server-generated correlation ID, and logs generic dependency status without raw errors.
+- The health endpoint is not proof of object-storage, worker, alert-delivery, backup, or full service readiness. See [Observability and Operations](OBSERVABILITY-OPERATIONS.md) for current scope and release evidence requirements.
+
 ## Operational risks
 
 - Per-process rate limiting is bypassable across instances.
-- No documented backup, restore rehearsal or recovery runbook.
-- No error tracking, structured logging or worker-failure alerting beyond `/api/health`.
+- A recovery runbook is documented, but no successful isolated backup/restore rehearsal evidence or measured recovery objectives are recorded.
+- Structured operational logging is initially integrated only with `/api/health`; broader route/worker instrumentation and tested alert delivery remain open (see [Observability and Operations](OBSERVABILITY-OPERATIONS.md)).
 - Audit tables have no tamper evidence.
 - Unpaginated list queries can grow without bound.
 - Fonts download at build time.
