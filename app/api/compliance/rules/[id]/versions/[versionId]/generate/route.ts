@@ -257,31 +257,37 @@ export async function POST(request: Request, routeContext: RouteContext) {
     if (error instanceof Error && error.message === "COMPLIANCE_RULE_VERSION_NOT_FOUND") return NextResponse.json({ error: "Rule version not found in the active workspace." }, { status: 404 });
     if (error instanceof Error && error.message === "COMPLIANCE_CLIENT_NOT_FOUND") return NextResponse.json({ error: "Client not found in the active workspace." }, { status: 404 });
     if (typeof error === "object" && error !== null && "code" in error && ["P2002", "P2034"].includes(String((error as { code?: unknown }).code))) {
-      try {
-        // A unique-key race must not bypass the live workspace authorization check.
-        // Re-read the winner only inside a fresh authorized transaction.
-        const existing = await withAuthorizedWorkspaceTransaction(principal, "compliance:write", async (transaction) =>
-          transaction.complianceObligation.findFirst({
-            where: {
-              organizationId: principal.organizationId,
-              workspaceId: principal.workspaceId,
-              clientId: input.clientId,
-              sourceRuleVersionId: versionId,
-              generationKey,
-            },
-          }),
-        );
-        if (existing) return NextResponse.json({ data: existing, alreadyExists: true }, { status: 200 });
-      } catch (recoveryError) {
-        if (recoveryError instanceof Error && recoveryError.message === "WORKSPACE_AUTHORIZATION_STALE") {
-          return NextResponse.json({ error: "Workspace authorization changed. Refresh and retry." }, { status: 409 });
+      // A concurrent request may win the idempotency key while this transaction is
+      // rolled back. Under serializable isolation, the first recovery read can itself
+      // receive P2034 or observe the row before the winner commits. Retry only the
+      // authorized read in a fresh transaction; never repeat the obligation writes.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const existing = await withAuthorizedWorkspaceTransaction(principal, "compliance:write", async (transaction) =>
+            transaction.complianceObligation.findFirst({
+              where: {
+                organizationId: principal.organizationId,
+                workspaceId: principal.workspaceId,
+                clientId: input.clientId,
+                sourceRuleVersionId: versionId,
+                generationKey,
+              },
+            }),
+          );
+          if (existing) return NextResponse.json({ data: existing, alreadyExists: true }, { status: 200 });
+        } catch (recoveryError) {
+          if (recoveryError instanceof Error && recoveryError.message === "WORKSPACE_AUTHORIZATION_STALE") {
+            return NextResponse.json({ error: "Workspace authorization changed. Refresh and retry." }, { status: 409 });
+          }
+          const recoveryCode = typeof recoveryError === "object" && recoveryError !== null && "code" in recoveryError
+            ? String((recoveryError as { code?: unknown }).code)
+            : null;
+          if (recoveryCode !== "P2034" || attempt === 2) {
+            console.error("Compliance obligation race recovery failed.");
+            return NextResponse.json({ error: "Unable to safely confirm the generated obligation. Retry the request." }, { status: 409 });
+          }
         }
-        if (typeof recoveryError === "object" && recoveryError !== null && "code" in recoveryError &&
-            String((recoveryError as { code?: unknown }).code) === "P2034") {
-          return NextResponse.json({ error: "Concurrent obligation generation conflicted. Retry the request." }, { status: 409 });
-        }
-        console.error("Compliance obligation race recovery failed.");
-        return NextResponse.json({ error: "Unable to safely confirm the generated obligation. Retry the request." }, { status: 409 });
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 15 * (attempt + 1)));
       }
       return NextResponse.json({ error: "Concurrent obligation generation conflicted. Retry the request." }, { status: 409 });
     }
