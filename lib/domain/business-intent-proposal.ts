@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateGraphEdge, validateOwnershipTotal, wouldCreateOwnershipCycle, type GraphEdgeInput } from "@/lib/domain/corporate-graph";
 
 const factSchema = z.object({
   id: z.string().trim().min(1).max(80),
@@ -81,6 +82,7 @@ export const businessIntentProposalSchema = z.object({
   });
 
   const relationships = new Set<string>();
+  const graphEdges: GraphEdgeInput[] = [];
   proposal.proposedRelationships.forEach((relationship, index) => {
     if (!keys.has(relationship.fromKey) || !keys.has(relationship.toKey)) {
       context.addIssue({
@@ -117,6 +119,42 @@ export const businessIntentProposalSchema = z.object({
       });
     }
     relationships.add(relationshipKey);
+
+    // Validate proposed edges using production graph rules. The AI proposal stays
+    // provisional; this validates structure and does not create persisted graph rows.
+    const graphRelation: GraphEdgeInput["relation"] =
+      relationship.relationshipType === "OWNS" || relationship.relationshipType === "BENEFICIAL_OWNER"
+        ? "OWNS"
+        : relationship.relationshipType === "CONTROLS"
+          ? "CONTROLS"
+          : "RELATED_TO";
+    const graphEdge: GraphEdgeInput = {
+      fromNodeId: relationship.fromKey,
+      toNodeId: relationship.toKey,
+      relation: graphRelation,
+      ...(relationship.ownershipPercentage === null ? {} : { ownershipPercent: relationship.ownershipPercentage }),
+      notes: relationship.rationale,
+    };
+    const edgeError = validateGraphEdge(graphEdge);
+    if (edgeError) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["proposedRelationships", index], message: edgeError });
+    }
+    const ownershipError = validateOwnershipTotal(graphEdges, graphEdge);
+    if (ownershipError) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["proposedRelationships", index, "ownershipPercentage"],
+        message: ownershipError,
+      });
+    }
+    if (wouldCreateOwnershipCycle(graphEdges, graphEdge)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["proposedRelationships", index],
+        message: "Proposed ownership/control relationships must not create a cycle.",
+      });
+    }
+    graphEdges.push(graphEdge);
   });
 });
 
