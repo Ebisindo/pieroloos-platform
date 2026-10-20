@@ -6,7 +6,7 @@ An AI/provider response, proposal status, evidence label, confidence score, or c
 
 ## Current route inventory
 
-The entries below are a source-level inventory of the relevant routes inspected for this slice, not a claim that the repository-wide audit is complete. Interactive routes have their own authenticated human permissions; they are not wired to the AI authorization ledger and must not be repurposed as AI executor endpoints.
+The entries below are a source-level inventory of relevant paths inspected so far, not a claim that the repository-wide audit is complete. Interactive routes have their own authenticated human permissions; they are not wired to the AI authorization ledger and must not be repurposed as AI executor endpoints.
 
 | Entry point | Mutation / responsibility | Current disposition |
 | --- | --- | --- |
@@ -18,19 +18,25 @@ The entries below are a source-level inventory of the relevant routes inspected 
 | `PATCH /api/corporate-graph/nodes/:id` | Updates an active node scoped to organization/workspace and writes an audit event | Direct interactive user mutation; not bound to AI authorization ledger |
 | `DELETE /api/corporate-graph/nodes/:id` | Archives a node and its active connected edges, with audit events | Direct interactive user mutation; not bound to AI authorization ledger |
 | `POST /api/corporate-graph/edges` | Creates a relationship after endpoint validation, workspace node checks, ownership-total and cycle checks; writes audit event | Direct interactive user mutation; not bound to AI authorization ledger |
-| `DELETE /api/corporate-graph/edges/:id` | Archives an active relationship scoped to organization/workspace and writes an audit event | Direct interactive user mutation; not bound to AI authorization ledger |
+| `DELETE /api/corporate-graph/edges/:id` | Archives an active relationship scoped to organization/workspace and writes audit | Direct interactive user mutation; not bound to AI authorization ledger |
 | `GET /api/corporate-graph/audit` | Reads recent workspace-scoped graph audit events | Read-only; not an executor |
 | `PATCH /api/workspaces/memberships` | Changes an organization membership role with owner permission and a transactional activity event | Privilege-changing interactive route; not bound to AI authorization ledger |
 | `DELETE /api/workspaces/memberships` | Removes a membership with owner permission and a transactional activity event | Privilege-changing interactive route; not bound to AI authorization ledger |
-| Filing/payment provider execution | Product documentation says no payment provider is integrated; no dedicated filing executor was verified in this review | No executor found in the inspected code/search; do not infer completeness until full route/service audit finishes |
-| Other privilege, billing, notification and control-plane paths | Related routes/services may mutate access or workflow state independently of this ledger | Repository-wide classification and bypass review remains open |
+| `POST /api/clients/:clientId/portal-access` | Grants client portal access after client-write permission, client/email/account checks and service-level scope validation | Privilege/access mutation; not bound to AI authorization ledger |
+| `DELETE /api/clients/:clientId/portal-access/:grantId` | Revokes a client portal grant via the portal service | Privilege/access mutation; not bound to AI authorization ledger |
+| `GET /api/clients/:clientId/portal-access` | Lists grants under client-read permission and service-level scope checks | Read-only; not an executor |
+| `POST /api/control-plane/actions` | Creates an operational workflow action from a trusted evidence-gap signal | Workflow-state mutation; not evidence of external filing/payment execution |
+| Filing/payment provider execution | Product documentation says no payment provider is integrated; no dedicated filing executor was verified in the inspected code/search | No executor found in the inspected code/search; do not infer repository-wide absence |
+| Other privilege, billing, notification, compliance, formation, cross-border, market-entry, worker and server-action paths | These families can mutate access, workflow state, records or communicate outcomes | Full path-by-path classification and bypass review remains open |
 
 ### Audit scope and disposition
 
 - The graph routes above are authenticated, workspace-scoped interactive mutations with validation and audit events, but they do not consume an AI execution authorization. This is a separation to preserve, not evidence that AI-triggered execution is safe.
-- The membership routes can change privileges through owner-authorized interactive actions; they are not connected to the AI authorization ledger. Any future AI-driven privilege mutation needs a separate typed executor and current-role checks.
-- Repository product documentation states that billing/payment provider integration is not implemented. The authorization schema accepts a sandbox-only payment/filing operation description, which is not a provider integration or evidence of a completed filing/payment.
-- This inventory is deliberately marked incomplete: the remaining audit must search every API route, server action, service, worker and provider integration for graph writes, filing/payment calls, privilege changes, and success-signaling notifications; then classify every path and add route-level negative tests. Issue #60 must remain open until that review and independent sign-off are complete.
+- Membership and client portal grant routes can change privileges/access through human-authorized actions; they are not connected to the AI authorization ledger. Any future AI-driven privilege mutation needs a separate typed executor and current-role checks.
+- The control-plane action route creates workflow state from a trusted signal; it must not be described as having executed the underlying remediation or external action.
+- Repository product documentation states that billing/payment provider integration is not implemented. The authorization schema accepts sandbox-only payment/filing operation descriptions, which are not provider integrations or evidence of a completed filing/payment.
+- **This is not yet the full mutation-path audit.** The remaining review must enumerate every `app/api/**/route.ts`, server action, service, worker, scheduled task and provider client; inspect actual write/call sites (not just route names); classify database writes, privilege/access grants, billing/payment, filing/submission, notification/success signals, and workflow transitions; and record evidence plus tests for each path. The GitHub code search used for this pass is not sufficient to prove the absence of an executor or bypass.
+- Issue #60 must remain open until that inventory is complete, all bypasses are dispositioned, PostgreSQL race/no-side-effect integration tests pass, and independent security/database/product review signs off.
 
 ## Authorization state machine
 
@@ -64,11 +70,10 @@ The database enforces workspace/proposal/user foreign keys, positive proposal ve
 - **No executor is implemented here.** The endpoint always returns `executionPerformed: false`. It does not call a filing, payment, graph-mutation, notification or privilege-change provider. Filing and payment authorization requests are sandbox-only in this slice; production filing/payment consent is rejected until a separately reviewed step-up, account allowlist, recipient/legal-entity confirmation and reconciliation path exists.
 - Do not close Issue #60 yet. Before consequential execution, add a dedicated typed executor/service for each operation family. It must atomically verify current authorization and proposal state, current actor permissions and tenant/client binding, expiry/revocation, exact operation digest and parameter snapshot, provider/environment allowlists, and an operation-level idempotency key; it must consume the authorization once and write the audit result in the same transaction where possible.
 - Prevent two different authorization rows from executing the same operation twice. The current workspace idempotency key prevents retries with the same key, but is not by itself a cross-key duplicate-execution guarantee. The executor must enforce an operation-digest/target uniqueness or equivalent database-backed claim.
-- An explicit revocation endpoint now transitions active authorization to `REVOKED` and records an activity event; attempting to revoke an expired authorization records `EXPIRED` before returning a conflict. This is not a scheduled expiry sweeper: every executor must check `expiresAt` directly and fail closed even if the persisted status still says `AUTHORIZED`.
+- An explicit revocation endpoint transitions active authorization to `REVOKED` and records an activity event; attempting to revoke an expired authorization records `EXPIRED` before returning a conflict. This is not a scheduled expiry sweeper: every executor must check `expiresAt` directly and fail closed even if the persisted status still says `AUTHORIZED`.
 - Verify evidence IDs, source versions/checksums, freshness, revocation and tenant/client scope in the executor immediately before side effects. Never trust a proposal's JSON or model output as verified evidence.
 - Filing/payment adapters need account/environment allowlists, legal-entity/jurisdiction/recipient/amount confirmation, provider idempotency where supported, reconciliation and fail-closed behavior. Do not enable production actions based on a sandbox test.
 - Add integration tests with PostgreSQL for unique-key races, two different keys targeting the same operation, expiry/revocation races, proposal version changes, tenant/client mismatches, transaction rollback, audit-write failure and zero-side-effect denial. Mocked route tests alone are not sufficient.
-- Audit any existing graph, billing/payment, filing, privilege and notification route for bypasses before linking it to AI proposals. Approval or authorization must not be inferred from generic status fields.
 - Obtain independent security, database and product review; run the complete CI/security workflows on the exact final head. No production migration, deployment, filing, payment or privilege change is authorized by this PR.
 
 ## API request contract
