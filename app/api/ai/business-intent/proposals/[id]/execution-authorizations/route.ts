@@ -126,7 +126,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
             proposalVersion: proposal.version,
             operationType: parsed.data.operationType,
             operationDigest,
-            operationSnapshot: parsed.data.operation as unknown as Prisma.InputJsonValue,
+            operationSnapshot: JSON.parse(JSON.stringify(parsed.data.operation)) as Prisma.InputJsonValue,
             idempotencyKey: parsed.data.idempotencyKey,
             status: "AUTHORIZED",
             authorizedByUserId: principal.userId,
