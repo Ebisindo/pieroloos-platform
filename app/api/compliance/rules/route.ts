@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-workspace-transaction";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
-import { prisma } from "@/lib/db/prisma";
 import { complianceRuleDraftSchema } from "@/lib/validation/compliance-rule-api";
 
 export async function GET() {
@@ -13,17 +12,28 @@ export async function GET() {
     return NextResponse.json({ error: "Compliance access denied." }, { status: 403 });
   }
 
-  const rules = await prisma.complianceRule.findMany({
-    where: {
-      organizationId: context.principal.organizationId,
-      workspaceId: context.principal.workspaceId,
-    },
-    include: {
-      versions: { orderBy: { version: "desc" }, take: 1 },
-    },
-    orderBy: [{ active: "desc" }, { ruleKey: "asc" }],
-  });
-  return NextResponse.json({ data: rules });
+  const principal = context.principal;
+  try {
+    const rules = await withAuthorizedWorkspaceTransaction(principal, "compliance:read", (transaction) =>
+      transaction.complianceRule.findMany({
+        where: { organizationId: principal.organizationId, workspaceId: principal.workspaceId },
+        include: { versions: { orderBy: { version: "desc" }, take: 1 } },
+        orderBy: [{ active: "desc" }, { ruleKey: "asc" }],
+      }),
+    );
+    return NextResponse.json({
+      data: rules,
+      notice: rules.length
+        ? "Rules are evidence leads, not legal conclusions. Confirm each version against its official source."
+        : "No rules are recorded in this workspace. An empty registry does not mean no obligations exist.",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "WORKSPACE_AUTHORIZATION_STALE") {
+      return NextResponse.json({ error: "Workspace authorization changed. Refresh and retry." }, { status: 409 });
+    }
+    console.error("Compliance rule listing failed.");
+    return NextResponse.json({ error: "Unable to list compliance rules." }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
