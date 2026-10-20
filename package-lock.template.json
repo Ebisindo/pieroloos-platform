@@ -1,0 +1,31 @@
+{
+  "name": "pieroloos-platform",
+  "version": "0.1.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "pieroloos-platform",
+      "version": "0.1.0",
+      "dependencies": {
+        "@prisma/client": "6.19.3",
+        "lucide-react": "latest",
+        "next": "latest",
+        "react": "latest",
+        "react-dom": "latest",
+        "zod": "latest"
+      },
+      "devDependencies": {
+        "@playwright/test": "latest",
+        "@tailwindcss/postcss": "latest",
+        "@types/node": "latest",
+        "@types/react": "latest",
+        "@types/react-dom": "latest",
+        "prisma": "6.19.3",
+        "tailwindcss": "latest",
+        "typescript": "latest",
+        "vitest": "latest"
+      }
+    }
+  }
+}

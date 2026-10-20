@@ -1,0 +1,42 @@
+name: Notification and escalation scheduler
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operational-worker-scheduler
+  cancel-in-progress: false
+
+jobs:
+  run-workers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validate scheduler secrets
+        env:
+          PIEROLOOS_APP_URL: ${{ secrets.PIEROLOOS_APP_URL }}
+          OPERATIONAL_WORKER_SECRET: ${{ secrets.OPERATIONAL_WORKER_SECRET }}
+        run: |
+          test -n "$PIEROLOOS_APP_URL"
+          test -n "$OPERATIONAL_WORKER_SECRET"
+      - name: Evaluate escalations
+        env:
+          PIEROLOOS_APP_URL: ${{ secrets.PIEROLOOS_APP_URL }}
+          OPERATIONAL_WORKER_SECRET: ${{ secrets.OPERATIONAL_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            -X POST "$PIEROLOOS_APP_URL/api/workers/escalations" \
+            -H "Authorization: Bearer $OPERATIONAL_WORKER_SECRET"
+      - name: Deliver queued notifications
+        env:
+          PIEROLOOS_APP_URL: ${{ secrets.PIEROLOOS_APP_URL }}
+          OPERATIONAL_WORKER_SECRET: ${{ secrets.OPERATIONAL_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            -X POST "$PIEROLOOS_APP_URL/api/workers/notifications?limit=5" \
+            -H "Authorization: Bearer $OPERATIONAL_WORKER_SECRET"

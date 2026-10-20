@@ -1,0 +1,91 @@
+// ADDITIVE SESSION 08 SCHEMA. MERGE INTO EXISTING prisma/schema.prisma.
+// Resolve relations against your existing Client, BusinessProfile, FormationPlan, Document and User models.
+
+enum ComplianceStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  AWAITING_EVIDENCE
+  IN_REVIEW
+  COMPLIANT
+  OVERDUE
+  BLOCKED
+  WAIVED
+  NOT_APPLICABLE
+}
+enum ComplianceObligationType {
+  FORMATION
+  GOVERNANCE
+  TAX
+  IDENTIFICATION
+  BANKING
+  PAYMENT_INFRASTRUCTURE
+  ANNUAL_FILING
+  LICENSE
+  REPORTING
+  RENEWAL
+  RECORDKEEPING
+  OTHER
+}
+enum ComplianceEvidenceClass { E0 E1 E2 E3 E4 }
+enum ReminderChannel { IN_APP EMAIL }
+
+model ComplianceObligation {
+  id String @id @default(cuid())
+  organizationId String
+  clientId String
+  businessProfileId String?
+  formationPlanId String?
+  jurisdictionId String?
+  sourceRuleId String?
+  title String
+  description String?
+  type ComplianceObligationType
+  status ComplianceStatus @default(NOT_STARTED)
+  evidenceClass ComplianceEvidenceClass @default(E0)
+  dueAt DateTime?
+  completedAt DateTime?
+  ownerUserId String?
+  professionalReviewRequired Boolean @default(false)
+  professionalReviewCompleted Boolean @default(false)
+  escalationLevel Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  evidences ComplianceEvidence[]
+  reminders ComplianceReminder[]
+  activities ComplianceActivity[]
+  @@index([organizationId, clientId])
+  @@index([jurisdictionId, status])
+  @@index([dueAt, status])
+}
+model ComplianceEvidence {
+  id String @id @default(cuid())
+  obligationId String
+  documentId String
+  evidenceClass ComplianceEvidenceClass
+  note String?
+  createdAt DateTime @default(now())
+  obligation ComplianceObligation @relation(fields:[obligationId], references:[id], onDelete:Cascade)
+  @@index([obligationId])
+}
+model ComplianceReminder {
+  id String @id @default(cuid())
+  obligationId String
+  scheduledFor DateTime
+  channel ReminderChannel
+  message String
+  sentAt DateTime?
+  createdAt DateTime @default(now())
+  obligation ComplianceObligation @relation(fields:[obligationId], references:[id], onDelete:Cascade)
+  @@index([scheduledFor, sentAt])
+}
+model ComplianceActivity {
+  id String @id @default(cuid())
+  obligationId String
+  action String
+  actorUserId String?
+  note String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  obligation ComplianceObligation @relation(fields:[obligationId], references:[id], onDelete:Cascade)
+  @@index([obligationId, createdAt])
+}

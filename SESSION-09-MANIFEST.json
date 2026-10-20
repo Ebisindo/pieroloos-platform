@@ -1,0 +1,7 @@
+{
+  "session": "09",
+  "title": "Compliance Intelligence & Operational Control Center",
+  "file_count": 14,
+  "merge_strategy": "additive",
+  "production_note": "Connect API adapters and notification dispatch to authenticated repositories/workers before production."
+}

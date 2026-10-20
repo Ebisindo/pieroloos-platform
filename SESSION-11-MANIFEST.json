@@ -1,0 +1,9 @@
+{
+  "session": "11",
+  "title": "Evidence-Aware Command Center and Operational Intelligence Integration",
+  "file_count": 17,
+  "merge_strategy": "additive",
+  "depends_on": "Sessions 01-10",
+  "architecture": "Evidence -> Intelligence -> Signals -> Control Center -> Command Center -> Audit -> Reports",
+  "security": "organization/workspace scoped authorization and controlled object storage"
+}

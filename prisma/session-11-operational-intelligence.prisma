@@ -1,0 +1,16 @@
+// ADDITIVE SESSION 11 SCHEMA. Merge into existing prisma/schema.prisma.
+model OperationalAuditEvent {
+  id String @id @default(cuid())
+  organizationId String
+  workspaceId String
+  actorUserId String
+  action String
+  entityType String
+  entityId String?
+  metadata Json?
+  occurredAt DateTime @default(now())
+
+  @@index([organizationId, workspaceId, occurredAt])
+  @@index([entityType, entityId, occurredAt])
+  @@index([actorUserId, occurredAt])
+}

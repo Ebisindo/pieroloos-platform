@@ -1,0 +1,7 @@
+{
+  "session": "08",
+  "title": "Compliance Obligation Register & Compliance Operations Engine",
+  "file_count": 18,
+  "merge_strategy": "additive",
+  "warning": "Merge Prisma additions into the existing schema; do not overwrite Sessions 01-07."
+}

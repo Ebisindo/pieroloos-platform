@@ -1,0 +1,9 @@
+DELETE THIS FILE FROM THE REPOSITORY:
+
+components/ui/Primitives.tsx
+
+KEEP:
+
+components/ui/primitives.tsx
+
+Reason: TypeScript TS1261 reports that both files are included while differing only by filename casing.

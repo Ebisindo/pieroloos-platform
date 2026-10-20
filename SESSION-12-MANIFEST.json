@@ -1,0 +1,19 @@
+{
+  "session": "12",
+  "title": "Unified Operational Control Plane, Tasks and Evidence Escalation",
+  "base": "Session 11 cumulative package",
+  "new_files": 18,
+  "total_package_files": 36,
+  "architecture": "Signal -> Action -> Assignment -> Deadline -> Execution -> Escalation -> Review -> Resolution -> Audit",
+  "professional_grade_controls": [
+    "explicit state machine",
+    "workspace authorization",
+    "idempotent signal-to-action creation",
+    "optimistic concurrency check",
+    "resolution note requirement",
+    "escalation policy engine",
+    "append-only audit boundary",
+    "repository/service separation",
+    "production integration boundaries"
+  ]
+}
