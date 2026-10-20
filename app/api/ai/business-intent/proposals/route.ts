@@ -57,6 +57,14 @@ export async function POST(request: Request) {
 
   const principal = context.principal;
   const now = new Date();
+  const evidenceIds = parsed.data.knownFacts.map((fact) => fact.id);
+  let resolvedEvidenceDocuments: Array<{
+    id: string;
+    name: string;
+    checksum: string;
+    version: number;
+    updatedAt: Date;
+  }> = [];
 
   try {
     await withAuthorizedWorkspaceTransaction(principal, "formation:write", async (transaction) => {
@@ -72,6 +80,28 @@ export async function POST(request: Request) {
         });
         if (!client) throw new Error("INTENT_CLIENT_NOT_FOUND");
       }
+      // Resolve evidence before provider invocation, and hold a snapshot of its version.
+      // These records prove provenance only; they do not prove the user's claim is true.
+      if (new Set(evidenceIds).size !== evidenceIds.length) {
+        throw new Error("INTENT_EVIDENCE_NOT_FOUND");
+      }
+      resolvedEvidenceDocuments = evidenceIds.length
+        ? await transaction.document.findMany({
+            where: {
+              id: { in: evidenceIds },
+              workspaceId: principal.workspaceId,
+              clientId: parsed.data.clientId ?? null,
+              status: "AVAILABLE",
+              scanStatus: "CLEAN",
+              reviewStatus: "VERIFIED",
+              deletedAt: null,
+            },
+            select: { id: true, name: true, checksum: true, version: true, updatedAt: true },
+          })
+        : [];
+      if (resolvedEvidenceDocuments.length !== evidenceIds.length) {
+        throw new Error("INTENT_EVIDENCE_NOT_FOUND");
+      }
     });
   } catch (error) {
     const response = entitlementOrClientError(error);
@@ -83,9 +113,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to authorize business-intent analysis." }, { status: 500 });
   }
 
+  // Never send caller-supplied source URLs or provenance assertions to the AI provider.
+  const providerInput = {
+    ...parsed.data,
+    knownFacts: parsed.data.knownFacts.map((fact) => ({
+      id: fact.id,
+      statement: fact.statement,
+      evidenceClass: "E1" as const,
+    })),
+  };
   let analysis;
   try {
-    analysis = await analyzeBusinessIntent(parsed.data);
+    analysis = await analyzeBusinessIntent(providerInput);
   } catch (error) {
     if (error instanceof BusinessIntentProviderError) {
       if (error.kind === "NOT_CONFIGURED") {
@@ -124,13 +163,8 @@ export async function POST(request: Request) {
           if (!client) throw new Error("INTENT_CLIENT_NOT_FOUND");
         }
 
-        // Evidence IDs must resolve to clean, reviewed server-owned documents
-        // in this exact workspace/client scope. User-supplied URLs are references,
-        // not trusted provenance; claims remain explicitly unverified.
-        const evidenceIds = parsed.data.knownFacts.map((fact) => fact.id);
-        if (new Set(evidenceIds).size !== evidenceIds.length) {
-          throw new Error("INTENT_EVIDENCE_NOT_FOUND");
-        }
+        // Re-resolve evidence after the provider call. Reject revocation, deletion,
+        // reassignment or version/checksum changes so stale evidence is never attached.
         const evidenceDocuments = evidenceIds.length
           ? await transaction.document.findMany({
               where: {
@@ -146,12 +180,22 @@ export async function POST(request: Request) {
             })
           : [];
         if (evidenceDocuments.length !== evidenceIds.length) {
-          throw new Error("INTENT_EVIDENCE_NOT_FOUND");
+          throw new Error("INTENT_EVIDENCE_CHANGED");
         }
+        const beforeById = new Map(resolvedEvidenceDocuments.map((document) => [document.id, document]));
         const documentsById = new Map(evidenceDocuments.map((document) => [document.id, document]));
+        for (const document of evidenceDocuments) {
+          const before = beforeById.get(document.id);
+          if (!before ||
+              before.checksum !== document.checksum ||
+              before.version !== document.version ||
+              before.updatedAt.getTime() !== document.updatedAt.getTime()) {
+            throw new Error("INTENT_EVIDENCE_CHANGED");
+          }
+        }
         const evidenceReferences = parsed.data.knownFacts.map((fact) => {
           const document = documentsById.get(fact.id);
-          if (!document) throw new Error("INTENT_EVIDENCE_NOT_FOUND");
+          if (!document) throw new Error("INTENT_EVIDENCE_CHANGED");
           return {
             id: document.id,
             sourceDocumentName: document.name,
@@ -253,6 +297,12 @@ function entitlementOrClientError(error: unknown): NextResponse | null {
     return NextResponse.json(
       { error: "Every evidence ID must identify a clean, reviewed document in the active workspace and client scope." },
       { status: 422 },
+    );
+  }
+  if (error instanceof Error && error.message === "INTENT_EVIDENCE_CHANGED") {
+    return NextResponse.json(
+      { error: "An evidence document changed or became unavailable during proposal generation. Refresh the source and retry." },
+      { status: 409 },
     );
   }
   return null;
