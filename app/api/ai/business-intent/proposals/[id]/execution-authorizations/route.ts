@@ -7,7 +7,9 @@ import {
   digestExecutionOperation,
   executionAuthorizationExpiresAt,
   executionAuthorizationRequestSchema,
+  type ExecutionAuthorizationRequest,
 } from "@/lib/domain/execution-authorization";
+import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -89,6 +91,8 @@ export async function POST(request: Request, routeContext: RouteContext) {
         if (proposal.version !== parsed.data.expectedVersion) {
           throw new Error("EXECUTION_PROPOSAL_VERSION_CONFLICT");
         }
+
+        await assertExecutionTargets(transaction, principal, proposal, parsed.data);
 
         const existing = await transaction.aiExecutionAuthorization.findUnique({
           where: {
@@ -180,6 +184,15 @@ export async function POST(request: Request, routeContext: RouteContext) {
     if (error instanceof Error && error.message === "EXECUTION_PROPOSAL_VERSION_CONFLICT") {
       return NextResponse.json({ error: "Proposal version changed. Refresh and authorize the exact currently approved version." }, { status: 409 });
     }
+    if (error instanceof Error && error.message === "EXECUTION_TARGET_NOT_FOUND") {
+      return NextResponse.json({ error: "The operation target is not active in the approved proposal's workspace and client scope." }, { status: 422 });
+    }
+    if (error instanceof Error && error.message === "EXECUTION_TARGET_SCOPE_MISMATCH") {
+      return NextResponse.json({ error: "The operation client scope must exactly match the approved proposal's client scope." }, { status: 422 });
+    }
+    if (error instanceof Error && error.message === "EXECUTION_SELF_PRIVILEGE_CHANGE") {
+      return NextResponse.json({ error: "An actor cannot authorize a privilege change targeting themselves." }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "EXECUTION_IDEMPOTENCY_CONFLICT") {
       return NextResponse.json({ error: "This idempotency key is already bound to a different operation. Use a new key only for a new intentional authorization." }, { status: 409 });
     }
@@ -201,4 +214,99 @@ function safeErrorCode(error: unknown): string {
     return (error as { code: string }).code;
   }
   return error instanceof Error ? error.name : "unknown";
+}
+
+
+async function assertExecutionTargets(
+  transaction: Prisma.TransactionClient,
+  principal: WorkspacePrincipal,
+  proposal: { id: string; clientId: string | null },
+  request: ExecutionAuthorizationRequest,
+): Promise<void> {
+  if (request.operationType === "CORPORATE_GRAPH_MUTATION") {
+    const operation = request.operation;
+    if (operation.clientId !== (proposal.clientId ?? undefined)) {
+      throw new Error("EXECUTION_TARGET_SCOPE_MISMATCH");
+    }
+    if (operation.action === "CREATE_NODE") return;
+
+    if (operation.action === "CREATE_RELATIONSHIP") {
+      const nodes = await transaction.corporateGraphNode.findMany({
+        where: {
+          id: { in: operation.targetIds },
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+          clientId: proposal.clientId,
+          archivedAt: null,
+        },
+        select: { id: true },
+      });
+      if (nodes.length !== operation.targetIds.length) throw new Error("EXECUTION_TARGET_NOT_FOUND");
+      return;
+    }
+
+    if (operation.action === "ARCHIVE_RELATIONSHIP") {
+      const edges = await transaction.corporateGraphEdge.findMany({
+        where: {
+          id: { in: operation.targetIds },
+          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
+          archivedAt: null,
+        },
+        select: {
+          id: true,
+          fromNode: { select: { clientId: true } },
+          toNode: { select: { clientId: true } },
+        },
+      });
+      if (edges.length !== operation.targetIds.length ||
+        edges.some((edge) => edge.fromNode.clientId !== proposal.clientId || edge.toNode.clientId !== proposal.clientId)) {
+        throw new Error("EXECUTION_TARGET_NOT_FOUND");
+      }
+      return;
+    }
+
+    const nodes = await transaction.corporateGraphNode.findMany({
+      where: {
+        id: { in: operation.targetIds },
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId: proposal.clientId,
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    if (nodes.length !== operation.targetIds.length) throw new Error("EXECUTION_TARGET_NOT_FOUND");
+    return;
+  }
+
+  if (request.operationType === "FILING_SUBMISSION") {
+    const entity = await transaction.corporateGraphNode.findFirst({
+      where: {
+        id: request.operation.legalEntityId,
+        organizationId: principal.organizationId,
+        workspaceId: principal.workspaceId,
+        clientId: proposal.clientId,
+        nodeType: "COMPANY",
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!entity) throw new Error("EXECUTION_TARGET_NOT_FOUND");
+    return;
+  }
+
+  if (request.operationType === "PRIVILEGE_CHANGE") {
+    if (request.operation.targetUserId === principal.userId) {
+      throw new Error("EXECUTION_SELF_PRIVILEGE_CHANGE");
+    }
+    const target = await transaction.membership.findFirst({
+      where: {
+        userId: request.operation.targetUserId,
+        organizationId: principal.organizationId,
+      },
+      select: { userId: true },
+    });
+    if (!target) throw new Error("EXECUTION_TARGET_NOT_FOUND");
+  }
 }
