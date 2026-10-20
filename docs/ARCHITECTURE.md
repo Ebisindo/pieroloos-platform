@@ -91,7 +91,7 @@ CI (`.github/workflows/ci.yml`) has separate quality and browser-test jobs. The 
 ## Operational risks
 
 - Per-process rate limiting is bypassable across instances.
-- No documented backup, restore rehearsal or recovery runbook.
+- A recovery runbook is documented, but no successful isolated backup/restore rehearsal evidence or measured recovery objectives are recorded.
 - Structured operational logging is initially integrated only with `/api/health`; broader route/worker instrumentation and tested alert delivery remain open (see [Observability and Operations](OBSERVABILITY-OPERATIONS.md)).
 - Audit tables have no tamper evidence.
 - Unpaginated list queries can grow without bound.
