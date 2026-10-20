@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import { buildObligationEvidenceView } from "@/lib/services/evidence-intelligence";
 
+// This endpoint remains disabled until an authenticated, workspace-scoped
+// evidence repository and authorization contract are implemented. Never return
+// fixture evidence from a live API route.
 export async function GET() {
-  // Replace fixture with authenticated repository query.
-  const view = buildObligationEvidenceView("example-obligation", []);
-  return NextResponse.json({ data: view });
+  return NextResponse.json(
+    { error: "Compliance evidence portfolio is not configured." },
+    { status: 501 },
+  );
 }
