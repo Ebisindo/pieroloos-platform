@@ -1,8 +1,0 @@
-ALTER INDEX "CorporateGraphAuditEvent_organizationId_workspaceId_occurredAt_"
-  RENAME TO "CorporateGraphAuditEvent_organizationId_workspaceId_occurre_idx";
-
-ALTER INDEX "CorporateGraphEdge_workspace_archivedAt_idx"
-  RENAME TO "CorporateGraphEdge_organizationId_workspaceId_archivedAt_idx";
-
-ALTER INDEX "CorporateGraphNode_workspace_archivedAt_idx"
-  RENAME TO "CorporateGraphNode_organizationId_workspaceId_archivedAt_idx";
