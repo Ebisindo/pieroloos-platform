@@ -26,6 +26,7 @@ Client Intake → Business Profile → Engagement → Jurisdiction Lens → Form
 - Tenancy: `Organization` → `Membership(role)` and `Workspace`; domain records carry `organizationId`/`workspaceId`, with composite foreign keys enforcing workspace scope.
 - Request path for authenticated APIs: origin check → session → workspace principal and permission → zod validation → service → domain rules → repository → Prisma. See [ARCHITECTURE-LIB.md](ARCHITECTURE-LIB.md).
 - Sensitive writes use `authorized-workspace-transaction` and `trusted-action-service`; consequential changes write audit events.
+- AI business-intent proposals are advisory snapshots. Human review is version-bound; separate operation-bound execution consent is recorded in `AIExecutionAuthorization`. No external executor is connected to this ledger yet; see [AI execution authority](AI-EXECUTION-AUTHORITY.md).
 - Documents use S3-compatible private storage with integrity hashes and scan status.
 - Background work (notifications, escalations) runs through secret-protected worker routes triggered by `.github/workflows/notification-scheduler.yml`.
 - `PartnershipInquiry` is the one intentionally non-tenant-scoped table (public submissions). See [PARTNERSHIP.md](PARTNERSHIP.md).
