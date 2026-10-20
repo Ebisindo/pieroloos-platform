@@ -63,6 +63,7 @@ const transaction = {
   },
   corporateGraphAuditEvent: {
     create: txAuditCreateMock,
+    findMany: directAuditFindManyMock,
   },
 };
 
