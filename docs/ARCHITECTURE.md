@@ -58,6 +58,7 @@ Never commit values. Examples live in `.env.example` and `.env.auth.example`.
 | Workers | `OPERATIONAL_WORKER_SECRET`, `DOCUMENT_SCANNER_WEBHOOK_SECRET` | Scheduler also needs repository secrets `PIEROLOOS_APP_URL` and `OPERATIONAL_WORKER_SECRET` |
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_MESSAGE_ID_DOMAIN` | Optional unless notifications are enabled |
 | Storage | `OBJECT_STORAGE_BUCKET`, `_REGION`, `_ENDPOINT`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_SERVER_SIDE_ENCRYPTION`, `_KMS_KEY_ID` | Private bucket only |
+| Rate limiting | `RATE_LIMIT_REDIS_REST_URL`, `RATE_LIMIT_REDIS_REST_TOKEN` | Required together in production; atomic shared Redis REST counters; no in-memory production fallback |
 | Public site | `SITE_URL` | Optional; enables canonical URLs, sitemap, JSON-LD |
 | Partnerships | `PARTNERSHIP_INQUIRY_NOTIFY_EMAIL` | Optional; content-free alert, needs SMTP |
 
@@ -79,7 +80,8 @@ CI (`.github/workflows/ci.yml`) has separate quality and browser-test jobs. The 
 - Node 22 (as used in CI), PostgreSQL 16+, an S3-compatible private bucket, an SMTP provider if notifications are enabled.
 - Run `npm run db:deploy` before starting a new release; migrations are additive.
 - Set all required secrets in a secret manager; set `SITE_URL` to the public origin.
-- Rate limiting is per-process: inject a shared store or enforce limits at the edge before running more than one instance. `x-forwarded-for` must be set by a trusted proxy.
+- Configure `RATE_LIMIT_REDIS_REST_URL` and `RATE_LIMIT_REDIS_REST_TOKEN` in production. Rate-limit requests use atomic Redis Lua counters and fail closed when the shared store is unavailable; validate provider quotas and alerting in staging before rollout.
+- Trust forwarded client-IP headers only when set by the configured trusted proxy/CDN; never accept arbitrary caller-supplied forwarding headers as identity.
 - Configure the scheduler secrets so notification and escalation workers run.
 - Verify security headers on the deployed host. The CSP is minimal (frame, base, form, object only).
 
@@ -91,7 +93,7 @@ CI (`.github/workflows/ci.yml`) has separate quality and browser-test jobs. The 
 
 ## Operational risks
 
-- Per-process rate limiting is bypassable across instances.
+- Rate-limit policies still need a route-by-route inventory and staging verification of limits, failure behavior, shared-store availability and trusted-proxy configuration.
 - A recovery runbook is documented, but no successful isolated backup/restore rehearsal evidence or measured recovery objectives are recorded.
 - Structured operational logging is initially integrated only with `/api/health`; broader route/worker instrumentation and tested alert delivery remain open (see [Observability and Operations](OBSERVABILITY-OPERATIONS.md)).
 - Audit tables have no tamper evidence.
