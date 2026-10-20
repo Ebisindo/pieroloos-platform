@@ -113,7 +113,7 @@ export async function enforceRateLimit(
   subject: string,
   now = Date.now(),
 ): Promise<NextResponse | null> {
-  if (process.env.NODE_ENV === "production" && store instanceof InMemoryRateLimitStore) {
+  if (process.env.NODE_ENV === "production" && !(store instanceof RedisRestRateLimitStore)) {
     throw new Error("Shared rate limiting is required in production; configure RATE_LIMIT_REDIS_REST_URL and RATE_LIMIT_REDIS_REST_TOKEN");
   }
   const { count, resetAt } = await store.hit(`${policy.name}:${subject}`, policy.windowMs, now);
