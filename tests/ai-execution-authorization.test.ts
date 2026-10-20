@@ -92,6 +92,32 @@ describe("separate AI execution authorization", () => {
     expect(authorizedTransactionMock).not.toHaveBeenCalled();
   });
 
+  it("fails closed on production filing/payment consent and mismatched graph client scope", async () => {
+    const productionPayment = await POST(request(validBody({
+      operation: {
+        currency: "NGN",
+        amountMinor: "125000",
+        recipientReference: "vendor-reference-7",
+        purpose: "Approved incorporation service fee",
+        environment: "PRODUCTION",
+      },
+    })), routeContext);
+    expect(productionPayment.status).toBe(422);
+    expect(authorizedTransactionMock).not.toHaveBeenCalled();
+
+    const mismatchedGraph = await POST(request(validBody({
+      operationType: "CORPORATE_GRAPH_MUTATION",
+      operation: {
+        action: "CREATE_NODE",
+        targetIds: [],
+        clientId: "different-client",
+        changesDigest: "a".repeat(64),
+      },
+    })), routeContext);
+    expect(mismatchedGraph.status).toBe(422);
+    expect(authorizationCreateMock).not.toHaveBeenCalled();
+  });
+
   it("refuses consent for a proposal that is not approved", async () => {
     proposalFindFirstMock.mockResolvedValueOnce({
       id: "proposal-1", status: "PROPOSED", version: 4,
