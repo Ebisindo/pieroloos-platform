@@ -232,6 +232,22 @@ describe("notification background worker", () => {
     }));
   });
 
+  it("does not count cancellation as finalized after the worker loses its lease", async () => {
+    notificationUpdateManyMock
+      .mockResolvedValueOnce({ count: 1 }) // claim notification
+      .mockResolvedValueOnce({ count: 0 }); // another worker owns the row now
+    membershipFindFirstMock.mockResolvedValueOnce(null);
+
+    const result = await runNotificationWorker(new Date("2026-10-06T06:30:00Z"));
+
+    expect(result).toMatchObject({ claimed: 1, cancelled: 0, failed: 1 });
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ status: "PROCESSING", lockedBy: expect.any(String) }),
+      data: expect.objectContaining({ status: "CANCELLED" }),
+    }));
+  });
+
   it("cancels email when the recipient has not opted in", async () => {
     preferenceFindUniqueMock.mockResolvedValueOnce({
       inAppEnabled: true,
