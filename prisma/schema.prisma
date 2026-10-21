@@ -485,6 +485,7 @@ model Workspace {
   billingUsageEvents         BillingUsageEvent[]
   billingCreditEntries       BillingCreditEntry[]
   businessIntentProposals    BusinessIntentProposal[]
+  businessIntentEvidenceReferences BusinessIntentEvidenceReference[]
   aiExecutionAuthorizations AIExecutionAuthorization[]
 
   @@unique([organizationId, slug])
@@ -520,6 +521,7 @@ model Client {
   documents             Document[]
   reports               Report[]
   businessIntentProposals BusinessIntentProposal[]
+  businessIntentEvidenceReferences BusinessIntentEvidenceReference[]
   crossBorderDossiers   CrossBorderDossier[]
   portalAccessGrants    ClientPortalGrant[]
   portalEvents          ClientPortalAuditEvent[]
@@ -688,6 +690,7 @@ model Evidence {
   jurisdiction   Jurisdiction?   @relation(fields: [jurisdictionId], references: [id], onDelete: SetNull)
   complianceItem ComplianceItem? @relation(fields: [complianceItemId], references: [id], onDelete: SetNull)
   documents      Document[]
+  businessIntentReferences BusinessIntentEvidenceReference[]
 
   @@index([evidenceClass])
   @@index([jurisdictionId])
@@ -734,6 +737,7 @@ model Document {
   nextVersions               Document[]                   @relation("DocumentPreviousVersion")
   accessEvents               DocumentAccessEvent[]
   complianceEvidence         ComplianceEvidence[]
+  businessIntentEvidenceReferences BusinessIntentEvidenceReference[]
   crossBorderControlEvidence CrossBorderControlEvidence[]
 
   @@unique([rootDocumentId, version])
@@ -1073,6 +1077,7 @@ model BusinessIntentProposal {
   @@index([clientId, createdAt], map: "BusinessIntentProposal_client_created_idx")
   reviews BusinessIntentProposalReview[]
   executionAuthorizations AIExecutionAuthorization[]
+  evidenceReferenceLinks BusinessIntentEvidenceReference[]
 }
 
 model BusinessIntentProposalReview {
@@ -2034,4 +2039,27 @@ model CorporateGraphAuditEvent {
 
   @@index([organizationId, workspaceId, occurredAt])
   @@index([subjectType, subjectId, occurredAt])
+}
+
+
+model BusinessIntentEvidenceReference {
+  id                String   @id @default(cuid())
+  proposalId        String
+  workspaceId       String
+  evidenceId        String
+  documentId        String
+  clientId          String?
+  claimStatement    String
+  verificationState String   @default("SOURCE_VERIFIED_RECORD")
+  createdAt         DateTime @default(now())
+
+  proposal  BusinessIntentProposal @relation(fields: [proposalId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  evidence  Evidence               @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  document  Document               @relation(fields: [documentId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  client    Client?                @relation(fields: [clientId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  workspace Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, evidenceId])
+  @@index([workspaceId, evidenceId])
+  @@index([clientId, evidenceId])
 }
