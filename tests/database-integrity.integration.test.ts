@@ -692,6 +692,69 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       },
     })).rejects.toThrow();
 
+    // Unverified sources must not be bindable, even when the tenant, document, and proposal all match.
+    const pendingSource = await prisma.evidence.create({
+      data: {
+        title: "Pending source must not be bindable",
+        source: "https://registry.example.gov/pending-source",
+        sourceType: "OFFICIAL_REGISTRY",
+        retrievedAt: new Date("2026-10-18T10:00:00.000Z"),
+        evidenceClass: "E3",
+        reviewStatus: "PENDING",
+      },
+    });
+    evidenceIds.push(pendingSource.id);
+    const pendingDocument = await createSourceDocument(firstClient.id, pendingSource.id);
+    await expect(prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: firstProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: pendingSource.id,
+        documentId: pendingDocument.id,
+        clientId: firstClient.id,
+        claimStatement: "Pending evidence must be rejected.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    })).rejects.toThrow();
+
+    // A concurrent revoke and bind must serialize on the Evidence row. Either the bind
+    // commits while the source is verified and remains auditable, or revocation wins and
+    // the bind is rejected; a binding must never be created after revocation.
+    const raceSource = await createSource("Concurrent revocation source");
+    const raceDocument = await createSourceDocument(firstClient.id, raceSource.id);
+    const raceProposal = await createProposal(firstClient.id, `race-${suffix}`);
+    const race = await Promise.allSettled([
+      prisma.businessIntentEvidenceReference.create({
+        data: {
+          proposalId: raceProposal.id,
+          workspaceId: workspace.id,
+          evidenceId: raceSource.id,
+          documentId: raceDocument.id,
+          clientId: firstClient.id,
+          claimStatement: "Concurrent binding remains tied to its verification moment.",
+          verificationState: "SOURCE_VERIFIED_RECORD",
+        },
+      }),
+      prisma.evidence.update({
+        where: { id: raceSource.id },
+        data: { reviewStatus: "REVOKED" },
+      }),
+    ]);
+    expect(race[1].status).toBe("fulfilled");
+    await expect(prisma.evidence.findUnique({ where: { id: raceSource.id } }))
+      .resolves.toMatchObject({ reviewStatus: "REVOKED" });
+    const raceReferenceCount = await prisma.businessIntentEvidenceReference.count({
+      where: { proposalId: raceProposal.id, evidenceId: raceSource.id },
+    });
+    expect(raceReferenceCount).toBeLessThanOrEqual(1);
+    if (race[0].status === "fulfilled") {
+      // The binding won the row lock first; revocation happened afterward and is preserved.
+      expect(raceReferenceCount).toBe(1);
+    } else {
+      // Revocation won first, so the eligibility trigger rejected the bind.
+      expect(raceReferenceCount).toBe(0);
+    }
+
     // Once a source document is referenced, its client/evidence/workspace identity cannot be rebound.
     await expect(prisma.document.update({
       where: { id: firstDocument.id },
