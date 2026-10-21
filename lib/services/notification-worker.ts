@@ -211,7 +211,7 @@ async function finishWithoutDelivery(
   workerId: string,
   data: { status: "CANCELLED" | "QUEUED"; reason: string; scheduledFor?: Date },
 ) {
-  await prisma.complianceNotification.updateMany({
+  const updated = await prisma.complianceNotification.updateMany({
     where: { id: notification.id, status: "PROCESSING", lockedBy: workerId },
     data: {
       status: data.status,
@@ -221,6 +221,7 @@ async function finishWithoutDelivery(
       lockedBy: null,
     },
   });
+  return updated.count === 1;
 }
 
 async function beginAttempt(notification: ClaimedNotification, workerId: string, now: Date) {
@@ -342,11 +343,12 @@ export async function runNotificationWorker(
       if (!recipient || !recipient.notificationsEnabled ||
         (notification.channel === "IN_APP" && !recipient.preference.inAppEnabled) ||
         (notification.channel === "EMAIL" && !recipient.preference.emailEnabled)) {
-        await finishWithoutDelivery(notification, workerId, {
+        const finalized = await finishWithoutDelivery(notification, workerId, {
           status: "CANCELLED",
           reason: !recipient ? "RECIPIENT_NOT_IN_WORKSPACE" : "RECIPIENT_PREFERENCE_DISABLED",
         });
-        summary.cancelled += 1;
+        if (finalized) summary.cancelled += 1;
+        else summary.failed += 1;
         continue;
       }
 
@@ -357,12 +359,13 @@ export async function runNotificationWorker(
         recipient.preference.timezone,
       );
       if (notification.channel === "EMAIL" && quietUntil) {
-        await finishWithoutDelivery(notification, workerId, {
+        const finalized = await finishWithoutDelivery(notification, workerId, {
           status: "QUEUED",
           reason: "DEFERRED_DURING_QUIET_HOURS",
           scheduledFor: quietUntil,
         });
-        summary.deferred += 1;
+        if (finalized) summary.deferred += 1;
+        else summary.failed += 1;
         continue;
       }
 
