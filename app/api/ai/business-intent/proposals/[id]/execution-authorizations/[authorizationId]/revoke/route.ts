@@ -67,8 +67,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
             data: { status: "EXPIRED" },
           });
           if (expired.count !== 1) throw new Error("EXECUTION_AUTHORIZATION_RACE");
-          {
-            await transaction.activity.create({
+          await transaction.activity.create({
               data: {
                 workspaceId: principal.workspaceId,
                 actorId: principal.userId,
@@ -84,8 +83,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
                   executionPerformed: false,
                 },
               },
-            });
-          }
+          });
           return { id: authorization.id, status: "EXPIRED" as const, revokedAt: now, expired: true };
         }
 
