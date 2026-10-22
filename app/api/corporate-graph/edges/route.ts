@@ -130,6 +130,9 @@ export async function POST(request: Request) {
     if (error instanceof Error && error.message === "OWNERSHIP_CYCLE") {
       return NextResponse.json({ error: "This relationship would introduce an ownership/control cycle." }, { status: 422 });
     }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      return NextResponse.json({ error: "A concurrent graph update conflicted. Refresh and retry." }, { status: 409 });
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ error: "This relationship already exists." }, { status: 409 });
     }
