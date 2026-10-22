@@ -2,6 +2,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { clientRepository } from "@/lib/db/client-repository";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
+import { validateOwnershipTotal, wouldCreateOwnershipCycle } from "@/lib/domain/corporate-graph";
 
 const integrationEnabled = process.env.DATABASE_INTEGRATION_TESTS === "1";
 const prisma = new PrismaClient();
@@ -763,3 +764,174 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
   });
 
 });
+
+  async function createGraphFixture(suffix: string) {
+    const organization = await createOrganization(`graph-${suffix}`);
+    const workspace = await createWorkspace(organization.id, `graph-${suffix}`);
+    const actor = await prisma.user.create({
+      data: { email: `graph-${suffix}@integration.invalid` },
+    });
+    userIds.push(actor.id);
+    const createNode = (name: string) => prisma.corporateGraphNode.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        name,
+        createdByUserId: actor.id,
+      },
+    });
+    return {
+      organization,
+      workspace,
+      actor,
+      createNode,
+    };
+  }
+
+  async function waitForConcurrentReads() {
+    let ready = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    return async () => {
+      ready += 1;
+      if (ready === 2) release();
+      await gate;
+    };
+  }
+
+  it("serializes concurrent ownership additions so total ownership cannot exceed 100 percent", async () => {
+    const fixture = await createGraphFixture(crypto.randomUUID());
+    const firstOwner = await fixture.createNode("Owner A");
+    const secondOwner = await fixture.createNode("Owner B");
+    const target = await fixture.createNode("Shared target");
+    const barrier = await waitForConcurrentReads();
+
+    const addOwnership = (fromNodeId: string) => prisma.$transaction(async (tx) => {
+      const existing = await tx.corporateGraphEdge.findMany({
+        where: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          archivedAt: null,
+        },
+        select: { toNodeId: true, relation: true, ownershipPercent: true },
+      });
+      const candidate = { fromNodeId, toNodeId: target.id, relation: "OWNS" as const, ownershipPercent: 60 };
+      const invalid = validateOwnershipTotal(existing.map((edge) => ({
+        toNodeId: edge.toNodeId,
+        relation: edge.relation,
+        ownershipPercent: edge.ownershipPercent?.toNumber() ?? null,
+      })), candidate);
+      if (invalid) throw new Error("OWNERSHIP_TOTAL_EXCEEDED");
+      await barrier();
+      return tx.corporateGraphEdge.create({
+        data: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          fromNodeId,
+          toNodeId: target.id,
+          relation: "OWNS",
+          ownershipPercent: new Prisma.Decimal(60),
+          createdByUserId: fixture.actor.id,
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    const results = await Promise.allSettled([
+      addOwnership(firstOwner.id),
+      addOwnership(secondOwner.id),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    expect(rejected).toBeDefined();
+    if (rejected?.status === "rejected") {
+      expect(rejected.reason).toMatchObject({ code: "P2034" });
+    }
+    const committed = await prisma.corporateGraphEdge.findMany({
+      where: { workspaceId: fixture.workspace.id, archivedAt: null },
+    });
+    expect(committed).toHaveLength(1);
+    expect(committed.reduce((total, edge) => total + (edge.ownershipPercent?.toNumber() ?? 0), 0)).toBeLessThanOrEqual(100);
+  });
+
+  it("serializes opposing ownership edges so concurrent writes cannot create a cycle", async () => {
+    const fixture = await createGraphFixture(crypto.randomUUID());
+    const first = await fixture.createNode("Cycle A");
+    const second = await fixture.createNode("Cycle B");
+    const barrier = await waitForConcurrentReads();
+
+    const addEdge = (fromNodeId: string, toNodeId: string) => prisma.$transaction(async (tx) => {
+      const existing = await tx.corporateGraphEdge.findMany({
+        where: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          archivedAt: null,
+        },
+        select: { fromNodeId: true, toNodeId: true, relation: true, ownershipPercent: true },
+      });
+      const candidate = { fromNodeId, toNodeId, relation: "OWNS" as const };
+      if (wouldCreateOwnershipCycle(existing, candidate)) throw new Error("OWNERSHIP_CYCLE");
+      await barrier();
+      return tx.corporateGraphEdge.create({
+        data: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          fromNodeId,
+          toNodeId,
+          relation: "OWNS",
+          createdByUserId: fixture.actor.id,
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    const results = await Promise.allSettled([
+      addEdge(first.id, second.id),
+      addEdge(second.id, first.id),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    expect(rejected).toBeDefined();
+    if (rejected?.status === "rejected") {
+      expect(rejected.reason).toMatchObject({ code: "P2034" });
+    }
+    await expect(prisma.corporateGraphEdge.count({
+      where: { workspaceId: fixture.workspace.id, archivedAt: null },
+    })).resolves.toBe(1);
+  });
+
+  it("rolls back a graph edge when its audit event cannot be written", async () => {
+    const fixture = await createGraphFixture(crypto.randomUUID());
+    const from = await fixture.createNode("Audit rollback source");
+    const to = await fixture.createNode("Audit rollback target");
+    const missingActorId = `missing-${crypto.randomUUID()}`;
+
+    await expect(prisma.$transaction(async (tx) => {
+      const edge = await tx.corporateGraphEdge.create({
+        data: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          fromNodeId: from.id,
+          toNodeId: to.id,
+          relation: "RELATED_TO",
+          createdByUserId: fixture.actor.id,
+        },
+      });
+      await tx.corporateGraphAuditEvent.create({
+        data: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          actorUserId: missingActorId,
+          action: "EDGE_CREATED",
+          subjectType: "CorporateGraphEdge",
+          subjectId: edge.id,
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })).rejects.toMatchObject({ code: "P2003" });
+
+    await expect(prisma.corporateGraphEdge.count({
+      where: { workspaceId: fixture.workspace.id, fromNodeId: from.id, toNodeId: to.id },
+    })).resolves.toBe(0);
+    await expect(prisma.corporateGraphAuditEvent.count({
+      where: { workspaceId: fixture.workspace.id, subjectType: "CorporateGraphEdge" },
+    })).resolves.toBe(0);
+  });
+
