@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assertSameWorkspace, permissionsForRole } from "@/lib/auth/workspace-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
+import { PERMISSIONS, ROLES, hasPermission } from "@/lib/auth/roles";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 
 const principal: WorkspacePrincipal = {
@@ -31,7 +32,30 @@ describe("workspace authorization boundaries", () => {
     })).toThrow("workspace boundary violation");
   });
 
-  it("derives the permission matrix from persisted role names", () => {
+  it("keeps every defined role mapped and the owner permission set complete", () => {
+    expect(ROLES).toEqual(["owner", "admin", "advisor", "member", "viewer"]);
+    const ownerPermissions = permissionsForRole("owner");
+    expect(ownerPermissions).toEqual(expect.arrayContaining([
+      "workspace:manage", "settings:manage", "client:delete", "engagement:delete",
+      "documents:delete", "evidence:delete", "compliance:write", "audit:read",
+    ]));
+    expect(new Set(ownerPermissions).size).toBe(ownerPermissions.length);
+    expect(PERMISSIONS).toContain("compliance:write");
+  });
+
+  it("enforces role boundaries for administrative, review and read-only capabilities", () => {
+    expect(hasPermission("owner", "settings:manage")).toBe(true);
+    expect(hasPermission("admin", "settings:manage")).toBe(false);
+    expect(hasPermission("admin", "workspace:manage")).toBe(true);
+    expect(hasPermission("advisor", "evidence:review")).toBe(true);
+    expect(hasPermission("member", "evidence:review")).toBe(false);
+    expect(hasPermission("member", "evidence:write")).toBe(true);
+    expect(hasPermission("viewer", "client:write")).toBe(false);
+    expect(hasPermission("viewer", "engagement:write")).toBe(false);
+    expect(hasPermission("viewer", "compliance:write")).toBe(false);
+  });
+
+  it("derives workspace-level permission aliases without granting extra privilege", () => {
     expect(permissionsForRole("owner")).toContain("workspace:manage");
     expect(permissionsForRole("owner")).toContain("documents:delete");
     expect(permissionsForRole("advisor")).not.toContain("documents:delete");
