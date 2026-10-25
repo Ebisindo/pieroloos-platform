@@ -27,8 +27,8 @@ export default async function BusinessContinuityPage() {
         reviewRequiredAt: currentCase.reviewRequiredAt?.toISOString() ?? null,
       })),
     })),
-    assets: data.assets.map((asset) => ({ ...asset, createdAt: asset.createdAt.toISOString(), updatedAt: asset.updatedAt.toISOString() })),
-    runbooks: data.runbooks.map((runbook) => ({ ...runbook, createdAt: runbook.createdAt.toISOString(), updatedAt: runbook.updatedAt.toISOString(), reviewedAt: runbook.reviewedAt?.toISOString() ?? null })),
+    assets: data.assets.map((asset) => ({ ...asset, updatedAt: asset.updatedAt.toISOString() })),
+    runbooks: data.runbooks.map((runbook) => ({ ...runbook, updatedAt: runbook.updatedAt.toISOString(), reviewedAt: runbook.reviewedAt?.toISOString() ?? null })),
   };
   return (
     <div className="page-stack">
