@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Activity, AlertTriangle, ArrowRightLeft, Check, ChevronRight, CircleHelp, Clock3, FileKey2, GitBranch, KeyRound, LockKeyhole, Mail, Plus, ShieldCheck, ShieldEllipsis, UserRoundCheck, X } from "lucide-react";
+import { useState } from "react";
+import { Activity, AlertTriangle, ArrowRightLeft, Check, ChevronRight, CircleHelp, Clock3, FileKey2, GitBranch, KeyRound, LockKeyhole, Plus, ShieldCheck, ShieldEllipsis, UserRoundCheck, X } from "lucide-react";
 
 type SuccessorStatus = "PENDING" | "ACCEPTED" | "ACTIVE" | "REVOKED";
 type ContinuityCase = { id: string; status: string; createdAt: string; warningSentAt: string | null; reviewRequiredAt: string | null };
@@ -76,7 +76,6 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
   const dueAt = lastActivity ? triggerDate(lastActivity, inactivityDays) : null;
   const hoursOld = lastActivity ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / 3600000) : 0;
   const assetTypes = ["GitHub organization", "GitHub repository", "Domain / DNS", "Vercel project", "Database credential location", "Stripe account", "1Password / Vault", "Object storage", "Backup / restore", "Identity provider", "Monitoring", "Other"];
-  const latestRunbook = useMemo(() => data.runbooks[0] ?? null, [data.runbooks]);
 
   async function mutate(payload: Record<string, unknown>) {
     setBusy(true); setError(""); setNotice("");
