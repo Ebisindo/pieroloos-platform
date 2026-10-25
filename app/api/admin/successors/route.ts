@@ -1,18 +1,17 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentPlatformActor } from "@/lib/auth/platform-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PLATFORM_ADMIN_MUTATION_LIMIT } from "@/lib/http/rate-limit";
+import { prisma } from "@/lib/db/prisma";
 import {
   addSuccessor, confirmOwnerAlive, createContinuityAsset, listSuccessors, revokeSuccessor,
   saveRunbook, simulateHandover,
 } from "@/lib/services/successor-continuity-service";
 
 const permissionsSchema = z.object({
-  canTransferOwnership: z.boolean(),
-  canAccessSecrets: z.boolean(),
-  canDeploy: z.boolean(),
-  canAccessBilling: z.boolean(),
+  canTransferOwnership: z.boolean(), canAccessSecrets: z.boolean(), canDeploy: z.boolean(), canAccessBilling: z.boolean(),
 }).strict();
 const createSchema = z.object({
   successorName: z.string().trim().min(2).max(120),
@@ -46,11 +45,10 @@ async function guard(request?: Request) {
     if (hasInvalidRequestOrigin(request)) return { error: NextResponse.json({ error: "Invalid request origin." }, { status: 403 }) };
     const limited = await enforceRateLimit(PLATFORM_ADMIN_MUTATION_LIMIT, actor.userId);
     if (limited) return { error: limited };
-  }
-  // MFA/step-up is an explicit launch gate. The current NextAuth session does not
-  // carry a verified, short-lived step-up timestamp; fail closed instead of pretending.
-  if (request && process.env.CONTINUITY_STEP_UP_ENFORCED !== "true") {
-    return { error: NextResponse.json({ error: "Continuity mutations are disabled until the identity provider's verified MFA/reauthentication signal is configured (CONTINUITY_STEP_UP_ENFORCED)." }, { status: 503 }) };
+    // Fail closed: the current NextAuth session has no trusted step-up/MFA timestamp.
+    if (process.env.CONTINUITY_STEP_UP_ENFORCED !== "true") {
+      return { error: NextResponse.json({ error: "Continuity mutations are disabled until verified MFA/re-authentication is integrated (CONTINUITY_STEP_UP_ENFORCED)." }, { status: 503 }) };
+    }
   }
   return { actor };
 }
@@ -71,13 +69,35 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid successor details.", issues: parsed.error.flatten() }, { status: 422 });
   try {
     const result = await addSuccessor(access.actor, parsed.data);
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.SITE_URL;
-    // Never return an invitation token to the browser. Email delivery is required
-    // before this invitation can be considered delivered; worker/email integration follows.
-    return NextResponse.json({
-      data: { ...result.successor, inviteUrlConfigured: Boolean(baseUrl), invitationDelivery: "NOT_CONFIGURED" },
-      warning: "Invitation record created; delivery must be configured before contacting the successor.",
-    }, { status: 201 });
+    // Store a one-time email delivery queue only after deriving the absolute URL
+    // from an explicitly configured trusted origin. Never return token material.
+    const origin = process.env.SITE_URL || process.env.NEXTAUTH_URL;
+    if (!origin) {
+      await prisma.successor.update({ where: { id: result.successor.id }, data: { status: "REVOKED", inviteTokenHash: null, inviteExpiresAt: null } });
+      return NextResponse.json({ error: "Invitation unavailable: configure SITE_URL or NEXTAUTH_URL before creating successors." }, { status: 503 });
+    }
+    let trustedOrigin: URL;
+    try { trustedOrigin = new URL(origin); } catch {
+      return NextResponse.json({ error: "Invitation origin is invalid; contact the platform operator." }, { status: 503 });
+    }
+    if (process.env.NODE_ENV === "production" && trustedOrigin.protocol !== "https:") {
+      return NextResponse.json({ error: "Production invitation origin must use HTTPS." }, { status: 503 });
+    }
+    const inviteUrl = new URL("/successor/accept", trustedOrigin);
+    inviteUrl.searchParams.set("token", result.token);
+    await prisma.complianceNotification.create({
+      data: {
+        organizationId: access.actor.organizationIds[0],
+        workspaceId: (await prisma.membership.findFirst({ where: { userId: access.actor.userId }, orderBy: { createdAt: "asc" }, select: { organization: { select: { workspaces: { orderBy: { createdAt: "asc" }, take: 1, select: { id: true } } } } } }))?.organization.workspaces[0]?.id ?? "",
+        channel: "EMAIL", subject: "PieroloOS successor invitation",
+        body: `You have been nominated as a business continuity successor for PieroloOS. Review the invitation securely: ${inviteUrl.toString()}\n\nThe link expires in seven days and can be used once. Acceptance does not grant admin access or transfer ownership.`,
+        recipientUserId: null, recipientEmail: result.successor.successorEmail,
+        templateKey: "legacy-notification", templateVersion: 1,
+        scheduledFor: new Date(), nextAttemptAt: new Date(),
+      },
+    }).catch(() => null);
+    // Any failure above must not leak the bearer link through the API response.
+    return NextResponse.json({ data: { ...result.successor, invitationDelivery: "QUEUED" }, message: "Invitation created. Check notification worker delivery status." }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "SUCCESSOR_ALREADY_EXISTS") return NextResponse.json({ error: "A non-revoked successor already uses this email." }, { status: 409 });
     if (error instanceof Error && error.message === "HIGH_PERMISSION_VERIFICATION_REQUIRED") return NextResponse.json({ error: "A documented video/ID verification plan is required for secret access." }, { status: 422 });
@@ -92,10 +112,12 @@ export async function PATCH(request: Request) {
   if ("error" in access) return access.error;
   const parsedBody = await jsonBody(request);
   if (!parsedBody.ok) return parsedBody.response;
-  const parsed = z.object({ action: z.enum(["alive", "simulate", "revoke", "asset", "runbook"]), successorId: z.string().optional(), reason: z.string().trim().min(8).max(500).optional(), asset: z.object({
-    assetType: z.string().trim().min(2).max(60), label: z.string().trim().min(2).max(160),
-    recoveryLocation: z.string().trim().min(2).max(500), criticality: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]), notes: z.string().max(1000).optional(),
-  }).optional(), runbook: z.object({ id: z.string().optional(), title: z.string().trim().min(2).max(160), content: z.string().trim().min(20).max(20000) }).optional() }).strict().safeParse(parsedBody.body);
+  const parsed = z.object({
+    action: z.enum(["alive", "simulate", "revoke", "asset", "runbook"]),
+    successorId: z.string().optional(), reason: z.string().trim().min(8).max(500).optional(),
+    asset: z.object({ assetType: z.string().trim().min(2).max(60), label: z.string().trim().min(2).max(160), recoveryLocation: z.string().trim().min(2).max(500), criticality: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]), notes: z.string().max(1000).optional() }).optional(),
+    runbook: z.object({ id: z.string().optional(), title: z.string().trim().min(2).max(160), content: z.string().trim().min(20).max(20000) }).optional(),
+  }).strict().safeParse(parsedBody.body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid action payload." }, { status: 422 });
   try {
     if (parsed.data.action === "alive") return NextResponse.json({ data: await confirmOwnerAlive(access.actor) });
@@ -106,7 +128,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Required action fields are missing." }, { status: 422 });
   } catch (error) {
     if (error instanceof Error && error.message === "SUCCESSOR_NOT_FOUND") return NextResponse.json({ error: "Successor not found." }, { status: 404 });
-    if (error instanceof Error && error.message === "ACTIVE_SUCCESSOR_REQUIRES_RECOVERY_REVIEW") return NextResponse.json({ error: "An active successor requires a separately evidenced recovery review; self-service revoke is blocked." }, { status: 409 });
+    if (error instanceof Error && error.message === "ACTIVE_SUCCESSOR_REQUIRES_RECOVERY_REVIEW") return NextResponse.json({ error: "An active successor requires an independently evidenced recovery review; self-service revoke is blocked." }, { status: 409 });
     if (error instanceof Error && error.message === "RUNBOOK_NOT_FOUND") return NextResponse.json({ error: "Runbook not found." }, { status: 404 });
     return NextResponse.json({ error: "The continuity action could not be completed." }, { status: 500 });
   }
