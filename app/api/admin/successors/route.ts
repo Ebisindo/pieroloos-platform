@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
   try {
     const invite = await prisma.$transaction(async (tx) => {
-      const created = await addSuccessor(access.actor, parsed.data);
+      const created = await addSuccessor(access.actor, parsed.data, tx);
       const inviteUrl = new URL("/successor/accept", trustedOrigin);
       inviteUrl.searchParams.set("token", created.token);
       await tx.complianceNotification.create({
