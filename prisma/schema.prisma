@@ -23,6 +23,28 @@ enum PlatformPermission {
   AUDIT_READ
 }
 
+
+enum SuccessorStatus {
+  PENDING
+  ACCEPTED
+  ACTIVE
+  REVOKED
+}
+
+enum SuccessorVerificationLevel {
+  EMAIL_INVITE
+  ID_VERIFIED
+}
+
+enum ContinuityCaseStatus {
+  WARNING_SENT
+  REVIEW_REQUIRED
+  ACTIVATED
+  CANCELLED
+  CLOSED
+}
+
+
 enum NotificationChannel {
   IN_APP
   EMAIL
@@ -365,6 +387,9 @@ model User {
   platformSuperAdmin        PlatformSuperAdmin?
   platformPermissionsGranted PlatformAdministratorPermission[] @relation("PlatformPermissionGrantor")
   platformAuditEvents       PlatformAuditEvent[] @relation("PlatformAuditActor")
+  successorsOwned            Successor[] @relation("SuccessorOwner")
+  continuityAssets           ContinuityAsset[] @relation("ContinuityAssetOwner")
+  continuityRunbooks          ContinuityRunbook[] @relation("ContinuityRunbookOwner")
   businessIntentProposalsCreated BusinessIntentProposal[] @relation("BusinessIntentProposalCreator")
   businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
   businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
@@ -2061,4 +2086,98 @@ model CorporateGraphAuditEvent {
 
   @@index([organizationId, workspaceId, occurredAt])
   @@index([subjectType, subjectId, occurredAt])
+}
+
+model Successor {
+  id                            String                     @id @default(cuid())
+  ownerId                       String
+  successorEmail                String
+  successorName                 String
+  successorGithub               String?
+  relationship                  String
+  status                        SuccessorStatus            @default(PENDING)
+  verificationLevel             SuccessorVerificationLevel @default(EMAIL_INVITE)
+  autoActivateAfterDays         Int                        @default(60)
+  permissions                   Json
+  inviteTokenHash               String?                    @unique
+  inviteExpiresAt               DateTime?
+  acceptedAt                    DateTime?
+  idVerifiedAt                  DateTime?
+  mfaVerifiedAt                 DateTime?
+  highPermissionVerificationNote String?
+  lastOwnerActivityAt            DateTime                   @default(now())
+  warningSentAt                 DateTime?
+  createdAt                     DateTime                   @default(now())
+  updatedAt                     DateTime                   @updatedAt
+
+  owner User @relation("SuccessorOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  continuityCases BusinessContinuityCase[]
+
+  @@index([ownerId, status])
+  @@index([status, lastOwnerActivityAt])
+}
+
+model BusinessContinuityCase {
+  id                  String               @id @default(cuid())
+  successorId         String
+  status              ContinuityCaseStatus @default(WARNING_SENT)
+  inactivityStartedAt DateTime
+  warningSentAt       DateTime?
+  reviewRequiredAt    DateTime?
+  activatedAt         DateTime?
+  cancelledAt         DateTime?
+  closedAt            DateTime?
+  closureReason       String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  successor Successor @relation(fields: [successorId], references: [id], onDelete: Restrict)
+  transmissionPackage ContinuityTransmissionPackage?
+
+  @@index([successorId, status])
+  @@index([status, updatedAt])
+}
+
+model ContinuityAsset {
+  id               String   @id @default(cuid())
+  ownerId          String
+  assetType        String
+  label            String
+  recoveryLocation String
+  criticality      String   @default("HIGH")
+  notes            String?
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+
+  owner User @relation("ContinuityAssetOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+
+  @@index([ownerId, assetType])
+}
+
+model ContinuityRunbook {
+  id         String   @id @default(cuid())
+  ownerId    String
+  title      String
+  content    String
+  version    Int      @default(1)
+  reviewedAt DateTime?
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  owner User @relation("ContinuityRunbookOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+
+  @@index([ownerId, updatedAt])
+}
+
+model ContinuityTransmissionPackage {
+  id                  String   @id @default(cuid())
+  caseId              String   @unique
+  manifest            Json
+  encryptedOwnerNote  String?
+  encryptionKeyRef    String?
+  encryptionAlgorithm String?
+  generatedAt         DateTime @default(now())
+  releasedAt          DateTime?
+
+  continuityCase BusinessContinuityCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
 }
