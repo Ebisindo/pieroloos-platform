@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       continuityCases: { where: { status: { in: [ContinuityCaseStatus.WARNING_SENT, ContinuityCaseStatus.REVIEW_REQUIRED] } }, select: { id: true, status: true, warningSentAt: true }, take: 1, orderBy: { createdAt: "desc" } },
     },
   });
-  const summary = { examined: candidates.length, warningsQueued: 0, reviewCasesOpened: 0, skipped: 0, failures: 0 };
+  const summary = { examined: candidates.length, warningsQueued: 0, reviewCasesOpened: 0, packagesGenerated: 0, skipped: 0, failures: 0 };
 
   for (const successor of candidates) {
     try {
@@ -45,8 +45,6 @@ export async function POST(request: Request) {
           await tx.platformAuditEvent.create({
             data: { actorRole: "SYSTEM_WORKER", action: "handover_warning_sent", subjectType: "SUCCESSOR", subjectId: successor.id, outcome: "SUCCESS", details: { inactivityDays: successor.autoActivateAfterDays, ownerId: successor.ownerId, caseId: newCase.id, notificationQueued: true } },
           });
-          // Only store the email in a private delivery marker; never include a bearer
-          // token in worker logs or API output. Notification body is stripped pre-send.
           await tx.complianceNotification.create({
             data: {
               organizationId: membership.organizationId, workspaceId: workspace.id, channel: "EMAIL",
@@ -71,12 +69,48 @@ export async function POST(request: Request) {
             data: { status: ContinuityCaseStatus.REVIEW_REQUIRED, reviewRequiredAt: now },
           });
           if (!changed.count) return false;
+
+          const [assets, runbooks] = await Promise.all([
+            tx.continuityAsset.findMany({
+              where: { ownerId: successor.ownerId }, orderBy: [{ criticality: "desc" }, { label: "asc" }], take: 200,
+              select: { id: true, assetType: true, label: true, recoveryLocation: true, criticality: true, updatedAt: true },
+            }),
+            tx.continuityRunbook.findMany({
+              where: { ownerId: successor.ownerId }, orderBy: { updatedAt: "desc" }, take: 50,
+              select: { id: true, title: true, content: true, version: true, updatedAt: true },
+            }),
+          ]);
+          await tx.continuityTransmissionPackage.upsert({
+            where: { caseId: currentCase.id },
+            create: {
+              caseId: currentCase.id,
+              manifest: {
+                generatedAt: now.toISOString(),
+                ownerId: successor.ownerId,
+                successorId: successor.id,
+                packageType: "BUSINESS_CONTINUITY_REVIEW",
+                limitations: [
+                  "This is a review package, not proof of death/incapacity or legal authority.",
+                  "No ownership, billing, repository, deployment or secret permissions have been transferred.",
+                  "Credential values are intentionally excluded. RecoveryLocation must point to an approved provider or vault.",
+                  "Encrypted owner note release is disabled until envelope encryption is configured with a production KMS.",
+                ],
+                criticalAssets: assets.map((asset) => ({ ...asset, updatedAt: asset.updatedAt.toISOString() })),
+                emergencyRunbooks: runbooks.map((runbook) => ({ ...runbook, updatedAt: runbook.updatedAt.toISOString() })),
+                integrationsPending: ["GitHub ownership transfer adapter", "Vercel project transfer adapter", "DNS/domain registrar recovery verification", "billing provider recovery workflow", "KMS envelope-encrypted owner note"],
+              },
+            },
+            update: {},
+          });
           await tx.platformAuditEvent.create({
-            data: { actorRole: "SYSTEM_WORKER", action: "handover_review_required", subjectType: "SUCCESSOR", subjectId: successor.id, outcome: "SUCCESS", details: { caseId: currentCase.id, ownerId: successor.ownerId, automaticPrivilegeGrant: false } },
+            data: { actorRole: "SYSTEM_WORKER", action: "handover_review_required", subjectType: "SUCCESSOR", subjectId: successor.id, outcome: "SUCCESS", details: { caseId: currentCase.id, ownerId: successor.ownerId, automaticPrivilegeGrant: false, transmissionPackageGenerated: true, assetsIncluded: assets.length, runbooksIncluded: runbooks.length } },
           });
           return true;
         }, { isolationLevel: "Serializable" });
-        if (updated) summary.reviewCasesOpened += 1;
+        if (updated) {
+          summary.reviewCasesOpened += 1;
+          summary.packagesGenerated += 1;
+        }
       }
     } catch {
       summary.failures += 1;
