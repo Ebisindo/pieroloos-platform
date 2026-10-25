@@ -70,26 +70,21 @@ export async function POST(request: Request) {
   if (!membership || !workspace) return NextResponse.json({ error: "A workspace is required for secure invitation delivery." }, { status: 409 });
 
   try {
-    const result = await addSuccessor(access.actor, parsed.data);
-    const inviteUrl = new URL("/successor/accept", trustedOrigin);
-    inviteUrl.searchParams.set("token", result.token);
-    // The existing email worker can send account-less invitees if its body ends in
-    // this server-controlled recipient marker. The marker is stripped before email.
-    try {
-      await prisma.complianceNotification.create({
+    const result = await prisma.$transaction(async (tx) => {
+      const invite = await addSuccessor(access.actor, parsed.data);
+      const inviteUrl = new URL("/successor/accept", trustedOrigin);
+      inviteUrl.searchParams.set("token", invite.token);
+      await tx.complianceNotification.create({
         data: {
           organizationId: membership.organizationId, workspaceId: workspace.id, channel: "EMAIL",
           subject: "PieroloOS successor invitation",
-          body: `You have been nominated as a business continuity successor for PieroloOS. Review the invitation securely: ${inviteUrl.toString()}\n\nThis one-time link expires in seven days. Acceptance does not grant admin access or transfer ownership.\nInvitation recipient: ${result.successor.successorEmail}`,
-          recipientUserId: null, scheduledFor: new Date(), dedupeKey: `successor-invite-${result.successor.id}`,
+          body: `You have been nominated as a business continuity successor for PieroloOS. Review the invitation securely: ${inviteUrl.toString()}\n\nThis one-time link expires in seven days. Acceptance does not grant admin access or transfer ownership.\nInvitation recipient: ${invite.successor.successorEmail}`,
+          recipientUserId: null, scheduledFor: new Date(), dedupeKey: `successor-invite-${invite.successor.id}`,
           templateKey: "legacy-notification", templateVersion: 1,
         },
       });
-    } catch {
-      await prisma.successor.update({ where: { id: result.successor.id }, data: { status: "REVOKED", inviteTokenHash: null, inviteExpiresAt: null } });
-      await prisma.platformAuditEvent.create({ data: { actorUserId: access.actor.userId, actorRole: "SUPER_ADMIN", action: "successor_invite_delivery_failed", subjectType: "SUCCESSOR", subjectId: result.successor.id, outcome: "DENIED" } });
-      return NextResponse.json({ error: "Invitation delivery could not be queued; the invitation was revoked." }, { status: 503 });
-    }
+      return invite;
+    }, { isolationLevel: "Serializable" });
     return NextResponse.json({ data: { ...result.successor, invitationDelivery: "QUEUED" }, message: "Invitation queued for email delivery." }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "SUCCESSOR_ALREADY_EXISTS") return NextResponse.json({ error: "A non-revoked successor already uses this email." }, { status: 409 });
