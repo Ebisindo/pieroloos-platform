@@ -55,10 +55,10 @@ describe("successor management route", () => {
   it("requires authenticated SuperAdmin access to list successors", async () => {
     actorMock.mockResolvedValue(null);
     const anonymousResponse = await GET();
-    expect(anonymousResponse.status).toBe(401);
+    expect(anonymousResponse!.status).toBe(401);
     actorMock.mockResolvedValue(ordinaryAdmin);
     const ordinaryResponse = await GET();
-    expect(ordinaryResponse.status).toBe(403);
+    expect(ordinaryResponse!.status).toBe(403);
     expect(listMock).not.toHaveBeenCalled();
   });
 
