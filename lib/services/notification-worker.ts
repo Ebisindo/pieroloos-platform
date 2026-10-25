@@ -12,6 +12,7 @@ type ClaimedNotification = {
   id: string;
   organizationId: string;
   workspaceId: string;
+  dedupeKey: string;
   recipientUserId: string | null;
   channel: "IN_APP" | "EMAIL";
   subject: string;
@@ -101,7 +102,14 @@ async function loadRecipientContext(notification: ClaimedNotification) {
   // Invitations intentionally target people who may not yet have a PieroloOS account.
   // Email is supplied explicitly only by trusted server-side queue writers.
   if (!notification.recipientUserId) {
-    return { email: notificationEmail(notification), preference: {
+    // Account-less delivery is allowed only for server-generated continuity
+    // messages. This prevents arbitrary queued notifications from becoming an
+    // email-to-any-address facility.
+    const allowedPrefix = notification.dedupeKey.startsWith("successor-invite-") ||
+      notification.dedupeKey.startsWith("continuity-warning-");
+    const email = allowedPrefix ? notificationEmail(notification) : "";
+    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return null;
+    return { email, preference: {
       inAppEnabled: false, emailEnabled: true, quietHoursStart: null, quietHoursEnd: null, timezone: "UTC", locale: "en",
     }, notificationsEnabled: true, externalInvite: true };
   }
