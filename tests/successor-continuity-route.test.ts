@@ -57,9 +57,11 @@ describe("successor management route", () => {
 
   it("requires authenticated SuperAdmin access to list successors", async () => {
     actorMock.mockResolvedValue(null);
-    expect((await GET()).status).toBe(401);
+    const anonymousResponse = await GET();
+    expect(anonymousResponse.status).toBe(401);
     actorMock.mockResolvedValue(ordinaryAdmin);
-    expect((await GET()).status).toBe(403);
+    const ordinaryResponse = await GET();
+    expect(ordinaryResponse.status).toBe(403);
     expect(listMock).not.toHaveBeenCalled();
   });
 
@@ -70,7 +72,7 @@ describe("successor management route", () => {
       autoActivateAfterDays: 60,
       permissions: { canTransferOwnership: false, canAccessSecrets: false, canDeploy: true, canAccessBilling: false },
     }));
-    expect(response.status).toBe(503);
+    expect(response!.status).toBe(503);
     expect(addMock).not.toHaveBeenCalled();
   });
 
@@ -81,7 +83,7 @@ describe("successor management route", () => {
       autoActivateAfterDays: 60,
       permissions: { canTransferOwnership: false, canAccessSecrets: false, canDeploy: true, canAccessBilling: false },
     }, "https://evil.example"));
-    expect(response.status).toBe(403);
+    expect(response!.status).toBe(403);
     expect(addMock).not.toHaveBeenCalled();
   });
 
@@ -92,7 +94,7 @@ describe("successor management route", () => {
       autoActivateAfterDays: 45,
       permissions: { canTransferOwnership: false, canAccessSecrets: false, canDeploy: true, canAccessBilling: false, isSuperAdmin: true },
     }));
-    expect(response.status).toBe(422);
+    expect(response!.status).toBe(422);
     expect(addMock).not.toHaveBeenCalled();
   });
 });
