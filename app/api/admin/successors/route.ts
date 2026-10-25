@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ error: "Invitation delivery could not be queued; the invitation was revoked." }, { status: 503 });
     }
-    return NextResponse.json({ data: { ...result.successor, invitationDelivery: "QUEUED" }, message: "Invitation queued for email delivery." }, { status: 201 });
+    return NextResponse.json({ data: { ...invite.successor, invitationDelivery: "QUEUED" }, message: "Invitation queued for email delivery." }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "SUCCESSOR_ALREADY_EXISTS") return NextResponse.json({ error: "A non-revoked successor already uses this email." }, { status: 409 });
     if (error instanceof Error && error.message === "HIGH_PERMISSION_VERIFICATION_REQUIRED") return NextResponse.json({ error: "A documented video/ID verification plan is required for secret access." }, { status: 422 });
