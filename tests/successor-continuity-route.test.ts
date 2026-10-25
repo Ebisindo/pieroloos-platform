@@ -38,7 +38,6 @@ function request(body: unknown, origin = "http://localhost") {
 describe("successor management route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.CONTINUITY_STEP_UP_ENFORCED;
     process.env.SITE_URL = "http://localhost";
     rateLimitMock.mockResolvedValue(null);
     prismaMock.membership.findFirst.mockResolvedValue({
@@ -50,7 +49,6 @@ describe("successor management route", () => {
     prismaMock.platformAuditEvent.create.mockResolvedValue({});
   });
   afterEach(() => {
-    if (oldStepUp === undefined) delete process.env.CONTINUITY_STEP_UP_ENFORCED; else process.env.CONTINUITY_STEP_UP_ENFORCED = oldStepUp;
     if (oldSiteUrl === undefined) delete process.env.SITE_URL; else process.env.SITE_URL = oldSiteUrl;
     if (oldNextAuthUrl === undefined) delete process.env.NEXTAUTH_URL; else process.env.NEXTAUTH_URL = oldNextAuthUrl;
   });
