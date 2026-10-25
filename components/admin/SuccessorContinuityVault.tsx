@@ -106,7 +106,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
         setData({
           successors: body.data.successors.map((item: Successor) => ({ ...item, createdAt: String(item.createdAt), lastOwnerActivityAt: String(item.lastOwnerActivityAt) })),
           assets: body.data.assets.map((item: Asset) => ({ ...item, updatedAt: String(item.updatedAt) })),
-          runbooks: body.data.runbooks.map((item: Runbook) => ({ ...item, createdAt: String(item.createdAt), updatedAt: String(item.updatedAt) })),
+          runbooks: body.data.runbooks.map((item: Runbook) => ({ ...item, updatedAt: String(item.updatedAt) })),
         });
       }
       if (payload.action === "create") {
