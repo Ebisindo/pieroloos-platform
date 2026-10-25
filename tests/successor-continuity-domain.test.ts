@@ -26,7 +26,6 @@ describe("successor continuity domain rules", () => {
     const trigger = getTriggerAt(activity, 60);
     expect(hasReachedTrigger(new Date(trigger.getTime() - 1), activity, 60)).toBe(false);
     expect(hasReachedTrigger(trigger, activity, 60)).toBe(true);
-    // The domain function calculates time only; an explicit review case is still needed.
   });
 
   it("accepts only the configured trigger days", () => {
