@@ -87,13 +87,12 @@ describe("successor management route", () => {
 
   it("rejects an unsupported inactivity threshold and undeclared permission keys", async () => {
     actorMock.mockResolvedValue(superAdmin);
-    process.env.SITE_URL = "http://localhost";
     const response = await POST(request({
       successorName: "Continuity Contact", successorEmail: "successor@example.test", relationship: "CTO",
       autoActivateAfterDays: 45,
       permissions: { canTransferOwnership: false, canAccessSecrets: false, canDeploy: true, canAccessBilling: false, isSuperAdmin: true },
     }));
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(422);
     expect(addMock).not.toHaveBeenCalled();
   });
 });
