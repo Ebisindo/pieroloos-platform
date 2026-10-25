@@ -42,7 +42,7 @@ export async function addSuccessor(actor: PlatformActor, input: {
   successorName: string; successorEmail: string; successorGithub?: string;
   relationship: string; autoActivateAfterDays: number; permissions: SuccessorPermissions;
   highPermissionVerificationNote?: string;
-}) {
+}, transactionClient?: Prisma.TransactionClient) {
   requireSuperAdmin(actor);
   if (!validateInactivityDays(input.autoActivateAfterDays)) throw new Error("INVALID_INACTIVITY_DAYS");
   if (!permissionsAreValid(input.permissions)) throw new Error("INVALID_PERMISSIONS");
@@ -52,7 +52,7 @@ export async function addSuccessor(actor: PlatformActor, input: {
   const normalizedEmail = input.successorEmail.trim().toLowerCase();
   const { token, tokenHash } = createInvitationToken();
   const now = new Date();
-  const created = await prisma.$transaction(async (tx) => {
+  const createWithinTransaction = async (tx: Prisma.TransactionClient) => {
     await assertCurrentSuperAdmin(tx, actor.userId);
     const sameEmail = await tx.successor.findFirst({
       where: { ownerId: actor.userId, successorEmail: normalizedEmail, status: { not: SuccessorStatus.REVOKED } },
@@ -81,7 +81,10 @@ export async function addSuccessor(actor: PlatformActor, input: {
       details: { verificationLevel: SuccessorVerificationLevel.EMAIL_INVITE, autoActivateAfterDays: input.autoActivateAfterDays, canAccessSecrets: input.permissions.canAccessSecrets },
     } });
     return successor;
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  };
+  const created = transactionClient
+    ? await createWithinTransaction(transactionClient)
+    : await prisma.$transaction(createWithinTransaction, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   return { successor: created, token };
 }
 
