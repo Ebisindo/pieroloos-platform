@@ -26,7 +26,6 @@ import { GET, POST } from "@/app/api/admin/successors/route";
 
 const superAdmin = { userId: "owner-1", email: "owner@example.test", isSuperAdmin: true, permissions: [], organizationIds: ["org-1"] };
 const ordinaryAdmin = { userId: "admin-1", email: "admin@example.test", isSuperAdmin: false, permissions: [], organizationIds: ["org-1"] };
-const oldStepUp = process.env.CONTINUITY_STEP_UP_ENFORCED;
 const oldSiteUrl = process.env.SITE_URL;
 const oldNextAuthUrl = process.env.NEXTAUTH_URL;
 function request(body: unknown, origin = "http://localhost") {
