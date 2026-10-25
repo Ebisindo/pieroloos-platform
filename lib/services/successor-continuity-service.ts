@@ -192,3 +192,22 @@ export async function saveRunbook(actor: PlatformActor, input: { id?: string; ti
     return runbook;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
+
+export async function recordSuperAdminContinuityActivity(userId: string) {
+  const now = new Date();
+  const refreshBefore = new Date(now.getTime() - 5 * 60 * 1000);
+  const changed = await prisma.successor.updateMany({
+    where: { ownerId: userId, status: { in: [SuccessorStatus.PENDING, SuccessorStatus.ACCEPTED, SuccessorStatus.ACTIVE] }, lastOwnerActivityAt: { lt: refreshBefore } },
+    data: { lastOwnerActivityAt: now, warningSentAt: null },
+  });
+  if (!changed.count) return;
+  await prisma.$transaction(async (tx) => {
+    await tx.businessContinuityCase.updateMany({
+      where: { successor: { ownerId: userId }, status: { in: [ContinuityCaseStatus.WARNING_SENT, ContinuityCaseStatus.REVIEW_REQUIRED] } },
+      data: { status: ContinuityCaseStatus.CANCELLED, cancelledAt: now, closureReason: "Authenticated owner activity detected; dead-man switch reset." },
+    });
+    await tx.platformAuditEvent.create({
+      data: { actorUserId: userId, actorRole: "SUPER_ADMIN", action: "owner_activity_detected", subjectType: "SUCCESSOR_PROTOCOL", outcome: "SUCCESS", details: { heartbeatAt: now.toISOString(), successorRecordsUpdated: changed.count } },
+    });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
