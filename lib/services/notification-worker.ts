@@ -130,10 +130,10 @@ async function loadRecipientContext(notification: ClaimedNotification) {
 }
 
 function notificationEmail(notification: ClaimedNotification): string {
-  const marker = "\\nInvitation recipient: ";
+  const marker = "\nInvitation recipient: ";
   const index = notification.body.lastIndexOf(marker);
   if (index < 0) return "";
-  return notification.body.slice(index + marker.length).trim().split(/\\r?\\n/)[0].trim();
+  return notification.body.slice(index + marker.length).trim().split(/\r?\n/)[0].trim();
 }
 
 async function finishWithoutDelivery(notification: ClaimedNotification, workerId: string, data: { status: "CANCELLED" | "QUEUED"; reason: string; scheduledFor?: Date }) {
@@ -227,7 +227,7 @@ export async function runNotificationWorker(now = new Date(), requestedLimit = 5
       try {
         const receipt = await sendNotificationEmail({
           id: notification.id, templateKey: notification.templateKey, templateVersion: notification.templateVersion,
-          subject: notification.subject, body: notification.body.split(/\\nInvitation recipient: /)[0],
+          subject: notification.subject, body: notification.body.split(/\nInvitation recipient: /)[0],
           recipientEmail: recipient.email, locale: resolveEmailLocale(recipient.preference.locale),
           templateParams: parseEmailTemplateParams(notification.templateKey, notification.templateParams),
         });
