@@ -33,9 +33,10 @@ async function guard(request?: Request) {
     if (hasInvalidRequestOrigin(request)) return { error: NextResponse.json({ error: "Invalid request origin." }, { status: 403 }) };
     const limited = await enforceRateLimit(PLATFORM_ADMIN_MUTATION_LIMIT, actor.userId);
     if (limited) return { error: limited };
-    if (process.env.CONTINUITY_STEP_UP_ENFORCED !== "true") {
-      return { error: NextResponse.json({ error: "Continuity mutations are disabled until verified MFA/re-authentication is integrated (CONTINUITY_STEP_UP_ENFORCED)." }, { status: 503 }) };
-    }
+    // The current auth provider has no trusted step-up timestamp. An environment
+    // flag is not proof of a recent MFA challenge, so writes remain disabled until
+    // a signed/verified identity-provider assertion is validated on this request.
+    return { error: NextResponse.json({ error: "Continuity mutations are temporarily locked until verified MFA/re-authentication can be proven by the identity provider." }, { status: 503 }) };
   }
   return { actor };
 }
