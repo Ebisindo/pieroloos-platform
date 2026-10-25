@@ -1,25 +1,16 @@
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentPlatformActor } from "@/lib/auth/platform-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PLATFORM_ADMIN_MUTATION_LIMIT } from "@/lib/http/rate-limit";
 import { prisma } from "@/lib/db/prisma";
-import {
-  addSuccessor, confirmOwnerAlive, createContinuityAsset, listSuccessors, revokeSuccessor,
-  saveRunbook, simulateHandover,
-} from "@/lib/services/successor-continuity-service";
+import { addSuccessor, confirmOwnerAlive, createContinuityAsset, listSuccessors, revokeSuccessor, saveRunbook, simulateHandover } from "@/lib/services/successor-continuity-service";
 
-const permissionsSchema = z.object({
-  canTransferOwnership: z.boolean(), canAccessSecrets: z.boolean(), canDeploy: z.boolean(), canAccessBilling: z.boolean(),
-}).strict();
+const permissionsSchema = z.object({ canTransferOwnership: z.boolean(), canAccessSecrets: z.boolean(), canDeploy: z.boolean(), canAccessBilling: z.boolean() }).strict();
 const createSchema = z.object({
-  successorName: z.string().trim().min(2).max(120),
-  successorEmail: z.string().trim().email().max(254),
-  successorGithub: z.string().trim().max(39).optional().or(z.literal("")),
-  relationship: z.string().trim().min(2).max(80),
-  autoActivateAfterDays: z.union([z.literal(30), z.literal(60), z.literal(90)]),
-  permissions: permissionsSchema,
+  successorName: z.string().trim().min(2).max(120), successorEmail: z.string().trim().email().max(254),
+  successorGithub: z.string().trim().max(39).optional().or(z.literal("")), relationship: z.string().trim().min(2).max(80),
+  autoActivateAfterDays: z.union([z.literal(30), z.literal(60), z.literal(90)]), permissions: permissionsSchema,
   highPermissionVerificationNote: z.string().trim().max(1000).optional(),
 }).strict();
 const MAX_BODY_BYTES = 8 * 1024;
@@ -28,13 +19,10 @@ async function jsonBody(request: Request) {
   const length = Number(request.headers.get("content-length") ?? 0);
   if (length > MAX_BODY_BYTES) return { ok: false as const, response: NextResponse.json({ error: "Request body is too large." }, { status: 413 }) };
   let raw: string;
-  try { raw = await request.text(); } catch {
-    return { ok: false as const, response: NextResponse.json({ error: "Unreadable request body." }, { status: 400 }) };
-  }
+  try { raw = await request.text(); } catch { return { ok: false as const, response: NextResponse.json({ error: "Unreadable request body." }, { status: 400 }) }; }
   if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) return { ok: false as const, response: NextResponse.json({ error: "Request body is too large." }, { status: 413 }) };
-  try { return { ok: true as const, body: JSON.parse(raw) as unknown }; } catch {
-    return { ok: false as const, response: NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 }) };
-  }
+  try { return { ok: true as const, body: JSON.parse(raw) as unknown }; }
+  catch { return { ok: false as const, response: NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 }) }; }
 }
 
 async function guard(request?: Request) {
@@ -66,17 +54,15 @@ export async function POST(request: Request) {
   if (!parsedBody.ok) return parsedBody.response;
   const parsed = createSchema.safeParse(parsedBody.body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid successor details.", issues: parsed.error.flatten() }, { status: 422 });
+
   const origin = process.env.SITE_URL || process.env.NEXTAUTH_URL;
   let trustedOrigin: URL;
-  try { if (!origin) throw new Error("missing"); trustedOrigin = new URL(origin); } catch {
-    return NextResponse.json({ error: "Invitation unavailable: configure a valid SITE_URL or NEXTAUTH_URL first." }, { status: 503 });
-  }
-  if (process.env.NODE_ENV === "production" && trustedOrigin.protocol !== "https:") {
-    return NextResponse.json({ error: "Production invitation origin must use HTTPS." }, { status: 503 });
-  }
+  try { if (!origin) throw new Error("missing"); trustedOrigin = new URL(origin); }
+  catch { return NextResponse.json({ error: "Configure a valid SITE_URL or NEXTAUTH_URL before inviting a successor." }, { status: 503 }); }
+  if (process.env.NODE_ENV === "production" && trustedOrigin.protocol !== "https:") return NextResponse.json({ error: "Production invitation origin must use HTTPS." }, { status: 503 });
+
   const membership = await prisma.membership.findFirst({
-    where: { userId: access.actor.userId },
-    orderBy: { createdAt: "asc" },
+    where: { userId: access.actor.userId }, orderBy: { createdAt: "asc" },
     select: { organizationId: true, organization: { select: { workspaces: { orderBy: { createdAt: "asc" }, take: 1, select: { id: true } } } } },
   });
   const workspace = membership?.organization.workspaces[0];
@@ -86,29 +72,23 @@ export async function POST(request: Request) {
     const result = await addSuccessor(access.actor, parsed.data);
     const inviteUrl = new URL("/successor/accept", trustedOrigin);
     inviteUrl.searchParams.set("token", result.token);
+    // The existing email worker can send account-less invitees if its body ends in
+    // this server-controlled recipient marker. The marker is stripped before email.
     try {
       await prisma.complianceNotification.create({
         data: {
-          organizationId: membership.organizationId,
-          workspaceId: workspace.id,
-          channel: "EMAIL",
+          organizationId: membership.organizationId, workspaceId: workspace.id, channel: "EMAIL",
           subject: "PieroloOS successor invitation",
-          body: `You have been nominated as a business continuity successor for PieroloOS. Review the invitation securely: ${inviteUrl.toString()}\n\nThis one-time link expires in seven days. Acceptance does not grant admin access or transfer ownership.`,
-          recipientUserId: null,
-          scheduledFor: new Date(),
-          dedupeKey: `successor-invite-${result.successor.id}`,
-          templateKey: "legacy-notification",
-          templateVersion: 1,
+          body: `You have been nominated as a business continuity successor for PieroloOS. Review the invitation securely: ${inviteUrl.toString()}\n\nThis one-time link expires in seven days. Acceptance does not grant admin access or transfer ownership.\nInvitation recipient: ${result.successor.successorEmail}`,
+          recipientUserId: null, scheduledFor: new Date(), dedupeKey: `successor-invite-${result.successor.id}`,
+          templateKey: "legacy-notification", templateVersion: 1,
         },
       });
     } catch {
-      // Revoke the un-delivered invitation rather than leaving an uncommunicated
-      // credential alive in the database.
       await prisma.successor.update({ where: { id: result.successor.id }, data: { status: "REVOKED", inviteTokenHash: null, inviteExpiresAt: null } });
       await prisma.platformAuditEvent.create({ data: { actorUserId: access.actor.userId, actorRole: "SUPER_ADMIN", action: "successor_invite_delivery_failed", subjectType: "SUCCESSOR", subjectId: result.successor.id, outcome: "DENIED" } });
       return NextResponse.json({ error: "Invitation delivery could not be queued; the invitation was revoked." }, { status: 503 });
     }
-    // Link material is only placed in the private notification body, never the response.
     return NextResponse.json({ data: { ...result.successor, invitationDelivery: "QUEUED" }, message: "Invitation queued for email delivery." }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "SUCCESSOR_ALREADY_EXISTS") return NextResponse.json({ error: "A non-revoked successor already uses this email." }, { status: 409 });
