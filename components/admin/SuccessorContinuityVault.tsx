@@ -13,7 +13,7 @@ type Successor = {
   highPermissionVerificationNote: string | null; continuityCases: ContinuityCase[];
 };
 type Asset = { id: string; assetType: string; label: string; recoveryLocation: string; criticality: string; notes: string | null; updatedAt: string };
-type Runbook = { id: string; title: string; content: string; version: number; reviewedAt: string | null; createdAt: string; updatedAt: string };
+type Runbook = { id: string; title: string; content: string; version: number; reviewedAt: string | null; updatedAt: string };
 type InitialData = { successors: Successor[]; assets: Asset[]; runbooks: Runbook[] };
 
 const permissionOptions = [
@@ -105,7 +105,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
         const body = await refreshed.json();
         setData({
           successors: body.data.successors.map((item: Successor) => ({ ...item, createdAt: String(item.createdAt), lastOwnerActivityAt: String(item.lastOwnerActivityAt) })),
-          assets: body.data.assets.map((item: Asset) => ({ ...item, createdAt: String(item.createdAt), updatedAt: String(item.updatedAt) })),
+          assets: body.data.assets.map((item: Asset) => ({ ...item, updatedAt: String(item.updatedAt) })),
           runbooks: body.data.runbooks.map((item: Runbook) => ({ ...item, createdAt: String(item.createdAt), updatedAt: String(item.updatedAt) })),
         });
       }
