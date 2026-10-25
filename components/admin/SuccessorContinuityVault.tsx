@@ -12,7 +12,7 @@ type Successor = {
   acceptedAt: string | null; idVerifiedAt: string | null; mfaVerifiedAt: string | null;
   highPermissionVerificationNote: string | null; continuityCases: ContinuityCase[];
 };
-type Asset = { id: string; assetType: string; label: string; recoveryLocation: string; criticality: string; notes: string | null; createdAt: string; updatedAt: string };
+type Asset = { id: string; assetType: string; label: string; recoveryLocation: string; criticality: string; notes: string | null; updatedAt: string };
 type Runbook = { id: string; title: string; content: string; version: number; reviewedAt: string | null; createdAt: string; updatedAt: string };
 type InitialData = { successors: Successor[]; assets: Asset[]; runbooks: Runbook[] };
 
