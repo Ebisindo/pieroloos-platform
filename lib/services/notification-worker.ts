@@ -163,12 +163,10 @@ async function claimDueNotifications(now: Date, workerId: string, limit: number)
 
 async function loadRecipientContext(notification: ClaimedNotification) {
   if (!notification.recipientUserId) {
-    // Account-less delivery is reserved for continuity messages written by the
-    // server. This is not a general-purpose "send to arbitrary email" mechanism.
     const allowedPrefix = notification.dedupeKey.startsWith("successor-invite-") ||
       notification.dedupeKey.startsWith("continuity-warning-");
     const email = allowedPrefix ? notificationEmail(notification) : "";
-    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return null;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
     return {
       email,
       preference: { inAppEnabled: false, emailEnabled: true, quietHoursStart: null, quietHoursEnd: null, timezone: "UTC", locale: "en" },
@@ -222,10 +220,10 @@ async function loadRecipientContext(notification: ClaimedNotification) {
 }
 
 function notificationEmail(notification: ClaimedNotification): string {
-  const marker = "\\nInvitation recipient: ";
+  const marker = "\nInvitation recipient: ";
   const index = notification.body.lastIndexOf(marker);
   if (index < 0) return "";
-  return notification.body.slice(index + marker.length).trim().split(/\\r?\\n/)[0].trim();
+  return notification.body.slice(index + marker.length).trim().split(/\r?\n/)[0].trim();
 }
 
 async function finishWithoutDelivery(
@@ -412,7 +410,7 @@ export async function runNotificationWorker(
           templateKey: notification.templateKey,
           templateVersion: notification.templateVersion,
           subject: notification.subject,
-          body: notification.body.split(/\\nInvitation recipient: /)[0],
+          body: notification.body.split(/\nInvitation recipient: /)[0],
           recipientEmail: recipient.email,
           locale: resolveEmailLocale(recipient.preference.locale),
           templateParams: parseEmailTemplateParams(notification.templateKey, notification.templateParams),
