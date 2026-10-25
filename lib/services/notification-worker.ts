@@ -108,7 +108,7 @@ async function loadRecipientContext(notification: ClaimedNotification) {
     const allowedPrefix = notification.dedupeKey.startsWith("successor-invite-") ||
       notification.dedupeKey.startsWith("continuity-warning-");
     const email = allowedPrefix ? notificationEmail(notification) : "";
-    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return null;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
     return { email, preference: {
       inAppEnabled: false, emailEnabled: true, quietHoursStart: null, quietHoursEnd: null, timezone: "UTC", locale: "en",
     }, notificationsEnabled: true, externalInvite: true };
