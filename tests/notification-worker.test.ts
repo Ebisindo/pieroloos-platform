@@ -63,6 +63,7 @@ import { runNotificationWorker } from "@/lib/services/notification-worker";
 
 const queuedEmail = {
   id: "notification-1",
+  dedupeKey: "test-notification",
   organizationId: "org-1",
   workspaceId: "workspace-1",
   recipientUserId: "user-1",
