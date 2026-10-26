@@ -44,7 +44,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This browser token is already registered to another account." }, { status: 409 });
     }
     const activeCount = await prisma.firebasePushToken.count({ where: { userId, revokedAt: null } });
-    if (!existing && activeCount >= 10 && !parsed.previousToken) {
+    const previousOwnedActive = parsed.previousToken
+      ? await prisma.firebasePushToken.findFirst({
+          where: { token: parsed.previousToken, userId, revokedAt: null },
+          select: { id: true },
+        })
+      : null;
+    if (!existing && activeCount >= 10 && !previousOwnedActive) {
       return NextResponse.json({ error: "This account has reached the active browser limit." }, { status: 429 });
     }
     await prisma.$transaction(async (tx) => {
