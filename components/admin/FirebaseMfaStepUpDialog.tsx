@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   getMultiFactorResolver,
-  multiFactor,
   PhoneAuthProvider,
   PhoneMultiFactorGenerator,
   RecaptchaVerifier,
@@ -43,7 +42,7 @@ export function FirebaseMfaStepUpDialog({ operationLabel, onVerified, onCancel }
     onCancel();
   }
 
-  async function startAuthentication(event: React.FormEvent<HTMLFormElement>) {
+  async function startAuthentication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
@@ -90,7 +89,7 @@ export function FirebaseMfaStepUpDialog({ operationLabel, onVerified, onCancel }
     }
   }
 
-  async function completeSmsChallenge(event: React.FormEvent<HTMLFormElement>) {
+  async function completeSmsChallenge(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!resolver || !verificationId) {
       setError("The SMS challenge has expired. Restart authentication.");
