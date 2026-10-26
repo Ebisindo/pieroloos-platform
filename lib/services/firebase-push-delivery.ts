@@ -56,15 +56,24 @@ export async function sendFirebasePush(input: {
     await prisma.firebasePushToken.updateMany({ where: { id: { in: invalidTokenIds } }, data: { revokedAt: new Date() } });
   }
 
+  const permanentTokenErrors = [
+    "messaging/registration-token-not-registered",
+    "messaging/invalid-registration-token",
+    "messaging/invalid-argument",
+  ];
   if (response.successCount === 0) {
     const permanent = response.failureCount > 0 && response.responses.every((result) =>
-      result.error && [
-        "messaging/registration-token-not-registered",
-        "messaging/invalid-registration-token",
-        "messaging/invalid-argument",
-      ].includes(result.error.code),
+      result.error && permanentTokenErrors.includes(result.error.code),
     );
     throw new Error(permanent ? "PUSH_PERMANENT_FAILURE" : "PUSH_PROVIDER_FAILURE");
+  }
+  // Retry the outbox item if any token had a transient failure. The stable
+  // notification tag reduces visual duplicates when a previously accepted
+  // token receives the same event again on a later attempt.
+  if (response.responses.some((result) =>
+    !result.success && result.error && !permanentTokenErrors.includes(result.error.code),
+  )) {
+    throw new Error("PUSH_PROVIDER_PARTIAL_FAILURE");
   }
   return {
     messageId: response.responses.find((result) => result.success)?.messageId ?? ("fcm:" + input.notificationId),
