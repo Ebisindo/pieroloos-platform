@@ -2190,8 +2190,10 @@ model FirebaseStepUpChallenge {
   handleHash    String   @unique
   operation     String
   sessionHash   String
-  authTime      DateTime
-  secondFactor  String
+  authTime      DateTime?
+  secondFactor  String?
+  proofHash     String?  @unique
+  verifiedAt    DateTime?
   expiresAt     DateTime
   consumedAt    DateTime?
   createdAt     DateTime @default(now())
