@@ -84,3 +84,34 @@ npm run lint
 npm test
 npm run build
 ```
+
+## Privileged-operation step-up contract (Successor & Business Continuity)
+
+**Current state:** the standard NextAuth session contains identity but does not expose a validated, recent authentication/MFA assertion. GitHub OAuth sign-in and OIDC `email_verified` are not sufficient evidence of MFA. Therefore successor/continuity POST and PATCH mutations must remain fail-closed (HTTP 503) until the checks below are implemented and independently verified.
+
+### Required provider contract
+
+Before implementing an adapter, the identity-provider owner must supply redacted documentation and a staging client configuration that establishes all of the following:
+
+1. **Provider binding:** one explicitly configured OIDC issuer and audience/client ID, using the OIDC discovery metadata/JWKS for signature verification. Do not trust issuer, audience, JWKS URL, or signing algorithm supplied by a request.
+2. **Fresh challenge:** an interactive reauthentication/step-up request with a cryptographically random, single-use state/nonce bound to the signed-in server-side user and the intended operation. A valid general login session by itself is not step-up.
+3. **Authentication recency:** validated `auth_time` no older than the configured short step-up window (default policy proposal: 5 minutes), with bounded clock skew. Require the provider-documented MFA assurance signal (for example `acr` / `amr` values only if documented and validated by the selected provider). Do not equate `email_verified`, a successful callback, an OAuth access token, a user-controlled claim, or an environment flag with MFA.
+4. **Identity binding:** validated `iss`, `aud`, `sub`, `iat`, `exp`, `nonce`, authentication time and required MFA assurance. Map `(issuer, subject)` to the local account through a trusted server-side account binding; never bind by a mutable email alone.
+5. **Replay resistance:** store a digest of the step-up transaction identifier/nonce server-side and atomically consume it once. Reject replay, expired state, wrong user, wrong operation, wrong issuer/audience, reused nonce and stale authentication. Keep the raw ID token and access token out of audit logs.
+6. **Per-request authorization:** the mutation request must carry an opaque, short-lived step-up handle or be bound to a server-managed one-time challenge. On each POST/PATCH, verify the handle against the active server-side session, subject, operation scope, expiry and unconsumed state, then consume it in the same transaction as the domain mutation/audit write. CSRF/origin, rate limits, current SuperAdmin database assignment and tenant/resource scope remain separately required.
+7. **Failure behavior:** provider outage, missing/malformed claim, unsupported assurance value, session mismatch, clock uncertainty, persistence failure, or failed audit write denies the mutation. No permissive fallback is allowed.
+
+This is an interface/acceptance contract, not a claim that any currently configured provider meets it. Exact `acr`/`amr` values and provider endpoint behavior must be supplied and reviewed before implementing the provider-specific adapter.
+
+### Required negative and integration tests
+
+Test valid fresh MFA; missing MFA; email-verified-only identity; unsupported `acr`/`amr`; forged signature; wrong issuer/audience/subject; stale `auth_time`; expired token/state; wrong nonce/state; state replay; reusing a step-up handle; using a handle for a different action; switching accounts between challenge and mutation; cross-tenant resource IDs; revoked SuperAdmin assignment; CSRF/origin rejection; provider timeout; transaction/audit failure; and concurrent claims. For every denial, assert that no successor, role, notification, provider, billing, secret or audit-success side effect occurs. Verify permitted denials are audited without recording tokens or sensitive payloads.
+
+### Controlled staging proof
+
+Use a dedicated staging OIDC client, disposable staff accounts, non-production assets and redacted claims. Capture the provider name/version, issuer and audience identifiers (not secrets), claim names and assurance semantics, test commit SHA, workflow URLs, sanitized expected/actual statuses, audit event identifiers, and reviewer decisions. Keep secret values out of GitHub comments/artifacts. Test SMTP invite delivery, expiry/replay, warning cancellation, worker-secret rejection, retry/dead-letter paths, and recovery runbook rollback separately from authentication tests.
+
+### Release gate
+
+The feature remains disabled for sensitive writes until (a) the identity-provider owner supplies the contract, (b) the adapter and negative tests pass on an exact SHA, (c) independent security/identity and database reviewers approve that SHA, and (d) staging evidence is recorded. No automatic promotion, legal ownership transfer or GitHub/Vercel/domain/secret/billing transfer may be triggered by inactivity.
+
