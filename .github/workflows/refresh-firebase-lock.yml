@@ -35,7 +35,27 @@ jobs:
           cache: npm
 
       - name: Regenerate complete npm lockfile
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund firebase-admin@13.5.0
+        run: npm install firebase-admin@13.5.0 --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Verify clean locked install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Firebase Admin lock metadata
+        shell: node {0}
+        run: |
+          const fs = require('node:fs');
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const expected = manifest.dependencies?.['firebase-admin'];
+          const root = lock.packages?.[''];
+          const resolved = lock.packages?.['node_modules/firebase-admin'];
+          if (expected !== '^13.5.0' || root?.dependencies?.['firebase-admin'] !== expected) {
+            throw new Error('firebase-admin manifest and lockfile declarations are inconsistent');
+          }
+          if (resolved?.version !== '13.5.0' || !resolved.resolved || !resolved.integrity) {
+            throw new Error('firebase-admin@13.5.0 is not fully resolved with integrity metadata');
+          }
+          console.log(`Verified firebase-admin ${resolved.version}`);
 
       - name: Commit generated lockfile when changed
         shell: bash
