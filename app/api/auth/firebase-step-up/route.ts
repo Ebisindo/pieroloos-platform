@@ -16,8 +16,10 @@ const schema = z.object({
 }).strict();
 
 function sessionBinding(session: unknown) {
-  // Session cookie/JWT itself is never persisted. This value is a random,
-  // httpOnly server-session binding when present in the signed session claims.
+  // This is a deterministic fingerprint of the current signed NextAuth session
+  // metadata, not a client-provided session identifier. It narrows reuse to the
+  // same user/session expiry. A dedicated session id is preferred in the
+  // production account/session-linking phase.
   if (!session || typeof session !== "object" || !("user" in session)) return null;
   const candidate = session as { user?: { id?: unknown }; expires?: unknown };
   if (typeof candidate.user?.id !== "string" || typeof candidate.expires !== "string") return null;
@@ -36,8 +38,11 @@ export async function POST(request: Request) {
 
   const length = Number(request.headers.get("content-length") ?? 0);
   if (length > 16_000) return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
+  let raw: string;
+  try { raw = await request.text(); } catch { return NextResponse.json({ error: "Unreadable request body." }, { status: 400 }); }
+  if (Buffer.byteLength(raw, "utf8") > 16_000) return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
   let body: unknown;
-  try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
+  try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
   const parsed = schema.safeParse(body);
   if (!parsed.success || !isStepUpOperation(parsed.data?.operation)) {
     return NextResponse.json({ error: "Invalid step-up request." }, { status: 422 });
