@@ -49,6 +49,8 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       successorIds.length = 0;
     }
     if (userIds.length > 0) {
+      // Audit rows retain actor foreign keys; remove only rows owned by disposable test actors before cleanup.
+      await prisma.platformAuditEvent.deleteMany({ where: { actorUserId: { in: userIds } } });
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
       userIds.length = 0;
     }
