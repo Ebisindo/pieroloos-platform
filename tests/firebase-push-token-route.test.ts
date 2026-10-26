@@ -7,6 +7,9 @@ const {
   tokenCountMock,
   transactionMock,
   tokenUpsertMock,
+  tokenCreateMock,
+  tokenFindFirstMock,
+  queryRawMock,
   tokenUpdateManyMock,
   preferenceUpsertMock,
 } = vi.hoisted(() => ({
@@ -16,6 +19,9 @@ const {
   tokenCountMock: vi.fn(),
   transactionMock: vi.fn(),
   tokenUpsertMock: vi.fn(),
+  tokenCreateMock: vi.fn(),
+  tokenFindFirstMock: vi.fn(),
+  queryRawMock: vi.fn(),
   tokenUpdateManyMock: vi.fn(),
   preferenceUpsertMock: vi.fn(),
 }));
@@ -26,8 +32,10 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     firebasePushToken: {
       findUnique: tokenFindUniqueMock,
+      findFirst: tokenFindFirstMock,
       count: tokenCountMock,
       upsert: tokenUpsertMock,
+      create: tokenCreateMock,
       updateMany: tokenUpdateManyMock,
     },
     notificationPreference: {
@@ -51,11 +59,22 @@ describe("Firebase push token route authorization", () => {
     });
     tokenFindUniqueMock.mockResolvedValue(null);
     tokenCountMock.mockResolvedValue(0);
+    tokenFindFirstMock.mockResolvedValue(null);
+    queryRawMock.mockResolvedValue([]);
+    tokenCreateMock.mockResolvedValue({ id: "token-1" });
     transactionMock.mockImplementation(async (operation: unknown) => {
       if (typeof operation === "function") {
         return operation({
-          firebasePushToken: { upsert: tokenUpsertMock, updateMany: tokenUpdateManyMock },
-          notificationPreference: { upsert: preferenceUpsertMock },
+          $queryRaw: queryRawMock,
+          firebasePushToken: {
+            findUnique: tokenFindUniqueMock,
+            findFirst: tokenFindFirstMock,
+            count: tokenCountMock,
+            upsert: tokenUpsertMock,
+            create: tokenCreateMock,
+            updateMany: tokenUpdateManyMock,
+          },
+          notificationPreference: { upsert: preferenceUpsertMock, updateMany: vi.fn() },
         });
       }
       return Promise.all(operation as Promise<unknown>[]);
@@ -94,8 +113,9 @@ describe("Firebase push token route authorization", () => {
       body: JSON.stringify({ token }),
     }));
     expect(response.status).toBe(409);
-    expect(transactionMock).not.toHaveBeenCalled();
-    expect(tokenUpsertMock).not.toHaveBeenCalled();
+    expect(transactionMock).toHaveBeenCalled();
+    expect(tokenCreateMock).not.toHaveBeenCalled();
+    expect(tokenUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("caps active browser registrations for a user", async () => {
@@ -106,7 +126,9 @@ describe("Firebase push token route authorization", () => {
       body: JSON.stringify({ token }),
     }));
     expect(response.status).toBe(429);
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(transactionMock).toHaveBeenCalled();
+    expect(tokenCreateMock).not.toHaveBeenCalled();
+    expect(tokenUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("rejects malformed tokens without writes", async () => {
