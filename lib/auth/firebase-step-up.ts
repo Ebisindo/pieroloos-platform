@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
-import { getApp, getApps, initializeApp, applicationDefault, cert } from "firebase-admin/app";
+import { getApps, initializeApp, applicationDefault, cert } from "firebase-admin/app";
 import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
 
 const DEFAULT_FRESHNESS_SECONDS = 5 * 60;
@@ -17,11 +17,6 @@ export type FirebaseStepUpIdentity = {
   secondFactor: string;
   issuer: string;
   audience: string;
-};
-
-export type VerifiedStepUp = FirebaseStepUpIdentity & {
-  handle: string;
-  tokenHash: string;
 };
 
 export type FirebaseStepUpErrorCode =
@@ -166,7 +161,6 @@ export async function verifyAndPrepareStepUp(idToken: string) {
     handle,
     handleHash,
     expiresAt: new Date(Math.min(identity.authTime * 1000 + DEFAULT_FRESHNESS_SECONDS * 1000, Date.now() + 2 * 60 * 1000)),
-    tokenHash: createHash("sha256").update(idToken, "utf8").digest("hex"),
   };
 }
 
