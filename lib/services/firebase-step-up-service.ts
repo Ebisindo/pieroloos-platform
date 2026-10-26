@@ -52,9 +52,15 @@ export async function beginFirebaseStepUpChallenge(input: {
   validateContext(input);
   const user = await prisma.user.findUnique({
     where: { id: input.userId },
+    select: { id: true },
+  });
+  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
+  if (!user || !projectId) throw new FirebaseStepUpError("INVALID_CHALLENGE");
+  const identity = await prisma.firebaseIdentity.findUnique({
+    where: { userId_projectId: { userId: input.userId, projectId } },
     select: { id: true, firebaseUid: true },
   });
-  if (!user?.firebaseUid) throw new FirebaseStepUpError("INVALID_CHALLENGE");
+  if (!identity) throw new FirebaseStepUpError("INVALID_CHALLENGE");
 
   const { handle, handleHash } = createOpaqueStepUpHandle();
   const now = new Date();
@@ -77,7 +83,8 @@ export async function beginFirebaseStepUpChallenge(input: {
       data: {
         id: randomUUID(),
         userId: input.userId,
-        firebaseUid: user.firebaseUid!,
+        firebaseUid: identity.firebaseUid,
+        firebaseIdentityId: identity.id,
         handleHash,
         operation: input.operation,
         sessionHash,
@@ -111,9 +118,15 @@ export async function completeFirebaseStepUpChallenge(input: {
   const identity = await verifyFirebaseMfaIdToken(input.firebaseIdToken);
   const user = await prisma.user.findUnique({
     where: { id: input.userId },
-    select: { id: true, firebaseUid: true },
+    select: { id: true },
   });
-  if (!user?.firebaseUid || user.firebaseUid !== identity.uid) {
+  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
+  if (!user || !projectId) throw new FirebaseStepUpError("INVALID_CHALLENGE");
+  const firebaseIdentity = await prisma.firebaseIdentity.findUnique({
+    where: { userId_projectId: { userId: input.userId, projectId } },
+    select: { id: true, firebaseUid: true, projectId: true },
+  });
+  if (!firebaseIdentity || firebaseIdentity.firebaseUid !== identity.uid || firebaseIdentity.projectId !== identity.audience) {
     throw new FirebaseStepUpError("INVALID_CHALLENGE");
   }
 
@@ -129,6 +142,7 @@ export async function completeFirebaseStepUpChallenge(input: {
         where: {
           userId: input.userId,
           firebaseUid: identity.uid,
+          firebaseIdentityId: firebaseIdentity.id,
           operation: input.operation,
           sessionHash,
           handleHash,
@@ -147,6 +161,7 @@ export async function completeFirebaseStepUpChallenge(input: {
         where: {
           id: challenge.id,
           userId: input.userId,
+          firebaseIdentityId: firebaseIdentity.id,
           operation: input.operation,
           sessionHash,
           handleHash,
