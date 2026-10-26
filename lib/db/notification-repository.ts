@@ -42,6 +42,7 @@ export const notificationRepository = {
         organizationId: principal.organizationId,
         workspaceId: principal.workspaceId,
         recipientUserId: principal.userId,
+        channel: "IN_APP",
         status: { not: "CANCELLED" },
         scheduledFor: { lte: new Date() },
       },
