@@ -129,7 +129,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const access = await guard(request);
   if ("error" in access) return access.error;
-  if (!("sessionId" in access)) return NextResponse.json({ error: "A signed session binding is required." }, { status: 401 });
+  const sessionId = access.sessionId;
+  if (typeof sessionId !== "string" || sessionId.length < 20) return NextResponse.json({ error: "A signed session binding is required." }, { status: 401 });
 
   const parsedBody = await jsonBody(request);
   if (!parsedBody.ok) return parsedBody.response;
@@ -146,23 +147,23 @@ export async function PATCH(request: Request) {
 
   try {
     if (parsed.data.action === "alive") {
-      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:owner-alive", handle, (tx) => confirmOwnerAlive(access.actor, tx));
+      const data = await inStepUpTransaction(access.actor.userId, sessionId, "continuity:owner-alive", handle, (tx) => confirmOwnerAlive(access.actor, tx));
       return NextResponse.json({ data });
     }
     if (parsed.data.action === "simulate" && parsed.data.successorId) {
-      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:simulate", handle, (tx) => simulateHandover(access.actor, parsed.data.successorId!, tx));
+      const data = await inStepUpTransaction(access.actor.userId, sessionId, "continuity:simulate", handle, (tx) => simulateHandover(access.actor, parsed.data.successorId!, tx));
       return NextResponse.json({ data });
     }
     if (parsed.data.action === "revoke" && parsed.data.successorId && parsed.data.reason) {
-      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:revoke", handle, (tx) => revokeSuccessor(access.actor, parsed.data.successorId!, parsed.data.reason!, tx));
+      const data = await inStepUpTransaction(access.actor.userId, sessionId, "continuity:revoke", handle, (tx) => revokeSuccessor(access.actor, parsed.data.successorId!, parsed.data.reason!, tx));
       return NextResponse.json({ data });
     }
     if (parsed.data.action === "asset" && parsed.data.asset) {
-      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:create-asset", handle, (tx) => createContinuityAsset(access.actor, parsed.data.asset!, tx));
+      const data = await inStepUpTransaction(access.actor.userId, sessionId, "continuity:create-asset", handle, (tx) => createContinuityAsset(access.actor, parsed.data.asset!, tx));
       return NextResponse.json({ data }, { status: 201 });
     }
     if (parsed.data.action === "runbook" && parsed.data.runbook) {
-      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:save-runbook", handle, (tx) => saveRunbook(access.actor, parsed.data.runbook!, tx));
+      const data = await inStepUpTransaction(access.actor.userId, sessionId, "continuity:save-runbook", handle, (tx) => saveRunbook(access.actor, parsed.data.runbook!, tx));
       return NextResponse.json({ data }, { status: 201 });
     }
     return NextResponse.json({ error: "Required action fields are missing." }, { status: 422 });
