@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
   FirebaseStepUpError,
@@ -38,13 +39,9 @@ export async function createFirebaseStepUpChallenge(input: {
   }
 
   const proof = await verifyAndPrepareStepUp(input.firebaseIdToken);
-  const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true } });
-  if (!user) throw new FirebaseStepUpError("INVALID_CHALLENGE");
-
-  // Never establish the local-account/Firebase relationship via email.
-  // The configured Firebase UID must be explicitly mapped by an authorized operator.
-  const allowedUid = process.env[`FIREBASE_UID_MAP_${input.userId}`]?.trim();
-  if (!allowedUid || allowedUid !== proof.identity.uid) {
+  const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true, firebaseUid: true } });
+  // Binding is durable and unique in PostgreSQL. Mutable email is never an identity key.
+  if (!user?.firebaseUid || user.firebaseUid !== proof.identity.uid) {
     throw new FirebaseStepUpError("INVALID_CHALLENGE");
   }
 
@@ -76,7 +73,7 @@ export async function createFirebaseStepUpChallenge(input: {
  * challenge consumption in a separate transaction from the operation.
  */
 export async function consumeFirebaseStepUpChallenge(
-  tx: { firebaseStepUpChallenge: { updateMany(args: unknown): Promise<{ count: number }> } },
+  tx: { firebaseStepUpChallenge: { updateMany(args: Prisma.FirebaseStepUpChallengeUpdateManyArgs): Promise<Prisma.BatchPayload> } },
   input: { userId: string; sessionId: string; operation: StepUpOperation; handle: string },
 ) {
   if (!input.userId || !input.sessionId || !isStepUpOperation(input.operation)) {
@@ -94,7 +91,7 @@ export async function consumeFirebaseStepUpChallenge(
       expiresAt: { gt: consumedAt },
     },
     data: { consumedAt },
-  } as never);
+  });
 
   if (result.count !== 1) throw new FirebaseStepUpError("INVALID_CHALLENGE");
   return { consumedAt };
