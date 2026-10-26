@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 const { prismaMock, verifyMock, hashMock, randomHandleMock } = vi.hoisted(() => ({
   prismaMock: {
     user: { findUnique: vi.fn() },
+    firebaseIdentity: { findUnique: vi.fn() },
     firebaseStepUpChallenge: { create: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn(), deleteMany: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -47,7 +48,9 @@ const txMock = {
 describe("Firebase step-up challenge service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prismaMock.user.findUnique.mockResolvedValue({ id: userId, firebaseUid: uid });
+    process.env.FIREBASE_PROJECT_ID = "pieroloos-platform";
+    prismaMock.user.findUnique.mockResolvedValue({ id: userId });
+    prismaMock.firebaseIdentity.findUnique.mockResolvedValue({ id: "firebase-identity-1", firebaseUid: uid, projectId: "pieroloos-platform" });
     prismaMock.$transaction.mockImplementation(async (work) => work(txMock));
     txMock.firebaseStepUpChallenge.create.mockResolvedValue({ id: "challenge-1" });
     txMock.firebaseStepUpChallenge.updateMany.mockResolvedValue({ count: 1 });
@@ -93,8 +96,8 @@ describe("Firebase step-up challenge service", () => {
     expect(JSON.stringify(txMock.firebaseStepUpChallenge.create.mock.calls)).not.toContain(nonce);
   });
 
-  it("refuses to create a challenge without a durable Firebase UID mapping", async () => {
-    prismaMock.user.findUnique.mockResolvedValue({ id: userId, firebaseUid: null });
+  it("refuses to create a challenge without a durable Firebase identity mapping", async () => {
+    prismaMock.firebaseIdentity.findUnique.mockResolvedValue(null);
     await expect(beginFirebaseStepUpChallenge({ userId, sessionId, operation })).rejects.toThrow();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
