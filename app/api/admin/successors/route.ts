@@ -7,6 +7,7 @@ import { enforceRateLimit, PLATFORM_ADMIN_MUTATION_LIMIT } from "@/lib/http/rate
 import { prisma } from "@/lib/db/prisma";
 import { getSessionBinding } from "@/lib/auth/session-binding";
 import { consumeFirebaseStepUpChallenge, type StepUpOperation } from "@/lib/services/firebase-step-up-service";
+import { FirebaseStepUpError } from "@/lib/auth/firebase-step-up";
 import { addSuccessor, confirmOwnerAlive, createContinuityAsset, listSuccessors, revokeSuccessor, saveRunbook, simulateHandover } from "@/lib/services/successor-continuity-service";
 
 const permissionsSchema = z.object({ canTransferOwnership: z.boolean(), canAccessSecrets: z.boolean(), canDeploy: z.boolean(), canAccessBilling: z.boolean() }).strict();
@@ -71,7 +72,6 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await guard(request);
   if ("error" in access) return access.error;
-  if (!access.sessionBinding) return NextResponse.json({ error: "A valid signed session cookie is required." }, { status: 401 });
   const sessionBinding = access.sessionBinding;
   if (!sessionBinding) return NextResponse.json({ error: "A valid signed session cookie is required." }, { status: 401 });
   const parsedBody = await jsonBody(request);
@@ -117,6 +117,10 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ data: { ...invite.successor, invitationDelivery: "QUEUED" }, message: "Invitation queued for email delivery." }, { status: 201 });
   } catch (error) {
+    if (error instanceof FirebaseStepUpError) {
+      const status = error.code === "NOT_CONFIGURED" ? 503 : 401;
+      return NextResponse.json({ error: status === 503 ? "Firebase step-up is not configured." : "The step-up handle is invalid, expired, replayed, or bound to another operation/session." }, { status });
+    }
     if (error instanceof Error && error.message === "SUCCESSOR_ALREADY_EXISTS") return NextResponse.json({ error: "A non-revoked successor already uses this email." }, { status: 409 });
     if (error instanceof Error && error.message === "HIGH_PERMISSION_VERIFICATION_REQUIRED") return NextResponse.json({ error: "A documented video/ID verification plan is required for secret access." }, { status: 422 });
     if (error instanceof Error && error.message === "SUPER_ADMIN_REQUIRED") return NextResponse.json({ error: "Super Administrator access required." }, { status: 403 });
@@ -132,7 +136,6 @@ export async function PATCH(request: Request) {
   if (!sessionBinding) return NextResponse.json({ error: "A valid signed session cookie is required." }, { status: 401 });
   const parsedBody = await jsonBody(request);
   if (!parsedBody.ok) return parsedBody.response;
-  if (!access.sessionBinding) return NextResponse.json({ error: "A valid signed session cookie is required." }, { status: 401 });
   const parsed = z.object({
     action: z.enum(["alive", "simulate", "revoke", "asset", "runbook"]),
     stepUpHandle: stepUpHandleSchema,
@@ -154,7 +157,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ data: await withStepUp(access.actor, sessionBinding, stepUpOperationByAction.alive, stepUpHandle, (tx) => confirmOwnerAlive(access.actor, tx)) });
     }
     if (actionInput.action === "simulate" && actionInput.successorId) {
-      return NextResponse.json({ data: await withStepUp(access.actor, access.sessionBinding, stepUpOperationByAction.simulate, stepUpHandle, (tx) => simulateHandover(access.actor, actionInput.successorId!, tx)) });
+      return NextResponse.json({ data: await withStepUp(access.actor, sessionBinding, stepUpOperationByAction.simulate, stepUpHandle, (tx) => simulateHandover(access.actor, actionInput.successorId!, tx)) });
     }
     if (actionInput.action === "revoke" && actionInput.successorId && actionInput.reason) {
       return NextResponse.json({ data: await withStepUp(access.actor, access.sessionBinding, stepUpOperationByAction.revoke, stepUpHandle, (tx) => revokeSuccessor(access.actor, actionInput.successorId!, actionInput.reason!, tx)) });
@@ -167,6 +170,10 @@ export async function PATCH(request: Request) {
     }
     return NextResponse.json({ error: "Required action fields are missing." }, { status: 422 });
   } catch (error) {
+    if (error instanceof FirebaseStepUpError) {
+      const status = error.code === "NOT_CONFIGURED" ? 503 : 401;
+      return NextResponse.json({ error: status === 503 ? "Firebase step-up is not configured." : "The step-up handle is invalid, expired, replayed, or bound to another operation/session." }, { status });
+    }
     if (error instanceof Error && error.message === "SUCCESSOR_NOT_FOUND") return NextResponse.json({ error: "Successor not found." }, { status: 404 });
     if (error instanceof Error && error.message === "ACTIVE_SUCCESSOR_REQUIRES_RECOVERY_REVIEW") return NextResponse.json({ error: "An active successor requires an independently evidenced recovery review; self-service revoke is blocked." }, { status: 409 });
     if (error instanceof Error && error.message === "RUNBOOK_NOT_FOUND") return NextResponse.json({ error: "Runbook not found." }, { status: 404 });
