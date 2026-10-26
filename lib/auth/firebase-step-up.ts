@@ -82,6 +82,9 @@ export function verifyFreshFirebaseMfaClaims(
   const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
   const maxAge = options.maxAgeSeconds ?? DEFAULT_FRESHNESS_SECONDS;
   const expectedIssuer = `https://securetoken.google.com/${options.projectId}`;
+  if (!options.projectId || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(options.projectId)) {
+    throw new FirebaseStepUpError("NOT_CONFIGURED");
+  }
   if (
     token.aud !== options.projectId ||
     token.iss !== expectedIssuer ||
@@ -100,7 +103,8 @@ export function verifyFreshFirebaseMfaClaims(
     issuedAt > now + CLOCK_SKEW_SECONDS ||
     expiresAt <= now ||
     issuedAt < authTime ||
-    now - authTime > maxAge
+    now - authTime > maxAge ||
+    now - issuedAt > maxAge + CLOCK_SKEW_SECONDS
   ) {
     throw new FirebaseStepUpError("STALE_AUTHENTICATION");
   }
