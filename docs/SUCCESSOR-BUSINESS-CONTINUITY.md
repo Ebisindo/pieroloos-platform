@@ -36,3 +36,25 @@ The `lastOwnerActivityAt` heartbeat is updated by authenticated owner activity a
 ## Transmission package inventory
 
 Track GitHub organization/repositories, deployment projects, domains/DNS, database connection location (never its value), billing account recovery route, identity provider, object storage, CI/CD, DNS, monitoring, backups, secret-manager/vault location, key owners, and provider support/recovery URLs. Store references and recovery procedures—not credentials—in the package.
+
+## Release-gate evidence record — 2026-10-26
+
+Latest verified repository head at this review: `175b75f2035761f0d13e6bb6d82c7ae2a1945aad` (merge of the continuity mutation fail-closed and invitation-race test work).
+
+GitHub Actions evidence for that exact SHA:
+- [CI workflow](https://github.com/Ebisindo/pieroloos-platform/actions/runs/40296961358): `quality` and `e2e` completed successfully. The quality job covered database validation/migration and integrity checks, lint, TypeScript, unit tests, and production build; the E2E job covered production build and Playwright browser tests.
+- [Security workflow](https://github.com/Ebisindo/pieroloos-platform/actions/runs/40296961360): CodeQL, Gitleaks secret-history scanning, and dependency audit completed successfully.
+
+These are automated repository checks—not proof that the configured production identity provider supplies a trusted MFA/step-up assertion, that production SMTP/KMS/provider recovery works, or that independent reviewers have approved the operational design. No production readiness claim should be inferred from CI success.
+
+### Remaining release blockers (must be evidenced, not inferred)
+
+- [ ] Identity-provider owner supplies redacted provider documentation/configuration and a server-side claim-validation contract proving issuer/audience, recent authentication, MFA assurance, subject binding, expiry, and replay resistance. Never attach tokens, private keys, credentials, or unredacted personal data.
+- [ ] Security/identity reviewer independent of the change author reviews the provider evidence and negative tests (forged, stale, wrong issuer/audience, expired, replayed).
+- [ ] Database reviewer independent of the change author reviews migration/schema, concurrency tests, transaction rollback, cleanup isolation, and mutation inventory.
+- [ ] Both reviewers explicitly approve the exact candidate SHA. Any subsequent code change requires new checks and review on its new SHA.
+- [ ] Staging evidence verifies SMTP delivery/retries/dead-letter handling, warning cancellation, worker authentication, idempotency, invite expiry/replay, rate limiting, and rollback.
+- [ ] Production KMS envelope encryption and provider-specific recovery procedures are implemented and independently tested before encrypted owner notes or sensitive recovery operations can be enabled.
+
+Until every applicable gate is evidenced and reviewed, keep continuity mutations fail-closed. The current worker may create an audited review package only; it must not grant SuperAdmin access or transfer legal ownership, repositories, deployments, secrets, domains, or billing based only on inactivity.
+
