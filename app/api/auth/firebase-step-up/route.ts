@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/auth";
@@ -15,22 +14,12 @@ const schema = z.object({
   firebaseIdToken: z.string().min(100).max(12_000),
 }).strict();
 
-function sessionBinding(session: unknown) {
-  // This is a deterministic fingerprint of the current signed NextAuth session
-  // metadata, not a client-provided session identifier. It narrows reuse to the
-  // same user/session expiry. A dedicated session id is preferred in the
-  // production account/session-linking phase.
-  if (!session || typeof session !== "object" || !("user" in session)) return null;
-  const candidate = session as { user?: { id?: unknown }; expires?: unknown };
-  if (typeof candidate.user?.id !== "string" || typeof candidate.expires !== "string") return null;
-  return createHash("sha256").update(`${candidate.user.id}\0${candidate.expires}`).digest("hex");
-}
 
 export async function POST(request: Request) {
   const session = await auth();
   const userId = session?.user?.id;
-  const binding = sessionBinding(session);
-  if (!userId || !binding) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const binding = session?.stepUpSessionId;
+  if (!userId || typeof binding !== "string" || binding.length < 20 || binding.length > 200) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   if (hasInvalidRequestOrigin(request)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
 
   const limit = await enforceRateLimit(PLATFORM_ADMIN_MUTATION_LIMIT, `firebase-step-up:${userId}`);
