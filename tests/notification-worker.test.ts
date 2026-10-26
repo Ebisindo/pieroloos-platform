@@ -14,6 +14,7 @@ const {
   workspaceSettingsFindUniqueMock,
   transactionMock,
   sendEmailMock,
+  sendPushMock,
 } = vi.hoisted(() => ({
   notificationFindManyMock: vi.fn(),
   notificationUpdateManyMock: vi.fn(),
@@ -28,6 +29,7 @@ const {
   workspaceSettingsFindUniqueMock: vi.fn(),
   transactionMock: vi.fn(),
   sendEmailMock: vi.fn(),
+  sendPushMock: vi.fn(),
 }));
 
 const transaction = {
@@ -57,6 +59,9 @@ vi.mock("@/lib/db/prisma", () => ({
 }));
 vi.mock("@/lib/services/notification-email", () => ({
   sendNotificationEmail: sendEmailMock,
+}));
+vi.mock("@/lib/services/firebase-push-delivery", () => ({
+  sendFirebasePush: sendPushMock,
 }));
 
 import { runNotificationWorker } from "@/lib/services/notification-worker";
@@ -92,6 +97,7 @@ describe("notification background worker", () => {
     preferenceFindUniqueMock.mockReset().mockResolvedValue({
       inAppEnabled: true,
       emailEnabled: true,
+      pushEnabled: true,
       quietHoursStart: null,
       quietHoursEnd: null,
       timezone: "UTC",
@@ -105,6 +111,10 @@ describe("notification background worker", () => {
     sendEmailMock.mockReset().mockResolvedValue({
       messageId: "<receipt@example.com>",
       response: "250 accepted",
+    });
+    sendPushMock.mockReset().mockResolvedValue({
+      messageId: "projects/staging/messages/push-receipt",
+      receipt: "accepted=1;failed=0",
     });
   });
 
@@ -124,6 +134,50 @@ describe("notification background worker", () => {
       data: expect.objectContaining({
         status: "SENT",
         deliveryReceipt: "250 accepted",
+      }),
+    }));
+  });
+
+  it("sends opted-in PUSH outbox rows through Firebase Admin and records provider acceptance", async () => {
+    notificationFindManyMock.mockResolvedValueOnce([{ ...queuedEmail, channel: "PUSH" as const }]);
+
+    const result = await runNotificationWorker(new Date("2026-10-06T06:30:00Z"));
+
+    expect(result).toMatchObject({ claimed: 1, delivered: 1, retried: 0 });
+    expect(sendPushMock).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user-1",
+      title: "Action needs attention",
+      body: "Please review.",
+      notificationId: "notification-1",
+    }));
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "SENT",
+        deliveryReceipt: "accepted=1;failed=0",
+      }),
+    }));
+  });
+
+  it("retries transient Firebase push provider failures with bounded backoff", async () => {
+    notificationFindManyMock.mockResolvedValueOnce([{ ...queuedEmail, channel: "PUSH" as const }]);
+    sendPushMock.mockRejectedValueOnce(Object.assign(new Error("PUSH_PROVIDER_PARTIAL_FAILURE"), { code: "ETIMEDOUT" }));
+    const now = new Date("2026-10-06T06:30:00Z");
+
+    const result = await runNotificationWorker(now);
+
+    expect(result).toMatchObject({ claimed: 1, retried: 1, deadLettered: 0 });
+    expect(attemptUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "RETRYABLE_FAILURE",
+        failureCode: "ETIMEDOUT",
+        failureMessage: "Notification delivery failed (ETIMEDOUT).",
+      }),
+    }));
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "QUEUED",
+        nextAttemptAt: new Date(now.getTime() + 30_000),
       }),
     }));
   });
