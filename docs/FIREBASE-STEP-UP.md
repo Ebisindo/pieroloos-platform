@@ -4,7 +4,7 @@ Firebase project: `pieroloos-platform`.
 
 ## Intended security boundary
 
-This is a secondary, provider-backed step-up control for the current PieroloOS Super Administrator session. It does not replace the existing NextAuth session or create an administrative grant. The current local user and Firebase user are paired by a durable, unique `User.firebaseUid` association created only through an audited operator workflow.
+This is a secondary, provider-backed step-up control for the current PieroloOS Super Administrator session. It does not replace the existing NextAuth session or create an administrative grant. The current local user and Firebase user are paired through the `FirebaseIdentity` registry. `(userId, projectId)` and `(projectId, firebaseUid)` are unique; the mapping references the operator and a corresponding `PlatformAuditEvent`.
 
 ## Configuration
 
@@ -25,7 +25,7 @@ The current UI implementation authenticates an email/password Firebase staff acc
 
 ## Durable UID association
 
-The `FirebaseStepUpChallenge` service checks the mapped `User.firebaseUid`; it never matches a Firebase identity by email. The field is unique in PostgreSQL. Link an existing staff account from a trusted operator workspace after the target Firebase UID has been verified through an approved out-of-band process and the user is enrolled in MFA:
+The `FirebaseStepUpChallenge` service checks the mapped `FirebaseIdentity` row; it never matches a Firebase identity by email. Link an existing staff account from a trusted operator workspace after the target Firebase UID has been verified through an approved out-of-band process and the user is enrolled in MFA:
 
 ```bash
 npm run admin:link-firebase-uid -- \
@@ -35,7 +35,7 @@ npm run admin:link-firebase-uid -- \
   --confirm
 ```
 
-The script verifies that the actor is the currently provisioned Super Administrator, the target is an existing staff account, the Firebase user exists and is enabled, and at least one MFA factor is enrolled. It writes the unique mapping and an audit event in the same serializable database transaction. It will not overwrite an existing mapping; reassignment requires a separately reviewed recovery procedure.
+The script verifies that the actor is the currently provisioned Super Administrator, the target is an existing staff account, the Firebase user exists and is enabled, and at least one MFA factor is enrolled. It writes the `FirebaseIdentity` row and linked audit event in the same serializable database transaction. It will not overwrite an existing mapping; reassignment requires a separately reviewed recovery procedure.
 
 Run the command only against the intended staging database and the intended Firebase project when validating staging. Do not paste real account IDs, private keys, passwords or MFA codes into GitHub issues or pull requests.
 
