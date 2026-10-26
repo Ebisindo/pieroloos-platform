@@ -7,6 +7,8 @@ import { prisma } from "@/lib/db/prisma";
 function firebaseAdminApp() {
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
   if (!projectId || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId)) throw new Error("FIREBASE_PUSH_NOT_CONFIGURED");
+  const clientProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
+  if (clientProjectId && clientProjectId !== projectId) throw new Error("FIREBASE_PUSH_PROJECT_MISMATCH");
   const name = "pieroloos-push-delivery";
   const existing = getApps().find((app) => app.name === name);
   if (existing) {
