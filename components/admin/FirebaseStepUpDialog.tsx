@@ -147,6 +147,10 @@ export function FirebaseStepUpDialog({
       const idToken = await credential.user.getIdToken(true);
       await issueStepUp(idToken, nonce);
     } catch (cause) {
+      // Any partially successful Firebase sign-in is disposable proof, not an
+      // application session. Clear it on every early error path as well.
+      try { await signOut(getStepUpAuth()); } catch { /* Client config may itself be unavailable. */ }
+      setPassword("");
       setError(cause instanceof Error ? cause.message : "Firebase step-up could not be started.");
     } finally {
       setBusy(false);
@@ -166,6 +170,10 @@ export function FirebaseStepUpDialog({
       const idToken = await signedIn.user.getIdToken(true);
       await issueStepUp(idToken, challengeNonce);
     } catch (cause) {
+      // Failed MFA resolution or token acquisition must not leave a Firebase
+      // user signed into the browser after the protected action was rejected.
+      try { await signOut(getStepUpAuth()); } catch { /* Ignore cleanup-only failures. */ }
+      setPassword("");
       setError(cause instanceof Error ? cause.message : "The verification code was not accepted.");
     } finally {
       setBusy(false);
