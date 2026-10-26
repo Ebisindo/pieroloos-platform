@@ -61,7 +61,6 @@ async function main() {
     where: { id: userId },
     select: {
       id: true,
-      firebaseUid: true,
       memberships: { select: { id: true }, take: 1 },
       platformAdministrator: { select: { id: true } },
       platformSuperAdmin: { select: { id: true } },
@@ -70,17 +69,21 @@ async function main() {
   if (!target || (!target.memberships.length && !target.platformAdministrator && !target.platformSuperAdmin)) {
     throw new Error("Target must be an existing staff account with a membership or platform-admin record.");
   }
-  if (target.firebaseUid === firebaseUid) {
+  const existingForUser = await prisma.firebaseIdentity.findUnique({
+    where: { userId_projectId: { userId, projectId } },
+    select: { firebaseUid: true },
+  });
+  if (existingForUser?.firebaseUid === firebaseUid) {
     console.log("This Firebase UID is already linked to this local user; no change made.");
     return;
   }
-  if (target.firebaseUid) {
-    throw new Error("This local user already has a Firebase UID; reassignment requires a separately reviewed recovery procedure.");
+  if (existingForUser) {
+    throw new Error("This local user already has a Firebase identity; reassignment requires a separately reviewed recovery procedure.");
   }
 
-  const duplicate = await prisma.user.findUnique({
-    where: { firebaseUid },
-    select: { id: true },
+  const duplicate = await prisma.firebaseIdentity.findUnique({
+    where: { projectId_firebaseUid: { projectId, firebaseUid } },
+    select: { userId: true },
   });
   if (duplicate) throw new Error("This Firebase UID is already linked to another local user.");
 
@@ -92,29 +95,44 @@ async function main() {
   await prisma.$transaction(async (tx) => {
     const current = await tx.user.findUnique({
       where: { id: userId },
-      select: { firebaseUid: true },
+      select: { id: true },
     });
-    if (!current || current.firebaseUid) {
-      throw new Error("Target Firebase UID mapping changed concurrently; retry after review.");
+    if (!current) throw new Error("Target user no longer exists.");
+    const linkedForUser = await tx.firebaseIdentity.findUnique({
+      where: { userId_projectId: { userId, projectId } },
+      select: { id: true },
+    });
+    const linkedForUid = await tx.firebaseIdentity.findUnique({
+      where: { projectId_firebaseUid: { projectId, firebaseUid } },
+      select: { id: true },
+    });
+    if (linkedForUser || linkedForUid) {
+      throw new Error("Firebase identity was linked concurrently; no reassignment was performed.");
     }
-    const updated = await tx.user.updateMany({
-      where: { id: userId, firebaseUid: null },
-      data: { firebaseUid },
-    });
-    if (updated.count !== 1) throw new Error("Firebase UID mapping could not be committed.");
-    await tx.platformAuditEvent.create({
+    const audit = await tx.platformAuditEvent.create({
       data: {
         actorUserId,
         actorRole: "SUPER_ADMIN",
-        action: "FIREBASE_UID_LINKED",
-        subjectType: "USER",
-        subjectId: userId,
+        action: "FIREBASE_IDENTITY_LINKED",
+        subjectType: "FIREBASE_IDENTITY",
+        subjectId: firebaseUid,
         outcome: "SUCCESS",
         details: {
           firebaseProjectId: projectId,
           firebaseUid,
+          localUserId: userId,
           enrolledMfaFactors: enrolledFactors.length,
         },
+      },
+      select: { id: true },
+    });
+    await tx.firebaseIdentity.create({
+      data: {
+        userId,
+        projectId,
+        firebaseUid,
+        linkedByUserId: actorUserId,
+        auditEventId: audit.id,
       },
     });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
