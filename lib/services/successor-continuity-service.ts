@@ -12,6 +12,15 @@ async function assertCurrentSuperAdmin(tx: Prisma.TransactionClient, userId: str
   if (current?.userId !== userId) throw new Error("SUPER_ADMIN_REQUIRED");
 }
 
+async function runInTransaction<T>(
+  transactionClient: Prisma.TransactionClient | undefined,
+  operation: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  if (transactionClient) return operation(transactionClient);
+  return prisma.$transaction(operation, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
+
+
 export async function listSuccessors(actor: PlatformActor) {
   requireSuperAdmin(actor);
   const successors = await prisma.successor.findMany({
@@ -88,9 +97,9 @@ export async function addSuccessor(actor: PlatformActor, input: {
   return { successor: created, token };
 }
 
-export async function revokeSuccessor(actor: PlatformActor, successorId: string, reason: string) {
+export async function revokeSuccessor(actor: PlatformActor, successorId: string, reason: string, transactionClient?: Prisma.TransactionClient) {
   requireSuperAdmin(actor);
-  return prisma.$transaction(async (tx) => {
+  return runInTransaction(transactionClient, async (tx) => {
     await assertCurrentSuperAdmin(tx, actor.userId);
     const successor = await tx.successor.findFirst({ where: { id: successorId, ownerId: actor.userId } });
     if (!successor) throw new Error("SUCCESSOR_NOT_FOUND");
@@ -110,13 +119,13 @@ export async function revokeSuccessor(actor: PlatformActor, successorId: string,
       reason: reason.trim(), details: { previousStatus: successor.status },
     } });
     return updated;
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  });
 }
 
-export async function confirmOwnerAlive(actor: PlatformActor) {
+export async function confirmOwnerAlive(actor: PlatformActor, transactionClient?: Prisma.TransactionClient) {
   requireSuperAdmin(actor);
   const now = new Date();
-  return prisma.$transaction(async (tx) => {
+  return runInTransaction(transactionClient, async (tx) => {
     await assertCurrentSuperAdmin(tx, actor.userId);
     const updated = await tx.successor.updateMany({
       where: { ownerId: actor.userId, status: { in: [SuccessorStatus.PENDING, SuccessorStatus.ACCEPTED, SuccessorStatus.ACTIVE] } },
@@ -131,34 +140,37 @@ export async function confirmOwnerAlive(actor: PlatformActor) {
       subjectType: "SUCCESSOR_PROTOCOL", outcome: "SUCCESS", details: { successorRecordsReset: updated.count },
     } });
     return { resetAt: now.toISOString(), successorRecordsReset: updated.count };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  });
 }
 
-export async function simulateHandover(actor: PlatformActor, successorId: string) {
+export async function simulateHandover(actor: PlatformActor, successorId: string, transactionClient?: Prisma.TransactionClient) {
   requireSuperAdmin(actor);
-  const successor = await prisma.successor.findFirst({
-    where: { id: successorId, ownerId: actor.userId },
-    select: { id: true, successorName: true, status: true, verificationLevel: true, permissions: true, autoActivateAfterDays: true },
+  return runInTransaction(transactionClient, async (tx) => {
+    await assertCurrentSuperAdmin(tx, actor.userId);
+    const successor = await tx.successor.findFirst({
+      where: { id: successorId, ownerId: actor.userId },
+      select: { id: true, successorName: true, status: true, verificationLevel: true, permissions: true, autoActivateAfterDays: true },
+    });
+    if (!successor) throw new Error("SUCCESSOR_NOT_FOUND");
+    await tx.platformAuditEvent.create({ data: {
+      actorUserId: actor.userId, actorRole: "SUPER_ADMIN", action: "handover_simulated",
+      subjectType: "SUCCESSOR", subjectId: successorId, outcome: "SUCCESS",
+      details: { status: successor.status, noPrivilegesGranted: true, noProviderStateChanged: true },
+    } });
+    return {
+      successor: successor.successorName, currentStatus: successor.status,
+      verificationLevel: successor.verificationLevel, triggerDays: successor.autoActivateAfterDays,
+      permissions: permissionsAreValid(successor.permissions) ? successor.permissions : null,
+      safeguards: ["No privileges granted", "No ownership changed", "No credentials accessed", "No external providers contacted"],
+    };
   });
-  if (!successor) throw new Error("SUCCESSOR_NOT_FOUND");
-  await prisma.platformAuditEvent.create({ data: {
-    actorUserId: actor.userId, actorRole: "SUPER_ADMIN", action: "handover_simulated",
-    subjectType: "SUCCESSOR", subjectId: successorId, outcome: "SUCCESS",
-    details: { status: successor.status, noPrivilegesGranted: true, noProviderStateChanged: true },
-  } });
-  return {
-    successor: successor.successorName, currentStatus: successor.status,
-    verificationLevel: successor.verificationLevel, triggerDays: successor.autoActivateAfterDays,
-    permissions: permissionsAreValid(successor.permissions) ? successor.permissions : null,
-    safeguards: ["No privileges granted", "No ownership changed", "No credentials accessed", "No external providers contacted"],
-  };
 }
 
 export async function createContinuityAsset(actor: PlatformActor, input: {
   assetType: string; label: string; recoveryLocation: string; criticality: string; notes?: string;
-}) {
+}, transactionClient?: Prisma.TransactionClient) {
   requireSuperAdmin(actor);
-  return prisma.$transaction(async (tx) => {
+  return runInTransaction(transactionClient, async (tx) => {
     await assertCurrentSuperAdmin(tx, actor.userId);
     const asset = await tx.continuityAsset.create({ data: {
       ownerId: actor.userId, assetType: input.assetType.trim(), label: input.label.trim(),
@@ -171,12 +183,12 @@ export async function createContinuityAsset(actor: PlatformActor, input: {
       details: { assetType: asset.assetType, criticality: asset.criticality },
     } });
     return asset;
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  });
 }
 
-export async function saveRunbook(actor: PlatformActor, input: { id?: string; title: string; content: string }) {
+export async function saveRunbook(actor: PlatformActor, input: { id?: string; title: string; content: string }, transactionClient?: Prisma.TransactionClient) {
   requireSuperAdmin(actor);
-  return prisma.$transaction(async (tx) => {
+  return runInTransaction(transactionClient, async (tx) => {
     await assertCurrentSuperAdmin(tx, actor.userId);
     const runbook = input.id
       ? await tx.continuityRunbook.updateMany({ where: { id: input.id, ownerId: actor.userId }, data: { title: input.title.trim(), content: input.content.trim(), version: { increment: 1 }, reviewedAt: null } }).then(async (result) => {
@@ -190,7 +202,7 @@ export async function saveRunbook(actor: PlatformActor, input: { id?: string; ti
       details: { version: runbook.version },
     } });
     return runbook;
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  });
 }
 
 export async function recordSuperAdminContinuityActivity(userId: string) {
