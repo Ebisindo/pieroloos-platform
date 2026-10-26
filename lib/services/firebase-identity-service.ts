@@ -39,7 +39,6 @@ export async function linkCurrentSuperAdminFirebaseIdentity(input: {
 
   if (
     identity.audience !== projectId ||
-    identity.issuer !== `https://securetoken.google.com/${projectId}` ||
     !identity.uid ||
     !identity.secondFactor ||
     !Number.isSafeInteger(identity.authTime) ||
