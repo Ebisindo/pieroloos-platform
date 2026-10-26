@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 
+vi.mock("server-only", () => ({}));
+
 const { prismaMock, verifyMock, hashMock, randomHandleMock } = vi.hoisted(() => ({
   prismaMock: {
     user: { findUnique: vi.fn() },
