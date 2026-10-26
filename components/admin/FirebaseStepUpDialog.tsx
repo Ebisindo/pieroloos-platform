@@ -26,7 +26,7 @@ function getStepUpAuth() {
   const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim();
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
   const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim();
-  if (!apiKey || !authDomain || projectId !== "pieroloos-platform" || !appId) {
+  if (!apiKey || !authDomain || !projectId || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId) || !appId) {
     throw new Error("Firebase step-up client configuration is incomplete.");
   }
   const name = "pieroloos-continuity-step-up";
