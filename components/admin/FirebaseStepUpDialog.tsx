@@ -9,6 +9,7 @@ import {
   PhoneMultiFactorGenerator,
   RecaptchaVerifier,
   signInWithEmailAndPassword,
+  signOut,
   type MultiFactorError,
   type MultiFactorResolver,
 } from "firebase/auth";
@@ -86,21 +87,31 @@ export function FirebaseStepUpDialog({
   }
 
   async function issueStepUp(idToken: string, nonce: string) {
-    const response = await fetch("/api/auth/firebase-step-up/complete", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      cache: "no-store",
-      body: JSON.stringify({ operation, challengeNonce: nonce, firebaseIdToken: idToken }),
-    });
-    const result = await response.json() as { data?: { handle?: string }; error?: string };
-    if (!response.ok || !result.data?.handle) {
-      throw new Error(result.error || "Firebase MFA step-up was rejected.");
+    const auth = getStepUpAuth();
+    let handle: string;
+    try {
+      const response = await fetch("/api/auth/firebase-step-up/complete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ operation, challengeNonce: nonce, firebaseIdToken: idToken }),
+      });
+      const result = await response.json() as { data?: { handle?: string }; error?: string };
+      if (!response.ok || !result.data?.handle) {
+        throw new Error(result.error || "Firebase MFA step-up was rejected.");
+      }
+      handle = result.data.handle;
+    } finally {
+      // The Firebase account is a one-operation proof source, not a second
+      // persistent application session. Clear it even when the server rejects proof.
+      await signOut(auth).catch(() => undefined);
     }
+
     disposeVerifier();
     setPassword("");
     setSmsCode("");
     setChallengeNonce("");
-    await onAuthorized(result.data.handle);
+    await onAuthorized(handle);
   }
 
   async function beginAuthentication() {
