@@ -74,7 +74,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
   const lastActivity = data.successors[0]?.lastOwnerActivityAt;
   const inactivityDays = data.successors[0]?.autoActivateAfterDays ?? 60;
   const dueAt = lastActivity ? triggerDate(lastActivity, inactivityDays) : null;
-  const hoursOld = lastActivity ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / 3600000) : 0;
+
   const assetTypes = ["GitHub organization", "GitHub repository", "Domain / DNS", "Vercel project", "Database credential location", "Stripe account", "1Password / Vault", "Object storage", "Backup / restore", "Identity provider", "Monitoring", "Other"];
 
   async function mutate(payload: Record<string, unknown>) {
