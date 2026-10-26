@@ -27,7 +27,7 @@ async function getBrowserMessaging(): Promise<Messaging | null> {
         authDomain: config.authDomain,
         projectId: config.projectId,
         appId: config.appId,
-        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        messagingSenderId: config.messagingSenderId,
       }, APP_NAME);
 
   return getMessaging(app);
@@ -42,6 +42,9 @@ export async function enableWebPushNotifications(): Promise<
 > {
   const config = getFirebaseMessagingConfig();
   if (!config) return { ok: false, reason: "Firebase Web Push configuration is incomplete." };
+  if (typeof Notification === "undefined") {
+    return { ok: false, reason: "Notifications are not available in this browser." };
+  }
 
   const messaging = await getBrowserMessaging();
   if (!messaging) return { ok: false, reason: "This browser does not support Firebase Web Push." };
