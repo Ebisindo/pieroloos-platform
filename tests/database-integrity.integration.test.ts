@@ -1,5 +1,5 @@
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient, SuccessorStatus } from "@prisma/client";
 import { clientRepository } from "@/lib/db/client-repository";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
 import { validateOwnershipTotal, wouldCreateOwnershipCycle } from "@/lib/domain/corporate-graph";
@@ -9,6 +9,7 @@ const prisma = new PrismaClient();
 const organizationIds: string[] = [];
 const evidenceIds: string[] = [];
 const userIds: string[] = [];
+const successorIds: string[] = [];
 
 async function createOrganization(slug: string) {
   const organization = await prisma.organization.create({
@@ -42,6 +43,10 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
     if (evidenceIds.length > 0) {
       await prisma.evidence.deleteMany({ where: { id: { in: evidenceIds } } });
       evidenceIds.length = 0;
+    }
+    if (successorIds.length > 0) {
+      await prisma.successor.deleteMany({ where: { id: { in: successorIds } } });
+      successorIds.length = 0;
     }
     if (userIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -935,3 +940,112 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
     })).resolves.toBe(0);
   });
 
+
+
+  it("allows only one concurrent PostgreSQL claim of a successor invitation and writes one audit event", async () => {
+    const suffix = crypto.randomUUID();
+    const owner = await prisma.user.create({ data: { email: `continuity-owner-${suffix}@integration.invalid` } });
+    const actorA = await prisma.user.create({ data: { email: `continuity-actor-a-${suffix}@integration.invalid` } });
+    const actorB = await prisma.user.create({ data: { email: `continuity-actor-b-${suffix}@integration.invalid` } });
+    userIds.push(owner.id, actorA.id, actorB.id);
+    const tokenHash = `test-token-hash-${suffix}`;
+    const now = new Date();
+    const successor = await prisma.successor.create({
+      data: {
+        ownerId: owner.id,
+        successorName: "Integration Successor",
+        successorEmail: actorA.email,
+        relationship: "Continuity tester",
+        permissions: { canTransferOwnership: false, canAccessSecrets: false, canDeploy: false, canAccessBilling: false },
+        inviteTokenHash: tokenHash,
+        inviteExpiresAt: new Date(now.getTime() + 60_000),
+        lastOwnerActivityAt: now,
+      },
+    });
+    successorIds.push(successor.id);
+
+    let ready = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const waitForBoth = async () => {
+      ready += 1;
+      if (ready === 2) release();
+      await gate;
+    };
+    const accept = (actorUserId: string) => prisma.$transaction(async (tx) => {
+      await waitForBoth();
+      const claim = await tx.successor.updateMany({
+        where: {
+          id: successor.id,
+          status: SuccessorStatus.PENDING,
+          inviteTokenHash: tokenHash,
+          inviteExpiresAt: { gt: now },
+        },
+        data: {
+          status: SuccessorStatus.ACCEPTED,
+          acceptedAt: now,
+          inviteTokenHash: null,
+          inviteExpiresAt: null,
+        },
+      });
+      if (!claim.count) return false;
+      await tx.platformAuditEvent.create({
+        data: {
+          actorUserId,
+          actorRole: "STAFF",
+          action: "successor_accepted",
+          subjectType: "SUCCESSOR",
+          subjectId: successor.id,
+          outcome: "SUCCESS",
+          details: { adminAccessGranted: false, mfaVerified: false },
+        },
+      });
+      return true;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    const results = await Promise.allSettled([accept(actorA.id), accept(actorB.id)]);
+    const winners = results.filter((result) => result.status === "fulfilled" && result.value === true);
+    expect(winners).toHaveLength(1);
+    const stored = await prisma.successor.findUniqueOrThrow({ where: { id: successor.id } });
+    expect(stored.status).toBe(SuccessorStatus.ACCEPTED);
+    expect(stored.inviteTokenHash).toBeNull();
+    expect(stored.inviteExpiresAt).toBeNull();
+    expect(await prisma.platformAuditEvent.count({ where: { subjectType: "SUCCESSOR", subjectId: successor.id, action: "successor_accepted" } })).toBe(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+  });
+
+  it("rolls back a successor invitation claim when its audit write fails", async () => {
+    const suffix = crypto.randomUUID();
+    const owner = await prisma.user.create({ data: { email: `continuity-rollback-owner-${suffix}@integration.invalid` } });
+    const actor = await prisma.user.create({ data: { email: `continuity-rollback-actor-${suffix}@integration.invalid` } });
+    userIds.push(owner.id, actor.id);
+    const tokenHash = `rollback-token-hash-${suffix}`;
+    const now = new Date();
+    const successor = await prisma.successor.create({
+      data: {
+        ownerId: owner.id,
+        successorName: "Rollback Successor",
+        successorEmail: actor.email,
+        relationship: "Continuity tester",
+        permissions: { canTransferOwnership: false, canAccessSecrets: false, canDeploy: false, canAccessBilling: false },
+        inviteTokenHash: tokenHash,
+        inviteExpiresAt: new Date(now.getTime() + 60_000),
+        lastOwnerActivityAt: now,
+      },
+    });
+    successorIds.push(successor.id);
+
+    await expect(prisma.$transaction(async (tx) => {
+      await tx.successor.updateMany({
+        where: { id: successor.id, status: SuccessorStatus.PENDING, inviteTokenHash: tokenHash, inviteExpiresAt: { gt: now } },
+        data: { status: SuccessorStatus.ACCEPTED, acceptedAt: now, inviteTokenHash: null, inviteExpiresAt: null },
+      });
+      throw new Error("SIMULATED_AUDIT_WRITE_FAILURE");
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })).rejects.toThrow("SIMULATED_AUDIT_WRITE_FAILURE");
+
+    const stored = await prisma.successor.findUniqueOrThrow({ where: { id: successor.id } });
+    expect(stored.status).toBe(SuccessorStatus.PENDING);
+    expect(stored.inviteTokenHash).toBe(tokenHash);
+    expect(stored.inviteExpiresAt?.getTime()).toBeGreaterThan(now.getTime());
+    expect(await prisma.platformAuditEvent.count({ where: { subjectType: "SUCCESSOR", subjectId: successor.id, action: "successor_accepted" } })).toBe(0);
+  });
