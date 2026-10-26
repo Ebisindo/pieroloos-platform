@@ -391,6 +391,7 @@ model User {
   successorsOwned            Successor[] @relation("SuccessorOwner")
   continuityAssets           ContinuityAsset[] @relation("ContinuityAssetOwner")
   continuityRunbooks          ContinuityRunbook[] @relation("ContinuityRunbookOwner")
+  firebaseStepUpChallenges    FirebaseStepUpChallenge[]
   businessIntentProposalsCreated BusinessIntentProposal[] @relation("BusinessIntentProposalCreator")
   businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
   businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
