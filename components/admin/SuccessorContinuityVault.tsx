@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FirebaseStepUpDialog, type FirebaseStepUpOperation } from "@/components/admin/FirebaseStepUpDialog";
 import { Activity, AlertTriangle, ArrowRightLeft, Check, ChevronRight, CircleHelp, Clock3, FileKey2, GitBranch, KeyRound, LockKeyhole, Plus, ShieldCheck, ShieldEllipsis, UserRoundCheck, X } from "lucide-react";
 
 type SuccessorStatus = "PENDING" | "ACCEPTED" | "ACTIVE" | "REVOKED";
@@ -69,6 +70,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
   const [runbookTitle, setRunbookTitle] = useState("");
   const [runbookContent, setRunbookContent] = useState("");
   const [activeTab, setActiveTab] = useState<"successors" | "assets" | "runbook">("successors");
+  const [stepUpRequest, setStepUpRequest] = useState<{ operation: FirebaseStepUpOperation; payload: Record<string, unknown> } | null>(null);
 
   const activeSuccessor = data.successors.find((item) => item.id === selectedId) ?? data.successors[0] ?? null;
   const lastActivity = data.successors[0]?.lastOwnerActivityAt;
@@ -77,12 +79,36 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
 
   const assetTypes = ["GitHub organization", "GitHub repository", "Domain / DNS", "Vercel project", "Database credential location", "Stripe account", "1Password / Vault", "Object storage", "Backup / restore", "Identity provider", "Monitoring", "Other"];
 
-  async function mutate(payload: Record<string, unknown>) {
+  function mutate(payload: Record<string, unknown>) {
+    const action = payload.action;
+    const operations: Record<string, FirebaseStepUpOperation> = {
+      create: "continuity:create-successor",
+      alive: "continuity:owner-alive",
+      simulate: "continuity:simulate",
+      revoke: "continuity:revoke",
+      asset: "continuity:create-asset",
+      runbook: "continuity:save-runbook",
+    };
+    const operation = typeof action === "string" ? operations[action] : undefined;
+    if (!operation) {
+      setError("This action does not have a configured step-up policy.");
+      return;
+    }
+    setError("");
+    setNotice("");
+    setStepUpRequest({ operation, payload });
+  }
+
+  async function executeMutation(payload: Record<string, unknown>, stepUpHandle: string) {
     setBusy(true); setError(""); setNotice("");
     try {
+      const requestPayload = payload.action === "create"
+        ? { ...Object.fromEntries(Object.entries(payload).filter(([key]) => key !== "action")), stepUpHandle }
+        : { ...payload, stepUpHandle };
       const response = await fetch("/api/admin/successors", {
         method: payload.action === "create" ? "POST" : "PATCH",
-        headers: { "content-type": "application/json" }, body: JSON.stringify(payload.action === "create" ? Object.fromEntries(Object.entries(payload).filter(([key]) => key !== "action")) : payload),
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(requestPayload),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "The continuity action was rejected.");
@@ -131,7 +157,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
           <h1>Legacy &amp; Successor Protocol</h1>
           <p className="continuity-subtitle">Who owns your code when you are not here?</p>
         </div>
-        <button className="continuity-primary-button" type="button" onClick={() => { setShowForm((open) => !open); setError(""); }} disabled={busy}><Plus size={16} /> Add Successor</button>
+        <button className="continuity-primary-button" type="button" onClick={() => { setShowForm((open) => !open); setError(""); }} disabled={busy || stepUpRequest !== null}><Plus size={16} /> Add Successor</button>
       </header>
 
       <section className="continuity-summary" aria-label="Continuity protocol status">
@@ -140,7 +166,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
           <strong>Dead-man switch</strong>
           <span>Last activity: {lastActivity ? timeAgo(lastActivity) : "not yet recorded"}. Handover review would trigger after {inactivityDays} days of inactivity.</span>
         </div>
-        <button type="button" className="continuity-quiet-button" disabled={busy} onClick={() => void mutate({ action: "alive" })}><Check size={15} /> I’m Alive</button>
+        <button type="button" className="continuity-quiet-button" disabled={busy || stepUpRequest !== null} onClick={() => void mutate({ action: "alive" })}><Check size={15} /> I’m Alive</button>
       </section>
 
       {error ? <div className="continuity-message continuity-error" role="alert"><AlertTriangle size={17} />{error}</div> : null}
@@ -161,7 +187,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
               <div className="continuity-permission-list">{permissionOptions.map(([key, label, description]) => <label className="continuity-permission-row" key={key}><input type="checkbox" checked={Boolean(permissions[key])} onChange={() => togglePermission(key)} /><span className="continuity-permission-text"><strong>{label}</strong><small>{description}</small></span></label>)}</div>
             </fieldset>
             {permissions.canAccessSecrets ? <label className="continuity-field-full">Verification plan for secrets access<textarea value={verificationNote} onChange={(e) => setVerificationNote(e.target.value)} minLength={8} maxLength={1000} required placeholder="Describe the independent video/ID verification process and evidence storage location. Do not enter secret values."/><span className="continuity-help">This records the verification plan only; secret access remains blocked until the evidence and vault controls are independently verified.</span></label> : null}
-            <div className="continuity-form-footer"><span><LockKeyhole size={14} /> Changes require a fresh authentication / MFA check.</span><button type="submit" className="continuity-primary-button" disabled={busy}>{busy ? "Saving…" : "Create invitation"}</button></div>
+            <div className="continuity-form-footer"><span><LockKeyhole size={14} /> Changes require a fresh authentication / MFA check.</span><button type="submit" className="continuity-primary-button" disabled={busy || stepUpRequest !== null}>{busy ? "Saving…" : "Create invitation"}</button></div>
           </form>
         </section>
       ) : null}
@@ -186,7 +212,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
             <div className="continuity-permission-chips">{permissionOptions.map(([key, label]) => <span key={key} className={item.permissions[key] ? "is-enabled" : ""}><span>{item.permissions[key] ? "✓" : "—"}</span>{label}</span>)}</div>
             {item.highPermissionVerificationNote ? <p className="continuity-help">A verification plan is recorded. Actual identity/video verification still needs evidence review.</p> : null}
             {item.continuityCases.length ? <p className="continuity-help">Latest continuity case: {item.continuityCases[0].status.replaceAll("_", " ").toLowerCase()}.</p> : null}
-            <div className="continuity-row-actions"><button type="button" className="continuity-secondary-button" disabled={busy} onClick={() => void mutate({ action: "simulate", successorId: item.id })}><Activity size={14} /> Simulate Handover</button>{item.status !== "REVOKED" && item.status !== "ACTIVE" ? <button type="button" className="continuity-danger-button" disabled={busy} onClick={() => { const reason = window.prompt("Why are you revoking this successor? (At least 8 characters)"); if (reason && reason.trim().length >= 8) void mutate({ action: "revoke", successorId: item.id, reason }); else if (reason) setError("Enter a revocation reason of at least 8 characters."); }}><X size={14} /> Revoke Access</button> : null}</div>
+            <div className="continuity-row-actions"><button type="button" className="continuity-secondary-button" disabled={busy || stepUpRequest !== null} onClick={() => void mutate({ action: "simulate", successorId: item.id })}><Activity size={14} /> Simulate Handover</button>{item.status !== "REVOKED" && item.status !== "ACTIVE" ? <button type="button" className="continuity-danger-button" disabled={busy || stepUpRequest !== null} onClick={() => { const reason = window.prompt("Why are you revoking this successor? (At least 8 characters)"); if (reason && reason.trim().length >= 8) void mutate({ action: "revoke", successorId: item.id, reason }); else if (reason) setError("Enter a revocation reason of at least 8 characters."); }}><X size={14} /> Revoke Access</button> : null}</div>
           </div> : null}
         </article>)}</div> : <div className="continuity-empty"><div className="continuity-empty-icon"><ShieldEllipsis size={22} /></div><strong>No successor configured</strong><p>Business continuity currently depends on the primary owner. Add and independently verify a trusted successor to begin.</p><button className="continuity-secondary-button" type="button" onClick={() => setShowForm(true)}><Plus size={15} /> Add first successor</button></div>}
       </section> : null}
@@ -196,7 +222,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
         <form className="continuity-asset-form" onSubmit={(event) => { event.preventDefault(); void mutate({ action: "asset", asset: { assetType, label: assetLabel, recoveryLocation: assetLocation, criticality: assetCriticality, notes: assetNotes } }); }}>
           <div className="continuity-form-grid"><label>Asset category<select value={assetType} onChange={(e) => setAssetType(e.target.value)}>{assetTypes.map((value) => <option key={value}>{value}</option>)}</select></label><label>Asset name / identifier<input value={assetLabel} onChange={(e) => setAssetLabel(e.target.value)} required maxLength={160} placeholder="pieroloos-platform" /></label><label>Recovery location<input value={assetLocation} onChange={(e) => setAssetLocation(e.target.value)} required maxLength={500} placeholder="Vault item, owner account, recovery URL" /></label><label>Criticality<select value={assetCriticality} onChange={(e) => setAssetCriticality(e.target.value)}><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></label></div>
           <label>Operational note <span className="continuity-optional">Optional</span><textarea value={assetNotes} onChange={(e) => setAssetNotes(e.target.value)} maxLength={1000} placeholder="Recovery dependencies, escalation contact, last review date. No secret values." /></label>
-          <button className="continuity-secondary-button" type="submit" disabled={busy}><Plus size={15} /> Record recovery pointer</button>
+          <button className="continuity-secondary-button" type="submit" disabled={busy || stepUpRequest !== null}><Plus size={15} /> Record recovery pointer</button>
         </form>
         {data.assets.length ? <div className="continuity-asset-list">{data.assets.map((asset) => <article key={asset.id} className="continuity-asset-row"><span className="continuity-asset-icon"><FileKey2 size={18} /></span><div><strong>{asset.label}</strong><small>{asset.assetType} · {asset.criticality} priority</small><p>{asset.recoveryLocation}</p>{asset.notes ? <small>{asset.notes}</small> : null}</div><span className="continuity-asset-updated">{formatDate(asset.updatedAt)}</span></article>)}</div> : <div className="continuity-inline-empty"><GitBranch size={18} /><span>No asset recovery pointers recorded. Begin with source control, domains, hosting, databases and the secret manager.</span></div>}
         <div className="continuity-transmission-note"><KeyRound size={17} /><div><strong>Transmission package</strong><p>At activation review, PieroloOS can assemble this inventory and your runbooks into a manifest. Encrypted notes stay disabled until a production KMS envelope-encryption adapter is configured.</p></div></div>
@@ -207,7 +233,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
         <form className="continuity-runbook-form" onSubmit={(event) => { event.preventDefault(); void mutate({ action: "runbook", runbook: { title: runbookTitle, content: runbookContent } }); }}>
           <label>Runbook title<input value={runbookTitle} onChange={(e) => setRunbookTitle(e.target.value)} required maxLength={160} placeholder="Production deployment and rollback" /></label>
           <label>Recovery procedure<textarea value={runbookContent} onChange={(e) => setRunbookContent(e.target.value)} required minLength={20} maxLength={20000} rows={9} placeholder={"1. Verify incident and contact the designated operator.\n2. Locate the approved deployment workflow.\n3. Confirm backup freshness and recovery point.\n4. Deploy a reviewed commit.\n5. Validate health checks and customer-facing flows.\n6. Roll back using the last known-good release if validation fails.\n7. Record evidence and notify stakeholders.\n\nDocument where the vault lives; do not paste passwords, tokens, private keys, or recovery codes."} /></label>
-          <button className="continuity-primary-button" type="submit" disabled={busy}>Save runbook</button>
+          <button className="continuity-primary-button" type="submit" disabled={busy || stepUpRequest !== null}>Save runbook</button>
         </form>
         {data.runbooks.length ? <div className="continuity-runbook-list"><h3>Saved procedures</h3>{data.runbooks.map((item) => <article key={item.id}><div><strong>{item.title}</strong><small>Version {item.version} · Updated {formatDate(item.updatedAt)}</small></div><button className="continuity-secondary-button" type="button" onClick={() => { setRunbookTitle(item.title); setRunbookContent(item.content); setNotice("Runbook loaded for editing. Saving will create a new version."); }}>Load to edit</button></article>)}</div> : <div className="continuity-inline-empty"><CircleHelp size={18} /><span>No emergency procedures saved. Add clear deploy, rollback, database restore, DNS, and incident-contact steps.</span></div>}
         <div className="continuity-transmission-note"><ArrowRightLeft size={17} /><div><strong>Encrypted owner note</strong><p>This implementation intentionally does not accept or store plaintext legacy notes. Configure a KMS-backed envelope-encryption service before exposing note authoring or release.</p></div></div>
@@ -218,6 +244,16 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
       <section className="continuity-safety"><LockKeyhole size={15} /><p><strong>Safety boundary.</strong> A handover simulation is read-only. Inactivity alone never transfers legal ownership, repository control, billing accounts, deployment secrets, or the SuperAdmin singleton. Those actions need independent verification, current authority checks, provider-specific APIs, and an auditable approval record.</p></section>
 
       {simulated ? <div className="continuity-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setSimulated(null); }}><section role="dialog" aria-modal="true" aria-labelledby="simulate-title" className="continuity-modal"><div className="continuity-modal-header"><div className="continuity-modal-symbol"><Activity size={20} /></div><button type="button" aria-label="Close simulation results" className="continuity-icon-button" onClick={() => setSimulated(null)}><X size={17} /></button></div><h2 id="simulate-title">Handover simulation</h2><p>This is a dry-run assessment of the configured protocol. No administrative access, ownership, billing, or secret permissions were changed.</p><dl className="continuity-simulation-results">{Object.entries(simulated).map(([key, value]) => <div key={key}><dt>{key.replaceAll(/([A-Z])/g, " $1").replaceAll("_", " ")}</dt><dd>{typeof value === "object" ? JSON.stringify(value, null, 2) : String(value)}</dd></div>)}</dl><button type="button" className="continuity-primary-button" onClick={() => setSimulated(null)}>Close report</button></section></div> : null}
+      {stepUpRequest ? <FirebaseStepUpDialog
+        operation={stepUpRequest.operation}
+        onClose={() => setStepUpRequest(null)}
+        onAuthorized={async (handle) => {
+          const pending = stepUpRequest.payload;
+          setStepUpRequest(null);
+          await executeMutation(pending, handle);
+        }}
+      /> : null}
+
       <footer className="continuity-bottomline"><span><LockKeyhole size={13} /> End-to-end control requires provider-level verification.</span><span>Signed in as {ownerEmail}</span></footer>
     </main>
   );
