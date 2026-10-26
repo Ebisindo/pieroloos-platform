@@ -31,7 +31,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.5",
-    "firebase-admin": "^13.5.0"
+    "firebase-admin": "^13.5.0",
+    "firebase": "^12.6.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
