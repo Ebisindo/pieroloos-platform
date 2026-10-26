@@ -402,6 +402,8 @@ model User {
   complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
   complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
   corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
+  firebaseIdentity FirebaseIdentity?
+
 }
 
 model PlatformAdministrator {
@@ -2199,4 +2201,21 @@ model FirebaseStepUpChallenge {
 
   @@index([userId, operation, expiresAt])
   @@index([expiresAt, consumedAt])
+}
+
+
+model FirebaseIdentity {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  projectId      String
+  firebaseUid    String
+  linkedAt       DateTime @default(now())
+  linkedByUserId String
+  auditEventId   String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, firebaseUid])
+  @@index([linkedByUserId, linkedAt])
+  @@index([auditEventId])
 }
