@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { AuthOptions, Profile } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
@@ -177,6 +178,8 @@ export const authOptions: AuthOptions = {
       );
     },
     async jwt({ token, user }) {
+      // Stable random binding for this signed NextAuth JWT session; never accept it from request bodies.
+      if (typeof token.stepUpSessionId !== "string") token.stepUpSessionId = randomUUID();
       if (user?.email) {
         const existingUser = await prisma.user.findFirst({
           where: { email: { equals: user.email, mode: "insensitive" } },
@@ -190,6 +193,7 @@ export const authOptions: AuthOptions = {
       if (session.user) {
         if (token.sub) session.user.id = token.sub;
       }
+      if (typeof token.stepUpSessionId === "string") session.stepUpSessionId = token.stepUpSessionId;
       return session;
     },
   },

@@ -390,6 +390,9 @@ model User {
   successorsOwned            Successor[] @relation("SuccessorOwner")
   continuityAssets           ContinuityAsset[] @relation("ContinuityAssetOwner")
   continuityRunbooks          ContinuityRunbook[] @relation("ContinuityRunbookOwner")
+  firebaseStepUpChallenges    FirebaseStepUpChallenge[]
+  firebaseIdentities          FirebaseIdentity[] @relation("FirebaseIdentityOwner")
+  firebaseIdentitiesLinked    FirebaseIdentity[] @relation("FirebaseIdentityLinkActor")
   businessIntentProposalsCreated BusinessIntentProposal[] @relation("BusinessIntentProposalCreator")
   businessIntentProposalsReviewed BusinessIntentProposal[] @relation("BusinessIntentProposalReviewer")
   businessIntentProposalReviews BusinessIntentProposalReview[] @relation("BusinessIntentProposalReviewActor")
@@ -450,6 +453,7 @@ model PlatformAuditEvent {
   occurredAt  DateTime @default(now())
 
   actor User? @relation("PlatformAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  firebaseIdentityLink FirebaseIdentity? @relation("FirebaseIdentityLinkAudit")
 
   @@index([occurredAt])
   @@index([actorUserId, occurredAt])
@@ -2180,4 +2184,46 @@ model ContinuityTransmissionPackage {
   releasedAt          DateTime?
 
   continuityCase BusinessContinuityCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+}
+
+model FirebaseIdentity {
+  id            String   @id @default(cuid())
+  userId        String
+  projectId     String
+  firebaseUid   String
+  linkedByUserId String
+  auditEventId  String   @unique
+  linkedAt      DateTime @default(now())
+
+  user       User               @relation("FirebaseIdentityOwner", fields: [userId], references: [id], onDelete: Restrict)
+  linkedBy   User               @relation("FirebaseIdentityLinkActor", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  auditEvent PlatformAuditEvent @relation("FirebaseIdentityLinkAudit", fields: [auditEventId], references: [id], onDelete: Restrict)
+  challenges FirebaseStepUpChallenge[]
+
+  @@unique([userId, projectId])
+  @@unique([projectId, firebaseUid])
+  @@index([linkedByUserId, linkedAt])
+}
+
+model FirebaseStepUpChallenge {
+  id            String   @id @default(cuid())
+  userId        String
+  firebaseIdentityId String
+  firebaseUid   String
+  handleHash    String   @unique
+  operation     String
+  sessionHash   String
+  authTime      DateTime?
+  secondFactor  String?
+  proofHash     String?  @unique
+  verifiedAt    DateTime?
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firebaseIdentity FirebaseIdentity @relation(fields: [firebaseIdentityId], references: [id], onDelete: Restrict)
+
+  @@index([userId, operation, expiresAt])
+  @@index([expiresAt, consumedAt])
 }
