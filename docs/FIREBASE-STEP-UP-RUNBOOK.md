@@ -12,7 +12,7 @@ This branch adds Firebase Admin verification, the two-phase MFA challenge, a dur
 
 ## Durable Firebase UID association
 
-Each PieroloOS local user may be linked to one Firebase UID via the unique `User.firebaseUid` field. The association is not derived from email and cannot be overwritten through this tool.
+Each PieroloOS local user may be linked to one Firebase UID through the `FirebaseIdentity` registry. The `(userId, projectId)` and `(projectId, firebaseUid)` pairs are unique, and the registry row links to the operator and a corresponding `PlatformAuditEvent`. The association is not derived from email and cannot be overwritten through this tool.
 
 After verifying the target identity out-of-band, configure the Admin SDK to the intended staging Firebase project and the app to the intended staging database. Run:
 
