@@ -101,7 +101,7 @@ export async function enableWebPushNotifications(): Promise<
   }
 }
 
-/** Revoke this browser's token; workspace push is disabled if no active browser remains. */
+/** Revoke this browser's token and disable push for the selected workspace. */
 export async function disableWebPushNotifications(): Promise<boolean> {
   let token: string | null = null;
   try {
