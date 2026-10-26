@@ -403,6 +403,7 @@ model User {
   complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
   corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
   firebaseIdentity FirebaseIdentity?
+  firebaseStepUpChallenges FirebaseStepUpChallenge[]
 
 }
 
@@ -2213,7 +2214,7 @@ model FirebaseIdentity {
   linkedByUserId String
   auditEventId   String
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation("FirebaseIdentityUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, firebaseUid])
   @@index([linkedByUserId, linkedAt])
