@@ -6,6 +6,7 @@ const validEnv = {
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "pieroloos-platform.firebaseapp.com",
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: "pieroloos-platform",
   NEXT_PUBLIC_FIREBASE_APP_ID: "1:123456789:web:abcdef",
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "123456789",
   NEXT_PUBLIC_FIREBASE_VAPID_KEY: "A".repeat(87),
 };
 
@@ -16,6 +17,7 @@ describe("Firebase Web Push configuration", () => {
       authDomain: validEnv.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
       projectId: validEnv.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       appId: validEnv.NEXT_PUBLIC_FIREBASE_APP_ID,
+      messagingSenderId: validEnv.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
       vapidKey: validEnv.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
     });
   });
@@ -25,8 +27,9 @@ describe("Firebase Web Push configuration", () => {
     expect(getFirebaseMessagingConfig(withoutVapidKey)).toBeNull();
   });
 
-  it("rejects malformed project IDs and VAPID keys", () => {
+  it("rejects malformed project IDs, sender IDs, and VAPID keys", () => {
     expect(getFirebaseMessagingConfig({ ...validEnv, NEXT_PUBLIC_FIREBASE_PROJECT_ID: "bad id" })).toBeNull();
+    expect(getFirebaseMessagingConfig({ ...validEnv, NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "abc" })).toBeNull();
     expect(getFirebaseMessagingConfig({ ...validEnv, NEXT_PUBLIC_FIREBASE_VAPID_KEY: "not-a-vapid-key" })).toBeNull();
   });
 
