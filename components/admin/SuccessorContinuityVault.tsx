@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { FirebaseMfaStepUpDialog } from "@/components/admin/FirebaseMfaStepUpDialog";
 import { Activity, AlertTriangle, ArrowRightLeft, Check, ChevronRight, CircleHelp, Clock3, FileKey2, GitBranch, KeyRound, LockKeyhole, Plus, ShieldCheck, ShieldEllipsis, UserRoundCheck, X } from "lucide-react";
 
 type SuccessorStatus = "PENDING" | "ACCEPTED" | "ACTIVE" | "REVOKED";
@@ -69,6 +70,22 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
   const [runbookTitle, setRunbookTitle] = useState("");
   const [runbookContent, setRunbookContent] = useState("");
   const [activeTab, setActiveTab] = useState<"successors" | "assets" | "runbook">("successors");
+  const [firebaseIdentityLinked, setFirebaseIdentityLinked] = useState<boolean | null>(null);
+  const [pendingMutation, setPendingMutation] = useState<Record<string, unknown> | null>(null);
+  const [stepUpDialogOpen, setStepUpDialogOpen] = useState(false);
+  const [linkOnly, setLinkOnly] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/auth/firebase-identity/link", { cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json();
+        if (active && response.ok) setFirebaseIdentityLinked(result.data?.linked === true);
+        else if (active) setFirebaseIdentityLinked(null);
+      })
+      .catch(() => { if (active) setFirebaseIdentityLinked(null); });
+    return () => { active = false; };
+  }, []);
 
   const activeSuccessor = data.successors.find((item) => item.id === selectedId) ?? data.successors[0] ?? null;
   const lastActivity = data.successors[0]?.lastOwnerActivityAt;
@@ -77,7 +94,7 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
 
   const assetTypes = ["GitHub organization", "GitHub repository", "Domain / DNS", "Vercel project", "Database credential location", "Stripe account", "1Password / Vault", "Object storage", "Backup / restore", "Identity provider", "Monitoring", "Other"];
 
-  async function mutate(payload: Record<string, unknown>) {
+  async function submitMutation(payload: Record<string, unknown>) {
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch("/api/admin/successors", {
@@ -112,9 +129,111 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
       if (payload.action === "create") {
         setShowForm(false); setName(""); setEmail(""); setGithub(""); setVerificationNote("");
       }
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The continuity action could not be completed.");
+      return false;
     } finally { setBusy(false); }
+  }
+
+  function operationForMutation(payload: Record<string, unknown>) {
+    switch (payload.action) {
+      case "create": return "continuity:create-successor";
+      case "alive": return "continuity:owner-alive";
+      case "simulate": return "continuity:simulate";
+      case "revoke": return "continuity:revoke";
+      case "asset": return "continuity:create-asset";
+      case "runbook": return "continuity:save-runbook";
+      default: return null;
+    }
+  }
+
+  function labelForOperation(operation: string) {
+    const labels: Record<string, string> = {
+      "continuity:create-successor": "Create successor invitation",
+      "continuity:owner-alive": "Reset the owner-activity heartbeat",
+      "continuity:simulate": "Run handover simulation",
+      "continuity:revoke": "Revoke successor invitation",
+      "continuity:create-asset": "Record a critical-asset recovery pointer",
+      "continuity:save-runbook": "Save emergency runbook",
+    };
+    return labels[operation] ?? "Protected continuity operation";
+  }
+
+  function mutate(payload: Record<string, unknown>) {
+    setError("");
+    setNotice("");
+    if (!operationForMutation(payload)) {
+      setError("This action is not eligible for Firebase step-up.");
+      return;
+    }
+    setPendingMutation(payload);
+    setLinkOnly(false);
+    setStepUpDialogOpen(true);
+  }
+
+  async function handleFirebaseVerified(firebaseIdToken: string) {
+    setError("");
+    try {
+      if (linkOnly && !pendingMutation) {
+        const response = await fetch("/api/auth/firebase-identity/link", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ firebaseIdToken }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Firebase identity linking failed.");
+        setFirebaseIdentityLinked(true);
+        setNotice("Firebase MFA identity linked. Each protected continuity action still requires its own one-time step-up handle.");
+        setStepUpDialogOpen(false);
+        setLinkOnly(false);
+        return;
+      }
+
+      if (!pendingMutation) throw new Error("No pending continuity action was found.");
+      if (firebaseIdentityLinked !== true) {
+        const linkResponse = await fetch("/api/auth/firebase-identity/link", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ firebaseIdToken }),
+        });
+        if (linkResponse.ok) {
+          setFirebaseIdentityLinked(true);
+        } else {
+          const linkError = await linkResponse.json();
+          if (linkResponse.status === 409) {
+            const statusResponse = await fetch("/api/auth/firebase-identity/link", { cache: "no-store" });
+            const status = await statusResponse.json();
+            if (statusResponse.ok && status.data?.linked === true) setFirebaseIdentityLinked(true);
+            else throw new Error(linkError.error || "Firebase identity linking failed.");
+          } else {
+            throw new Error(linkError.error || "Firebase identity linking failed.");
+          }
+        }
+      }
+
+      const operation = operationForMutation(pendingMutation);
+      if (!operation) throw new Error("The pending action is not eligible for step-up.");
+      const challengeResponse = await fetch("/api/auth/firebase-step-up", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ operation, firebaseIdToken }),
+      });
+      const challenge = await challengeResponse.json();
+      if (!challengeResponse.ok || typeof challenge.data?.handle !== "string") {
+        throw new Error(challenge.error || "Firebase step-up challenge was rejected.");
+      }
+
+      const succeeded = await submitMutation({ ...pendingMutation, stepUpHandle: challenge.data.handle });
+      if (!succeeded) throw new Error("The continuity operation was rejected. Review the error and re-authenticate before retrying.");
+      setPendingMutation(null);
+      setLinkOnly(false);
+      setStepUpDialogOpen(false);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Firebase MFA step-up failed.";
+      setError(message);
+      throw new Error(message);
+    }
   }
 
   function togglePermission(key: string) {
@@ -131,7 +250,12 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
           <h1>Legacy &amp; Successor Protocol</h1>
           <p className="continuity-subtitle">Who owns your code when you are not here?</p>
         </div>
-        <button className="continuity-primary-button" type="button" onClick={() => { setShowForm((open) => !open); setError(""); }} disabled={busy}><Plus size={16} /> Add Successor</button>
+        <div className="flex flex-wrap items-center gap-2">
+          {firebaseIdentityLinked === true
+            ? <span className="continuity-status continuity-status-accepted">Firebase MFA linked</span>
+            : <button className="continuity-secondary-button" type="button" onClick={() => { setPendingMutation(null); setLinkOnly(true); setStepUpDialogOpen(true); setError(""); }} disabled={busy}>Link Firebase MFA</button>}
+          <button className="continuity-primary-button" type="button" onClick={() => { setShowForm((open) => !open); setError(""); }} disabled={busy}><Plus size={16} /> Add Successor</button>
+        </div>
       </header>
 
       <section className="continuity-summary" aria-label="Continuity protocol status">
@@ -219,6 +343,13 @@ export function SuccessorContinuityVault({ initialData, ownerEmail }: { initialD
 
       {simulated ? <div className="continuity-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setSimulated(null); }}><section role="dialog" aria-modal="true" aria-labelledby="simulate-title" className="continuity-modal"><div className="continuity-modal-header"><div className="continuity-modal-symbol"><Activity size={20} /></div><button type="button" aria-label="Close simulation results" className="continuity-icon-button" onClick={() => setSimulated(null)}><X size={17} /></button></div><h2 id="simulate-title">Handover simulation</h2><p>This is a dry-run assessment of the configured protocol. No administrative access, ownership, billing, or secret permissions were changed.</p><dl className="continuity-simulation-results">{Object.entries(simulated).map(([key, value]) => <div key={key}><dt>{key.replaceAll(/([A-Z])/g, " $1").replaceAll("_", " ")}</dt><dd>{typeof value === "object" ? JSON.stringify(value, null, 2) : String(value)}</dd></div>)}</dl><button type="button" className="continuity-primary-button" onClick={() => setSimulated(null)}>Close report</button></section></div> : null}
       <footer className="continuity-bottomline"><span><LockKeyhole size={13} /> End-to-end control requires provider-level verification.</span><span>Signed in as {ownerEmail}</span></footer>
+      {stepUpDialogOpen ? (
+        <FirebaseMfaStepUpDialog
+          operationLabel={linkOnly && !pendingMutation ? "Link your Firebase MFA identity" : labelForOperation(operationForMutation(pendingMutation ?? {}) ?? "")}
+          onVerified={handleFirebaseVerified}
+          onCancel={() => { setStepUpDialogOpen(false); setPendingMutation(null); setLinkOnly(false); setError(""); }}
+        />
+      ) : null}
     </main>
   );
 }
