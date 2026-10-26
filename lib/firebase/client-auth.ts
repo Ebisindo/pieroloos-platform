@@ -1,6 +1,6 @@
 "use client";
 
-import { getApp, getApps, initializeApp, type FirebaseOptions } from "firebase/app";
+import { getApps, initializeApp, type FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
 const appName = "pieroloos-step-up-client";
