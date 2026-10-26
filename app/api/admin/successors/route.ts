@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { getCurrentPlatformActor } from "@/lib/auth/platform-access";
+import { getCurrentPlatformActor, type PlatformActor } from "@/lib/auth/platform-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PLATFORM_ADMIN_MUTATION_LIMIT } from "@/lib/http/rate-limit";
 import { prisma } from "@/lib/db/prisma";
@@ -30,7 +30,7 @@ async function jsonBody(request: Request) {
   catch { return { ok: false as const, response: NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 }) }; }
 }
 
-async function guard(request?: Request) {
+async function guard(request?: Request): Promise<{ error: NextResponse } | { actor: PlatformActor; sessionBinding?: string }> {
   const actor = await getCurrentPlatformActor();
   if (!actor) return { error: NextResponse.json({ error: "Authentication required." }, { status: 401 }) };
   if (!actor.isSuperAdmin) return { error: NextResponse.json({ error: "Super Administrator access required." }, { status: 403 }) };
@@ -72,6 +72,8 @@ export async function POST(request: Request) {
   const access = await guard(request);
   if ("error" in access) return access.error;
   if (!access.sessionBinding) return NextResponse.json({ error: "A valid signed session cookie is required." }, { status: 401 });
+  const sessionBinding = access.sessionBinding;
+  if (!sessionBinding) return NextResponse.json({ error: "A valid signed session cookie is required." }, { status: 401 });
   const parsedBody = await jsonBody(request);
   if (!parsedBody.ok) return parsedBody.response;
   const parsed = createSchema.safeParse(parsedBody.body);
@@ -94,7 +96,7 @@ export async function POST(request: Request) {
     const { stepUpHandle, ...successorInput } = parsed.data;
     const invite = await withStepUp(
       access.actor,
-      access.sessionBinding,
+      sessionBinding,
       "continuity:create-successor",
       stepUpHandle,
       async (tx) => {
@@ -126,6 +128,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const access = await guard(request);
   if ("error" in access) return access.error;
+  const sessionBinding = access.sessionBinding;
+  if (!sessionBinding) return NextResponse.json({ error: "A valid signed session cookie is required." }, { status: 401 });
   const parsedBody = await jsonBody(request);
   if (!parsedBody.ok) return parsedBody.response;
   if (!access.sessionBinding) return NextResponse.json({ error: "A valid signed session cookie is required." }, { status: 401 });
@@ -147,7 +151,7 @@ export async function PATCH(request: Request) {
     };
     const { stepUpHandle, ...actionInput } = parsed.data;
     if (actionInput.action === "alive") {
-      return NextResponse.json({ data: await withStepUp(access.actor, access.sessionBinding, stepUpOperationByAction.alive, stepUpHandle, (tx) => confirmOwnerAlive(access.actor, tx)) });
+      return NextResponse.json({ data: await withStepUp(access.actor, sessionBinding, stepUpOperationByAction.alive, stepUpHandle, (tx) => confirmOwnerAlive(access.actor, tx)) });
     }
     if (actionInput.action === "simulate" && actionInput.successorId) {
       return NextResponse.json({ data: await withStepUp(access.actor, access.sessionBinding, stepUpOperationByAction.simulate, stepUpHandle, (tx) => simulateHandover(access.actor, actionInput.successorId!, tx)) });
