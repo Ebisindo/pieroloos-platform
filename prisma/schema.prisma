@@ -2181,3 +2181,22 @@ model ContinuityTransmissionPackage {
 
   continuityCase BusinessContinuityCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
 }
+
+model FirebaseStepUpChallenge {
+  id            String   @id @default(cuid())
+  userId        String
+  firebaseUid   String
+  handleHash    String   @unique
+  operation     String
+  sessionHash   String
+  authTime      DateTime
+  secondFactor  String
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, operation, expiresAt])
+  @@index([expiresAt, consumedAt])
+}
