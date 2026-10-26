@@ -103,7 +103,18 @@ export const notificationRepository = {
     // notification events. Delivery remains gated by the recipient's explicit
     // push preference and an active token in the worker.
     if (input.channel === "IN_APP" && input.recipientUserId) {
-      const { id: _unusedId, ...pushData } = data;
+      const pushData = {
+        organizationId: data.organizationId,
+        workspaceId: data.workspaceId,
+        obligationId: data.obligationId,
+        actionId: data.actionId,
+        recipientUserId: data.recipientUserId,
+        channel: "PUSH" as const,
+        subject: data.subject,
+        body: data.body,
+        scheduledFor: data.scheduledFor,
+        status: data.status,
+      };
       await prisma.complianceNotification.upsert({
         where: {
           organizationId_workspaceId_dedupeKey: {
@@ -114,7 +125,6 @@ export const notificationRepository = {
         },
         create: {
           ...pushData,
-          channel: "PUSH",
           dedupeKey: `push:${input.dedupeKey}`,
           templateKey: "firebase-web-push",
           templateVersion: 1,
