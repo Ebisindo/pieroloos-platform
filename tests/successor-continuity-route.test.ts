@@ -89,7 +89,7 @@ describe("successor management route", () => {
         headers: { origin: "http://localhost", "content-type": "application/json" },
         body: JSON.stringify(action),
       }));
-      expect(response.status, action.action).toBe(503);
+      expect(response!.status, action.action).toBe(503);
     }
 
     expect(aliveMock).not.toHaveBeenCalled();
