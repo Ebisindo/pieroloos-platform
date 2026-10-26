@@ -31,8 +31,8 @@ function parseArgs(args) {
 
 function getFirebaseAdminAuth() {
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
-  if (!projectId || projectId !== "pieroloos-platform") {
-    throw new Error("FIREBASE_PROJECT_ID must be set to pieroloos-platform.");
+  if (!projectId || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId)) {
+    throw new Error("FIREBASE_PROJECT_ID must be set to a valid project ID.");
   }
   const appName = "pieroloos-step-up";
   const existing = getApps().find((app) => app.name === appName);
