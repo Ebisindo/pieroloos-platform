@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
-import { getApp, getApps, initializeApp, applicationDefault, cert } from "firebase-admin/app";
+import { getApps, initializeApp, applicationDefault, cert } from "firebase-admin/app";
 import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
 
 const DEFAULT_FRESHNESS_SECONDS = 5 * 60;
