@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/auth";
+import { getSessionBinding } from "@/lib/auth/session-binding";
 import { createFirebaseStepUpChallenge, isStepUpOperation } from "@/lib/services/firebase-step-up-service";
 import { enforceRateLimit, PLATFORM_ADMIN_MUTATION_LIMIT } from "@/lib/http/rate-limit";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
@@ -15,23 +15,13 @@ const schema = z.object({
   firebaseIdToken: z.string().min(100).max(12_000),
 }).strict();
 
-function sessionBinding(session: unknown) {
-  // This is a deterministic fingerprint of the current signed NextAuth session
-  // metadata, not a client-provided session identifier. It narrows reuse to the
-  // same user/session expiry. A dedicated session id is preferred in the
-  // production account/session-linking phase.
-  if (!session || typeof session !== "object" || !("user" in session)) return null;
-  const candidate = session as { user?: { id?: unknown }; expires?: unknown };
-  if (typeof candidate.user?.id !== "string" || typeof candidate.expires !== "string") return null;
-  return createHash("sha256").update(`${candidate.user.id}\0${candidate.expires}`).digest("hex");
-}
-
 export async function POST(request: Request) {
   const session = await auth();
   const userId = session?.user?.id;
-  const binding = sessionBinding(session);
-  if (!userId || !binding) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   if (hasInvalidRequestOrigin(request)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  const binding = getSessionBinding(request, userId);
+  if (!binding) return NextResponse.json({ error: "A valid signed session cookie is required." }, { status: 401 });
 
   const limit = await enforceRateLimit(PLATFORM_ADMIN_MUTATION_LIMIT, `firebase-step-up:${userId}`);
   if (limit) return limit;
@@ -61,7 +51,6 @@ export async function POST(request: Request) {
       const status = error.code === "NOT_CONFIGURED" ? 503 : 401;
       return NextResponse.json({ error: status === 503 ? "Step-up provider is not configured." : "Recent Firebase MFA verification was not accepted." }, { status, headers: { "Cache-Control": "no-store" } });
     }
-    // Do not log request bodies, bearer tokens, provider payloads, or untrusted error text.
     return NextResponse.json({ error: "Unable to establish step-up authorization." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }
