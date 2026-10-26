@@ -13,7 +13,7 @@ import {
   type MultiFactorResolver,
 } from "firebase/auth";
 
-type StepUpOperation =
+export type FirebaseStepUpOperation =
   | "continuity:create-successor"
   | "continuity:owner-alive"
   | "continuity:simulate"
@@ -41,7 +41,7 @@ export function FirebaseStepUpDialog({
   onAuthorized,
   onClose,
 }: {
-  operation: StepUpOperation;
+  operation: FirebaseStepUpOperation;
   onAuthorized: (handle: string) => Promise<void>;
   onClose: () => void;
 }) {
