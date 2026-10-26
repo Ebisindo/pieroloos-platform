@@ -119,7 +119,7 @@ export function FirebaseStepUpDialog({
         const resolver = getMultiFactorResolver(auth, cause as MultiFactorError);
         const phoneHint = resolver.hints.find((hint) => hint.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
         if (!phoneHint) {
-          throw new Error("This initial step-up flow requires an enrolled SMS phone factor. Configure a supported factor for this staging account.");
+          throw new Error("This initial step-up flow requires an enrolled SMS phone factor. Configure a supported factor for this staging account.", { cause });
         }
         const verifier = new RecaptchaVerifier(auth, recaptchaContainerRef.current!, { size: "invisible" });
         verifierRef.current = verifier;
