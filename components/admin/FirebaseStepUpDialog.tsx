@@ -49,6 +49,7 @@ export function FirebaseStepUpDialog({
   const [password, setPassword] = useState("");
   const [smsCode, setSmsCode] = useState("");
   const [verificationId, setVerificationId] = useState("");
+  const [challengeNonce, setChallengeNonce] = useState("");
   const [mode, setMode] = useState<"credentials" | "sms">("credentials");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -67,15 +68,29 @@ export function FirebaseStepUpDialog({
     disposeVerifier();
     setPassword("");
     setSmsCode("");
+    setChallengeNonce("");
     onClose();
   }
 
-  async function issueStepUp(idToken: string) {
+  async function startChallenge() {
     const response = await fetch("/api/auth/firebase-step-up", {
       method: "POST",
       headers: { "content-type": "application/json" },
       cache: "no-store",
-      body: JSON.stringify({ operation, firebaseIdToken: idToken }),
+      body: JSON.stringify({ operation }),
+    });
+    const result = await response.json() as { data?: { challengeNonce?: string }; error?: string };
+    if (!response.ok || !result.data?.challengeNonce) throw new Error(result.error || "Unable to begin step-up authentication.");
+    setChallengeNonce(result.data.challengeNonce);
+    return result.data.challengeNonce;
+  }
+
+  async function issueStepUp(idToken: string, nonce: string) {
+    const response = await fetch("/api/auth/firebase-step-up/complete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ operation, challengeNonce: nonce, firebaseIdToken: idToken }),
     });
     const result = await response.json() as { data?: { handle?: string }; error?: string };
     if (!response.ok || !result.data?.handle) {
@@ -84,6 +99,7 @@ export function FirebaseStepUpDialog({
     disposeVerifier();
     setPassword("");
     setSmsCode("");
+    setChallengeNonce("");
     await onAuthorized(result.data.handle);
   }
 
@@ -92,8 +108,9 @@ export function FirebaseStepUpDialog({
     setError("");
     setNotice("");
     try {
+      const nonce = await startChallenge();
       const auth = getStepUpAuth();
-      let credential;
+      let credential: Awaited<ReturnType<typeof signInWithEmailAndPassword>>;
       try {
         credential = await signInWithEmailAndPassword(auth, email.trim(), password);
       } catch (cause) {
@@ -117,7 +134,7 @@ export function FirebaseStepUpDialog({
         return;
       }
       const idToken = await credential.user.getIdToken(true);
-      await issueStepUp(idToken);
+      await issueStepUp(idToken, nonce);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Firebase step-up could not be started.");
     } finally {
@@ -130,14 +147,13 @@ export function FirebaseStepUpDialog({
     setError("");
     setNotice("");
     try {
-      const auth = getStepUpAuth();
       const resolver = resolverRef.current;
-      if (!resolver || !verificationId) throw new Error("The SMS challenge expired. Start the authentication step again.");
+      if (!resolver || !verificationId || !challengeNonce) throw new Error("The SMS challenge expired. Start the authentication step again.");
       const phoneCredential = PhoneAuthProvider.credential(verificationId, smsCode.trim());
       const assertion = PhoneMultiFactorGenerator.assertion(phoneCredential);
       const signedIn = await resolver.resolveSignIn(assertion);
       const idToken = await signedIn.user.getIdToken(true);
-      await issueStepUp(idToken);
+      await issueStepUp(idToken, challengeNonce);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The verification code was not accepted.");
     } finally {
@@ -173,7 +189,7 @@ export function FirebaseStepUpDialog({
               <input inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={10} value={smsCode} onChange={(event) => setSmsCode(event.target.value.replace(/\s/g, ""))} />
             </label>
             <button type="submit" className="continuity-primary-button" disabled={busy || smsCode.trim().length < 6}>{busy ? "Verifying…" : "Verify code and authorize this action"}</button>
-            <button type="button" className="continuity-secondary-button" disabled={busy} onClick={() => { disposeVerifier(); setMode("credentials"); setVerificationId(""); setSmsCode(""); setNotice(""); }}>Start again</button>
+            <button type="button" className="continuity-secondary-button" disabled={busy} onClick={() => { disposeVerifier(); setMode("credentials"); setVerificationId(""); setSmsCode(""); setChallengeNonce(""); setNotice(""); }}>Start again</button>
           </form>
         )}
         <div ref={recaptchaContainerRef} aria-hidden="true" />
