@@ -31,6 +31,17 @@ export function isStepUpOperation(value: unknown): value is StepUpOperation {
   return typeof value === "string" && STEP_UP_OPERATIONS.includes(value as StepUpOperation);
 }
 
+/**
+ * Kill switch for the provider-backed MFA path. Protected continuity writes must
+ * stay disabled unless an operator explicitly opts an environment in after review.
+ * The unset/default state is deliberately disabled.
+ */
+function assertFirebaseStepUpEnabled(): void {
+  if (process.env.FIREBASE_STEP_UP_ENABLED !== "true") {
+    throw new FirebaseStepUpError("NOT_CONFIGURED");
+  }
+}
+
 function validateContext(input: { userId: string; sessionId: string; operation: unknown }): asserts input is {
   userId: string; sessionId: string; operation: StepUpOperation;
 } {
@@ -50,6 +61,7 @@ export async function beginFirebaseStepUpChallenge(input: {
   operation: StepUpOperation;
 }) {
   validateContext(input);
+  assertFirebaseStepUpEnabled();
   const user = await prisma.user.findUnique({
     where: { id: input.userId },
     select: { id: true },
@@ -115,6 +127,7 @@ export async function completeFirebaseStepUpChallenge(input: {
   firebaseIdToken: string;
 }) {
   validateContext(input);
+  assertFirebaseStepUpEnabled();
   const identity = await verifyFirebaseMfaIdToken(input.firebaseIdToken);
   const user = await prisma.user.findUnique({
     where: { id: input.userId },
@@ -208,6 +221,7 @@ export async function consumeFirebaseStepUpChallenge(
   input: { userId: string; sessionId: string; operation: StepUpOperation; handle: string },
 ) {
   validateContext(input);
+  assertFirebaseStepUpEnabled();
   const hash = hashStepUpHandle(input.handle);
   const consumedAt = new Date();
   const result = await tx.firebaseStepUpChallenge.updateMany({
