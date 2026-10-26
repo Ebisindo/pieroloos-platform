@@ -1010,7 +1010,11 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
     expect(stored.inviteTokenHash).toBeNull();
     expect(stored.inviteExpiresAt).toBeNull();
     expect(await prisma.platformAuditEvent.count({ where: { subjectType: "SUCCESSOR", subjectId: successor.id, action: "successor_accepted" } })).toBe(1);
-    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    const losingResults = results.filter((result) => result.status === "fulfilled" && result.value === false || result.status === "rejected");
+    expect(losingResults).toHaveLength(1);
+    for (const result of results) {
+      if (result.status === "rejected") expect(result.reason).toMatchObject({ code: "P2034" });
+    }
   });
 
   it("rolls back a successor invitation claim when its audit write fails", async () => {
@@ -1039,8 +1043,17 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
         where: { id: successor.id, status: SuccessorStatus.PENDING, inviteTokenHash: tokenHash, inviteExpiresAt: { gt: now } },
         data: { status: SuccessorStatus.ACCEPTED, acceptedAt: now, inviteTokenHash: null, inviteExpiresAt: null },
       });
-      throw new Error("SIMULATED_AUDIT_WRITE_FAILURE");
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })).rejects.toThrow("SIMULATED_AUDIT_WRITE_FAILURE");
+      await tx.platformAuditEvent.create({
+        data: {
+          actorUserId: `missing-audit-actor-${suffix}`,
+          actorRole: "STAFF",
+          action: "successor_accepted",
+          subjectType: "SUCCESSOR",
+          subjectId: successor.id,
+          outcome: "SUCCESS",
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })).rejects.toBeDefined();
 
     const stored = await prisma.successor.findUniqueOrThrow({ where: { id: successor.id } });
     expect(stored.status).toBe(SuccessorStatus.PENDING);
