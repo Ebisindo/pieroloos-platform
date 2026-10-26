@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+
+vi.mock("server-only", () => ({}));
 import { createOpaqueStepUpHandle, hashStepUpHandle, verifyFreshFirebaseMfaClaims, FirebaseStepUpError } from "@/lib/auth/firebase-step-up";
 
 const now = 1_800_000_000;
