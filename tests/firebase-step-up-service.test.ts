@@ -17,7 +17,7 @@ import { createFirebaseStepUpChallenge, consumeFirebaseStepUpChallenge } from "@
 describe("Firebase step-up challenge service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prismaMock.user.findUnique.mockResolvedValue({ id: "local-user" });
+    prismaMock.user.findUnique.mockResolvedValue({ id: "local-user", firebaseUid: "firebase-uid" });
     prismaMock.firebaseStepUpChallenge.create.mockImplementation(async ({ data }) => ({
       id: data.id, expiresAt: data.expiresAt, operation: data.operation,
     }));
@@ -29,7 +29,6 @@ describe("Firebase step-up challenge service", () => {
       tokenHash: "e".repeat(64),
     });
     hashMock.mockReturnValue("d".repeat(64));
-    process.env.FIREBASE_UID_MAP_local-user = "firebase-uid";
   });
 
   it("persists only the handle digest and binds a user, operation and session fingerprint", async () => {
@@ -42,14 +41,14 @@ describe("Firebase step-up challenge service", () => {
       data: expect.objectContaining({
         userId: "local-user", firebaseUid: "firebase-uid",
         operation: "continuity:owner-alive", handleHash: "d".repeat(64),
-        sessionHash: expect.any(String), consumedAt: undefined,
+        sessionHash: expect.any(String),
       }),
     }));
     expect(JSON.stringify(prismaMock.firebaseStepUpChallenge.create.mock.calls)).not.toContain("x".repeat(200));
   });
 
   it("rejects UID mismatch instead of matching by email", async () => {
-    process.env.FIREBASE_UID_MAP_local-user = "different-uid";
+    prismaMock.user.findUnique.mockResolvedValue({ id: "local-user", firebaseUid: "different-uid" });
     await expect(createFirebaseStepUpChallenge({
       userId: "local-user", sessionId: "signed-session-binding",
       operation: "continuity:owner-alive", firebaseIdToken: "x".repeat(200),
