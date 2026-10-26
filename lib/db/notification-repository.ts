@@ -102,7 +102,11 @@ export const notificationRepository = {
     // Fan out a separately deduplicated push outbox item for existing in-app
     // notification events. Delivery remains gated by the recipient's explicit
     // push preference and an active token in the worker.
-    if (input.channel === "IN_APP" && input.recipientUserId) {
+    if (
+      input.channel === "IN_APP" &&
+      input.recipientUserId &&
+      (input.status === undefined || input.status === "QUEUED")
+    ) {
       const pushData = {
         organizationId: data.organizationId,
         workspaceId: data.workspaceId,
@@ -113,7 +117,7 @@ export const notificationRepository = {
         subject: data.subject,
         body: data.body,
         scheduledFor: data.scheduledFor,
-        status: data.status,
+        status: "QUEUED" as const,
       };
       await prisma.complianceNotification.upsert({
         where: {
