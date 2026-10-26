@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getCurrentPlatformActor } from "@/lib/auth/platform-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PLATFORM_ADMIN_MUTATION_LIMIT } from "@/lib/http/rate-limit";
+import { prisma } from "@/lib/db/prisma";
 import { FirebaseIdentityLinkError, linkCurrentSuperAdminFirebaseIdentity } from "@/lib/services/firebase-identity-service";
 
 export const runtime = "nodejs";
@@ -69,5 +70,24 @@ export async function POST(request: Request) {
       }, { status, headers: { "Cache-Control": "no-store" } });
     }
     return NextResponse.json({ error: "Unable to link Firebase identity." }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+}
+
+export async function GET() {
+  const actor = await getCurrentPlatformActor();
+  if (!actor) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (!actor.isSuperAdmin) return NextResponse.json({ error: "Super Administrator access required." }, { status: 403 });
+  try {
+    const identity = await prisma.firebaseIdentity.findUnique({
+      where: { userId: actor.userId },
+      select: { projectId: true, firebaseUid: true, linkedAt: true, auditEventId: true },
+    });
+    return NextResponse.json({
+      data: identity
+        ? { linked: true, projectId: identity.projectId, firebaseUid: identity.firebaseUid, linkedAt: identity.linkedAt.toISOString(), auditEventId: identity.auditEventId }
+        : { linked: false },
+    }, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return NextResponse.json({ error: "Unable to load Firebase identity status." }, { status: 503 });
   }
 }
