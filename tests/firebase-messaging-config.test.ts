@@ -23,8 +23,10 @@ describe("Firebase Web Push configuration", () => {
   });
 
   it("fails closed when any required public setting is missing", () => {
-    const { NEXT_PUBLIC_FIREBASE_VAPID_KEY: _ignored, ...withoutVapidKey } = validEnv;
-    expect(getFirebaseMessagingConfig(withoutVapidKey)).toBeNull();
+    expect(getFirebaseMessagingConfig({
+      ...validEnv,
+      NEXT_PUBLIC_FIREBASE_VAPID_KEY: undefined,
+    })).toBeNull();
   });
 
   it("rejects malformed project IDs, sender IDs, and VAPID keys", () => {
