@@ -72,14 +72,28 @@ export async function enableWebPushNotifications(): Promise<
       serviceWorkerRegistration: registration,
     });
     if (!token) return { ok: false, reason: "Firebase did not return a Web Push token." };
+    let previousToken: string | undefined;
+    try {
+      previousToken = window.localStorage.getItem("pieroloos-fcm-token") ?? undefined;
+    } catch {
+      // Registration can still succeed when browser storage is restricted.
+    }
     const serverRegistration = await fetch("/api/notifications/push-token", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({
+        token,
+        ...(previousToken && previousToken !== token ? { previousToken } : {}),
+      }),
     });
     if (!serverRegistration.ok) {
       return { ok: false, reason: "The push token could not be securely registered to your account." };
+    }
+    try {
+      window.localStorage.setItem("pieroloos-fcm-token", token);
+    } catch {
+      // The Firebase SDK still retains its token if browser storage is restricted.
     }
     return { ok: true, token };
   } catch {
@@ -89,17 +103,32 @@ export async function enableWebPushNotifications(): Promise<
 
 /** Revoke this browser's token; workspace push is disabled if no active browser remains. */
 export async function disableWebPushNotifications(): Promise<boolean> {
-  const config = getFirebaseMessagingConfig();
-  if (!config) return false;
-  const messaging = await getBrowserMessaging();
-  if (!messaging) return false;
+  let token: string | null = null;
   try {
-    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
-    const token = await getToken(messaging, {
-      vapidKey: config.vapidKey,
-      serviceWorkerRegistration: registration,
-    });
-    if (!token) return false;
+    token = window.localStorage.getItem("pieroloos-fcm-token");
+  } catch {
+    // Fall back to the Firebase SDK token store below.
+  }
+
+  let messaging: Messaging | null = null;
+  if (!token) {
+    const config = getFirebaseMessagingConfig();
+    if (!config) return false;
+    messaging = await getBrowserMessaging();
+    if (!messaging) return false;
+    try {
+      const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+      token = await getToken(messaging, {
+        vapidKey: config.vapidKey,
+        serviceWorkerRegistration: registration,
+      });
+    } catch {
+      return false;
+    }
+  }
+  if (!token) return false;
+
+  try {
     const response = await fetch("/api/notifications/push-token", {
       method: "DELETE",
       credentials: "same-origin",
@@ -107,7 +136,18 @@ export async function disableWebPushNotifications(): Promise<boolean> {
       body: JSON.stringify({ token }),
     });
     if (!response.ok) return false;
-    await deleteToken(messaging);
+    try {
+      window.localStorage.removeItem("pieroloos-fcm-token");
+    } catch {
+      // Server-side revocation has already succeeded.
+    }
+    if (messaging) {
+      try {
+        await deleteToken(messaging);
+      } catch {
+        // Server-side revocation remains authoritative.
+      }
+    }
     return true;
   } catch {
     return false;
