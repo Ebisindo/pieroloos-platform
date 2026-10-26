@@ -67,9 +67,34 @@ export async function enableWebPushNotifications(): Promise<
       serviceWorkerRegistration: registration,
     });
     if (!token) return { ok: false, reason: "Firebase did not return a Web Push token." };
+    const registration = await fetch("/api/notifications/push-token", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    if (!registration.ok) {
+      return { ok: false, reason: "The push token could not be securely registered to your account." };
+    }
     return { ok: true, token };
   } catch {
     return { ok: false, reason: "Web Push registration failed. Check HTTPS, Firebase settings, and service-worker availability." };
+  }
+}
+
+/** Revoke this browser's server-side token and disable push for the active workspace. */
+export async function disableWebPushNotifications(token: string): Promise<boolean> {
+  if (!token || /\\s/.test(token) || token.length < 100 || token.length > 4096) return false;
+  try {
+    const response = await fetch("/api/notifications/push-token", {
+      method: "DELETE",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
