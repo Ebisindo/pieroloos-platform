@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { auth } from "@/lib/auth/auth";
-import { getCurrentPlatformActor } from "@/lib/auth/platform-access";
+import { getCurrentPlatformActor, type PlatformActor } from "@/lib/auth/platform-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PLATFORM_ADMIN_MUTATION_LIMIT } from "@/lib/http/rate-limit";
 import { prisma } from "@/lib/db/prisma";
@@ -31,7 +31,9 @@ async function jsonBody(request: Request) {
   catch { return { ok: false as const, response: NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 }) }; }
 }
 
-async function guard(request?: Request) {
+type GuardAccess = { error: NextResponse } | { actor: PlatformActor; sessionId?: string };
+
+async function guard(request?: Request): Promise<GuardAccess> {
   const actor = await getCurrentPlatformActor();
   if (!actor) return { error: NextResponse.json({ error: "Authentication required." }, { status: 401 }) };
   if (!actor.isSuperAdmin) return { error: NextResponse.json({ error: "Super Administrator access required." }, { status: 403 }) };
@@ -56,11 +58,11 @@ async function inStepUpTransaction<T>(
   operation: StepUpOperation,
   handle: string,
   action: (tx: Prisma.TransactionClient) => Promise<T>,
-) {
-  return prisma.$transaction(async (tx) => {
+) : Promise<T> {
+  return prisma.$transaction<T>(async (tx) => {
     await consumeFirebaseStepUpChallenge(tx, { userId: actorUserId, sessionId, operation, handle });
     // Challenge consumption, domain mutation and audit write must commit or roll back together.
-    return action(tx);
+    return await action(tx);
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
@@ -74,7 +76,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await guard(request);
   if ("error" in access) return access.error;
-  if (!("sessionId" in access)) return NextResponse.json({ error: "A signed session binding is required." }, { status: 401 });
+  const sessionId = access.sessionId;
+  if (typeof sessionId !== "string" || sessionId.length < 20) return NextResponse.json({ error: "A signed session binding is required." }, { status: 401 });
 
   const parsedBody = await jsonBody(request);
   if (!parsedBody.ok) return parsedBody.response;
@@ -97,7 +100,7 @@ export async function POST(request: Request) {
   if (!membership || !workspace) return NextResponse.json({ error: "A workspace is required for secure invitation delivery." }, { status: 409 });
 
   try {
-    const invite = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:create-successor", stepUpHandle, async (tx) => {
+    const invite = await inStepUpTransaction(access.actor.userId, sessionId, "continuity:create-successor", stepUpHandle, async (tx) => {
       const created = await addSuccessor(access.actor, successorInput, tx);
       const inviteUrl = new URL("/successor/accept", trustedOrigin);
       inviteUrl.searchParams.set("token", created.token);
