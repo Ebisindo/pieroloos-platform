@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - security/firebase-mfa-step-up-hardening
-    paths-ignore:
-      - package-lock.json
+    paths:
+      - package.json
 
 permissions:
   contents: write
