@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 
 vi.mock("server-only", () => ({}));
@@ -38,6 +38,7 @@ const uid = "firebase-uid";
 const userId = "local-user";
 const sessionId = "server-issued-session-binding";
 const operation = "continuity:owner-alive" as const;
+const originalStepUpEnabled = process.env.FIREBASE_STEP_UP_ENABLED;
 
 const txMock = {
   firebaseStepUpChallenge: {
@@ -51,6 +52,7 @@ describe("Firebase step-up challenge service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.FIREBASE_PROJECT_ID = "pieroloos-platform";
+    process.env.FIREBASE_STEP_UP_ENABLED = "true";
     prismaMock.user.findUnique.mockResolvedValue({ id: userId });
     prismaMock.firebaseIdentity.findUnique.mockResolvedValue({ id: "firebase-identity-1", firebaseUid: uid, projectId: "pieroloos-platform" });
     prismaMock.$transaction.mockImplementation(async (work) => work(txMock));
@@ -77,6 +79,30 @@ describe("Firebase step-up challenge service", () => {
       issuer: "https://securetoken.google.com/pieroloos-platform",
       audience: "pieroloos-platform",
     });
+  });
+
+  afterEach(() => {
+    if (originalStepUpEnabled === undefined) delete process.env.FIREBASE_STEP_UP_ENABLED;
+    else process.env.FIREBASE_STEP_UP_ENABLED = originalStepUpEnabled;
+  });
+
+  it("fails closed by default when the explicit environment opt-in is absent", async () => {
+    delete process.env.FIREBASE_STEP_UP_ENABLED;
+    const tx = { firebaseStepUpChallenge: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) } };
+
+    await expect(beginFirebaseStepUpChallenge({ userId, sessionId, operation }))
+      .rejects.toMatchObject({ code: "NOT_CONFIGURED" });
+    await expect(completeFirebaseStepUpChallenge({
+      userId, sessionId, operation, challengeNonce: nonce, firebaseIdToken: token,
+    })).rejects.toMatchObject({ code: "NOT_CONFIGURED" });
+    await expect(consumeFirebaseStepUpChallenge(tx, { userId, sessionId, operation, handle: nonce }))
+      .rejects.toMatchObject({ code: "NOT_CONFIGURED" });
+
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.firebaseIdentity.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(verifyMock).not.toHaveBeenCalled();
+    expect(tx.firebaseStepUpChallenge.updateMany).not.toHaveBeenCalled();
   });
 
   it("begins a challenge before Firebase reauthentication and stores only the nonce digest", async () => {
