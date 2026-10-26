@@ -43,6 +43,10 @@ export async function POST(request: Request) {
     if (existing && existing.userId !== userId) {
       return NextResponse.json({ error: "This browser token is already registered to another account." }, { status: 409 });
     }
+    const activeCount = await prisma.firebasePushToken.count({ where: { userId, revokedAt: null } });
+    if (!existing && activeCount >= 10 && !parsed.previousToken) {
+      return NextResponse.json({ error: "This account has reached the active browser limit." }, { status: 429 });
+    }
     await prisma.$transaction(async (tx) => {
       if (parsed.previousToken && parsed.previousToken !== parsed.token) {
         await tx.firebasePushToken.updateMany({
@@ -63,9 +67,11 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ data: { registered: true } });
   } catch (error) {
-    console.error("Push token registration failed.", {
-      errorCode: error instanceof Error && "code" in error ? String(error.code) : "UNKNOWN",
-    });
+    const errorCode = error instanceof Error && "code" in error ? String(error.code) : "UNKNOWN";
+    if (errorCode === "P2002") {
+      return NextResponse.json({ error: "This browser token is already registered to another account." }, { status: 409 });
+    }
+    console.error("Push token registration failed.", { errorCode });
     return NextResponse.json({ error: "Unable to register push notifications." }, { status: 500 });
   }
 }
