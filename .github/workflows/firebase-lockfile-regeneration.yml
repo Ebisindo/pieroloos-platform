@@ -1,0 +1,51 @@
+name: Regenerate Firebase Admin lockfile
+
+on:
+  push:
+    branches:
+      - security/firebase-mfa-step-up-hardening
+    paths-ignore:
+      - package-lock.json
+
+permissions:
+  contents: write
+
+concurrency:
+  group: firebase-lockfile-{github.ref}
+  cancel-in-progress: false
+
+jobs:
+  lockfile:
+    if: github.ref == 'refs/heads/security/firebase-mfa-step-up-hardening'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+
+      - name: Generate complete package lock
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Verify clean locked installation
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify package declaration and lockfile consistency
+        run: node scripts/check-dependency-controls.mjs
+
+      - name: Commit generated lockfile to the isolated hardening branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "The committed lockfile is already complete."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'build(auth): regenerate complete Firebase Admin lockfile'
+          git push origin HEAD:security/firebase-mfa-step-up-hardening
