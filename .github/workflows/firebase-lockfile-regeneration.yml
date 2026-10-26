@@ -6,12 +6,13 @@ on:
       - security/firebase-mfa-step-up-hardening
     paths:
       - package.json
+      - package-lock.json
 
 permissions:
   contents: write
 
 concurrency:
-  group: firebase-lockfile-{github.ref}
+  group: firebase-lockfile-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
