@@ -35,6 +35,10 @@ describe("Firebase MFA claim policy", () => {
     expect(() => verifyFreshFirebaseMfaClaims(claims({ auth_time: now + 60 }), { projectId: "pieroloos-platform", nowSeconds: now })).toThrow(FirebaseStepUpError);
   });
 
+  it("rejects issued-at time that is too old even when auth_time is recent", () => {
+    expect(() => verifyFreshFirebaseMfaClaims(claims({ iat: now - 400 }), { projectId: "pieroloos-platform", nowSeconds: now })).toThrow(FirebaseStepUpError);
+  });
+
   it("rejects authentication older than the step-up window", () => {
     expect(() => verifyFreshFirebaseMfaClaims(claims({ auth_time: now - 301, iat: now - 10 }), { projectId: "pieroloos-platform", nowSeconds: now })).toThrow(FirebaseStepUpError);
   });
