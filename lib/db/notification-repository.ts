@@ -99,6 +99,30 @@ export const notificationRepository = {
       update: {},
     });
 
+    // Fan out a separately deduplicated push outbox item for existing in-app
+    // notification events. Delivery remains gated by the recipient's explicit
+    // push preference and an active token in the worker.
+    if (input.channel === "IN_APP" && input.recipientUserId) {
+      const { id: _unusedId, ...pushData } = data;
+      await prisma.complianceNotification.upsert({
+        where: {
+          organizationId_workspaceId_dedupeKey: {
+            organizationId: input.organizationId,
+            workspaceId: input.workspaceId,
+            dedupeKey: `push:${input.dedupeKey}`,
+          },
+        },
+        create: {
+          ...pushData,
+          channel: "PUSH",
+          dedupeKey: `push:${input.dedupeKey}`,
+          templateKey: "firebase-web-push",
+          templateVersion: 1,
+        },
+        update: {},
+      });
+    }
+
     return mapRecord(record);
   },
 };
