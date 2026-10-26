@@ -67,13 +67,13 @@ export async function enableWebPushNotifications(): Promise<
       serviceWorkerRegistration: registration,
     });
     if (!token) return { ok: false, reason: "Firebase did not return a Web Push token." };
-    const registration = await fetch("/api/notifications/push-token", {
+    const serverRegistration = await fetch("/api/notifications/push-token", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ token }),
     });
-    if (!registration.ok) {
+    if (!serverRegistration.ok) {
       return { ok: false, reason: "The push token could not be securely registered to your account." };
     }
     return { ok: true, token };
