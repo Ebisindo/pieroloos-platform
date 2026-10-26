@@ -39,39 +39,56 @@ export async function POST(request: Request) {
   }
 
   try {
-    const existing = await prisma.firebasePushToken.findUnique({ where: { token: parsed.token }, select: { userId: true } });
-    if (existing && existing.userId !== userId) {
-      return NextResponse.json({ error: "This browser token is already registered to another account." }, { status: 409 });
-    }
-    const activeCount = await prisma.firebasePushToken.count({ where: { userId, revokedAt: null } });
-    const previousOwnedActive = parsed.previousToken
-      ? await prisma.firebasePushToken.findFirst({
-          where: { token: parsed.previousToken, userId, revokedAt: null },
-          select: { id: true },
-        })
-      : null;
-    if (!existing && activeCount >= 10 && !previousOwnedActive) {
-      return NextResponse.json({ error: "This account has reached the active browser limit." }, { status: 429 });
-    }
-    await prisma.$transaction(async (tx) => {
+    const outcome = await prisma.$transaction(async (tx) => {
+      // Serialize token-cap checks per account so concurrent registrations cannot
+      // exceed the limit. The lock is scoped to the authenticated User row.
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+      const existing = await tx.firebasePushToken.findUnique({
+        where: { token: parsed.token },
+        select: { id: true, userId: true },
+      });
+      if (existing && existing.userId !== userId) return "TOKEN_OWNED_BY_OTHER";
+
+      const activeCount = await tx.firebasePushToken.count({ where: { userId, revokedAt: null } });
+      const previousOwnedActive = parsed.previousToken
+        ? await tx.firebasePushToken.findFirst({
+            where: { token: parsed.previousToken, userId, revokedAt: null },
+            select: { id: true },
+          })
+        : null;
+      if (!existing && activeCount >= 10 && !previousOwnedActive) return "TOKEN_LIMIT";
+
       if (parsed.previousToken && parsed.previousToken !== parsed.token) {
         await tx.firebasePushToken.updateMany({
           where: { token: parsed.previousToken, userId, revokedAt: null },
           data: { revokedAt: new Date() },
         });
       }
-      await tx.firebasePushToken.upsert({
-        where: { token: parsed.token },
-        create: { userId, token: parsed.token, lastSeenAt: new Date() },
-        update: { lastSeenAt: new Date(), revokedAt: null },
-      });
+      if (existing) {
+        await tx.firebasePushToken.updateMany({
+          where: { token: parsed.token, userId },
+          data: { lastSeenAt: new Date(), revokedAt: null },
+        });
+      } else {
+        await tx.firebasePushToken.create({
+          data: { userId, token: parsed.token, lastSeenAt: new Date() },
+        });
+      }
       await tx.notificationPreference.upsert({
         where: { workspaceId_userId: { workspaceId: context.principal!.workspaceId, userId } },
         create: { workspaceId: context.principal!.workspaceId, userId, pushEnabled: true },
         update: { pushEnabled: true },
       });
+      return "REGISTERED";
     });
+    if (outcome === "TOKEN_OWNED_BY_OTHER") {
+      return NextResponse.json({ error: "This browser token is already registered to another account." }, { status: 409 });
+    }
+    if (outcome === "TOKEN_LIMIT") {
+      return NextResponse.json({ error: "This account has reached the active browser limit." }, { status: 429 });
+    }
     return NextResponse.json({ data: { registered: true } });
+
   } catch (error) {
     const errorCode = error instanceof Error && "code" in error ? String(error.code) : "UNKNOWN";
     if (errorCode === "P2002") {
@@ -99,13 +116,19 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Invalid push-token request." }, { status: 400 });
   }
   try {
-    await prisma.$transaction([
-      prisma.firebasePushToken.updateMany({ where: { token, userId, revokedAt: null }, data: { revokedAt: new Date() } }),
-      prisma.notificationPreference.updateMany({
-        where: { workspaceId: context.principal.workspaceId, userId },
-        data: { pushEnabled: false },
-      }),
-    ]);
+    await prisma.$transaction(async (tx) => {
+      await tx.firebasePushToken.updateMany({
+        where: { token, userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      const remainingTokens = await tx.firebasePushToken.count({ where: { userId, revokedAt: null } });
+      if (remainingTokens === 0) {
+        await tx.notificationPreference.updateMany({
+          where: { workspaceId: context.principal!.workspaceId, userId },
+          data: { pushEnabled: false },
+        });
+      }
+    });
     return NextResponse.json({ data: { revoked: true } });
   } catch {
     return NextResponse.json({ error: "Unable to revoke push notifications." }, { status: 500 });
