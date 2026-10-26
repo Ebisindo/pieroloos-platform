@@ -22,7 +22,7 @@ vi.mock("@/lib/services/successor-continuity-service", () => ({
   listSuccessors: listMock, revokeSuccessor: revokeMock, saveRunbook: runbookMock, simulateHandover: simulateMock,
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: prismaMock }));
-import { GET, POST } from "@/app/api/admin/successors/route";
+import { GET, PATCH, POST } from "@/app/api/admin/successors/route";
 
 const superAdmin = { userId: "owner-1", email: "owner@example.test", isSuperAdmin: true, permissions: [], organizationIds: ["org-1"] };
 const ordinaryAdmin = { userId: "admin-1", email: "admin@example.test", isSuperAdmin: false, permissions: [], organizationIds: ["org-1"] };
@@ -71,6 +71,37 @@ describe("successor management route", () => {
     }));
     expect(response!.status).toBe(503);
     expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for every PATCH action without any continuity or database side effect", async () => {
+    actorMock.mockResolvedValue(superAdmin);
+    const actions = [
+      { action: "alive" },
+      { action: "simulate", successorId: "successor-1" },
+      { action: "revoke", successorId: "successor-1", reason: "Revocation requested by owner" },
+      { action: "asset", asset: { assetType: "domain", label: "Primary domain", recoveryLocation: "Registrar account reference", criticality: "HIGH" } },
+      { action: "runbook", runbook: { title: "Recovery procedure", content: "Documented recovery steps for the authorized reviewer." } },
+    ];
+
+    for (const action of actions) {
+      const response = await PATCH(new Request("http://localhost/api/admin/successors", {
+        method: "PATCH",
+        headers: { origin: "http://localhost", "content-type": "application/json" },
+        body: JSON.stringify(action),
+      }));
+      expect(response.status, action.action).toBe(503);
+    }
+
+    expect(aliveMock).not.toHaveBeenCalled();
+    expect(simulateMock).not.toHaveBeenCalled();
+    expect(revokeMock).not.toHaveBeenCalled();
+    expect(assetMock).not.toHaveBeenCalled();
+    expect(runbookMock).not.toHaveBeenCalled();
+    expect(addMock).not.toHaveBeenCalled();
+    expect(prismaMock.membership.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.complianceNotification.create).not.toHaveBeenCalled();
+    expect(prismaMock.successor.update).not.toHaveBeenCalled();
+    expect(prismaMock.platformAuditEvent.create).not.toHaveBeenCalled();
   });
 
   it("rejects cross-origin mutations before any service call", async () => {
