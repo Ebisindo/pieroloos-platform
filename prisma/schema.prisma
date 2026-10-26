@@ -402,7 +402,8 @@ model User {
   complianceStatusSnapshots            ComplianceStatusSnapshot[]        @relation("ComplianceStatusSnapshotActor")
   complianceRuleActivities            ComplianceRuleActivity[]          @relation("ComplianceRuleActivityActor")
   corporateGraphAuditEvents CorporateGraphAuditEvent[] @relation("CorporateGraphAuditActor")
-  firebaseIdentity FirebaseIdentity?
+  firebaseIdentity FirebaseIdentity? @relation("FirebaseIdentityUser")
+  firebaseIdentitiesLinked FirebaseIdentity[] @relation("FirebaseIdentityLinker")
   firebaseStepUpChallenges FirebaseStepUpChallenge[]
 
 }
@@ -453,6 +454,7 @@ model PlatformAuditEvent {
   occurredAt  DateTime @default(now())
 
   actor User? @relation("PlatformAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  firebaseIdentityLink FirebaseIdentity? @relation("FirebaseIdentityAuditEvent")
 
   @@index([occurredAt])
   @@index([actorUserId, occurredAt])
@@ -2212,11 +2214,12 @@ model FirebaseIdentity {
   firebaseUid    String
   linkedAt       DateTime @default(now())
   linkedByUserId String
-  auditEventId   String
+  auditEventId   String   @unique
 
-  user User @relation("FirebaseIdentityUser", fields: [userId], references: [id], onDelete: Cascade)
+  user          User               @relation("FirebaseIdentityUser", fields: [userId], references: [id], onDelete: Cascade)
+  linkedByUser  User               @relation("FirebaseIdentityLinker", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  auditEvent    PlatformAuditEvent @relation("FirebaseIdentityAuditEvent", fields: [auditEventId], references: [id], onDelete: Restrict)
 
   @@unique([projectId, firebaseUid])
   @@index([linkedByUserId, linkedAt])
-  @@index([auditEventId])
 }
