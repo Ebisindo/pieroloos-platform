@@ -768,7 +768,6 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
     })).rejects.toThrow();
   });
 
-});
 
   async function createGraphFixture(suffix: string) {
     const organization = await createOrganization(`graph-${suffix}`);
@@ -1049,3 +1048,5 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
     expect(stored.inviteExpiresAt?.getTime()).toBeGreaterThan(now.getTime());
     expect(await prisma.platformAuditEvent.count({ where: { subjectType: "SUCCESSOR", subjectId: successor.id, action: "successor_accepted" } })).toBe(0);
   });
+
+});
