@@ -1,6 +1,7 @@
 import { PlatformPermission } from "@prisma/client";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
+import { recordSuperAdminContinuityActivity } from "@/lib/services/successor-continuity-service";
 
 export type PlatformActor = {
   userId: string;
@@ -31,18 +32,26 @@ export async function getCurrentPlatformActor(): Promise<PlatformActor | null> {
     where: { id: userId },
     select: {
       platformSuperAdmin: { select: { userId: true } },
-      platformAdministrator: {
-        select: { permissions: { select: { permission: true } } },
-      },
+      platformAdministrator: { select: { permissions: { select: { permission: true } } } },
       memberships: { select: { organizationId: true } },
     },
   });
   if (!user || user.memberships.length === 0) return null;
 
+  const isSuperAdmin = Boolean(user.platformSuperAdmin);
+  if (isSuperAdmin) {
+    try {
+      await recordSuperAdminContinuityActivity(userId);
+    } catch {
+      // The continuity heartbeat must not take down normal authenticated pages.
+      // The separate worker remains fail-safe if activity recording is unavailable.
+    }
+  }
+
   return {
     userId,
     email,
-    isSuperAdmin: Boolean(user.platformSuperAdmin),
+    isSuperAdmin,
     permissions: user.platformAdministrator?.permissions.map(({ permission }) => permission) ?? [],
     organizationIds: user.memberships.map(({ organizationId }) => organizationId),
   };

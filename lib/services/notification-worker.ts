@@ -12,6 +12,7 @@ type ClaimedNotification = {
   id: string;
   organizationId: string;
   workspaceId: string;
+  dedupeKey: string;
   recipientUserId: string | null;
   channel: "IN_APP" | "EMAIL";
   subject: string;
@@ -161,7 +162,18 @@ async function claimDueNotifications(now: Date, workerId: string, limit: number)
 }
 
 async function loadRecipientContext(notification: ClaimedNotification) {
-  if (!notification.recipientUserId) return null;
+  if (!notification.recipientUserId) {
+    const allowedPrefix = notification.dedupeKey.startsWith("successor-invite-") ||
+      notification.dedupeKey.startsWith("continuity-warning-");
+    const email = allowedPrefix ? notificationEmail(notification) : "";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+    return {
+      email,
+      preference: { inAppEnabled: false, emailEnabled: true, quietHoursStart: null, quietHoursEnd: null, timezone: "UTC", locale: "en" },
+      notificationsEnabled: true,
+      externalInvite: true,
+    };
+  }
   const [user, preference, workspace, membership, workspaceSettings] = await Promise.all([
     prisma.user.findUnique({
       where: { id: notification.recipientUserId },
@@ -203,7 +215,15 @@ async function loadRecipientContext(notification: ClaimedNotification) {
       locale: "en",
     },
     notificationsEnabled: workspaceSettings?.notificationsEnabled ?? true,
+    externalInvite: false,
   };
+}
+
+function notificationEmail(notification: ClaimedNotification): string {
+  const marker = "\nInvitation recipient: ";
+  const index = notification.body.lastIndexOf(marker);
+  if (index < 0) return "";
+  return notification.body.slice(index + marker.length).trim().split(/\r?\n/)[0].trim();
 }
 
 async function finishWithoutDelivery(
@@ -341,8 +361,9 @@ export async function runNotificationWorker(
     try {
       const recipient = await loadRecipientContext(notification);
       if (!recipient || !recipient.notificationsEnabled ||
-        (notification.channel === "IN_APP" && !recipient.preference.inAppEnabled) ||
-        (notification.channel === "EMAIL" && !recipient.preference.emailEnabled)) {
+        (!recipient.externalInvite && notification.channel === "IN_APP" && !recipient.preference.inAppEnabled) ||
+        (!recipient.externalInvite && notification.channel === "EMAIL" && !recipient.preference.emailEnabled) ||
+        (recipient.externalInvite && notification.channel !== "EMAIL")) {
         const finalized = await finishWithoutDelivery(notification, workerId, {
           status: "CANCELLED",
           reason: !recipient ? "RECIPIENT_NOT_IN_WORKSPACE" : "RECIPIENT_PREFERENCE_DISABLED",
@@ -352,7 +373,7 @@ export async function runNotificationWorker(
         continue;
       }
 
-      const quietUntil = quietHoursEnd(
+      const quietUntil = recipient.externalInvite ? null : quietHoursEnd(
         now,
         recipient.preference.quietHoursStart,
         recipient.preference.quietHoursEnd,
@@ -389,7 +410,7 @@ export async function runNotificationWorker(
           templateKey: notification.templateKey,
           templateVersion: notification.templateVersion,
           subject: notification.subject,
-          body: notification.body,
+          body: notification.body.split(/\nInvitation recipient: /)[0],
           recipientEmail: recipient.email,
           locale: resolveEmailLocale(recipient.preference.locale),
           templateParams: parseEmailTemplateParams(notification.templateKey, notification.templateParams),
