@@ -121,13 +121,10 @@ export async function DELETE(request: Request) {
         where: { token, userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      const remainingTokens = await tx.firebasePushToken.count({ where: { userId, revokedAt: null } });
-      if (remainingTokens === 0) {
-        await tx.notificationPreference.updateMany({
-          where: { workspaceId: context.principal!.workspaceId, userId },
-          data: { pushEnabled: false },
-        });
-      }
+      await tx.notificationPreference.updateMany({
+        where: { workspaceId: context.principal!.workspaceId, userId },
+        data: { pushEnabled: false },
+      });
     });
     return NextResponse.json({ data: { revoked: true } });
   } catch {
