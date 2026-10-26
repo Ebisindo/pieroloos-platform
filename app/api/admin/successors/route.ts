@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { auth } from "@/lib/auth/auth";
 import { getCurrentPlatformActor } from "@/lib/auth/platform-access";
 import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
 import { enforceRateLimit, PLATFORM_ADMIN_MUTATION_LIMIT } from "@/lib/http/rate-limit";
 import { prisma } from "@/lib/db/prisma";
+import { FirebaseStepUpError } from "@/lib/auth/firebase-step-up";
+import { consumeFirebaseStepUpChallenge, type StepUpOperation } from "@/lib/services/firebase-step-up-service";
 import { addSuccessor, confirmOwnerAlive, createContinuityAsset, listSuccessors, revokeSuccessor, saveRunbook, simulateHandover } from "@/lib/services/successor-continuity-service";
 
 const permissionsSchema = z.object({ canTransferOwnership: z.boolean(), canAccessSecrets: z.boolean(), canDeploy: z.boolean(), canAccessBilling: z.boolean() }).strict();
+const handleSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 const createSchema = z.object({
   successorName: z.string().trim().min(2).max(120), successorEmail: z.string().trim().email().max(254),
   successorGithub: z.string().trim().max(39).optional().or(z.literal("")), relationship: z.string().trim().min(2).max(80),
   autoActivateAfterDays: z.union([z.literal(30), z.literal(60), z.literal(90)]), permissions: permissionsSchema,
   highPermissionVerificationNote: z.string().trim().max(1000).optional(),
+  stepUpHandle: handleSchema.optional(),
 }).strict();
 const MAX_BODY_BYTES = 8 * 1024;
 
@@ -33,12 +39,29 @@ async function guard(request?: Request) {
     if (hasInvalidRequestOrigin(request)) return { error: NextResponse.json({ error: "Invalid request origin." }, { status: 403 }) };
     const limited = await enforceRateLimit(PLATFORM_ADMIN_MUTATION_LIMIT, actor.userId);
     if (limited) return { error: limited };
-    // The current auth provider has no trusted step-up timestamp. An environment
-    // flag is not proof of a recent MFA challenge, so writes remain disabled until
-    // a signed/verified identity-provider assertion is validated on this request.
-    return { error: NextResponse.json({ error: "Continuity mutations are temporarily locked until verified MFA/re-authentication can be proven by the identity provider." }, { status: 503 }) };
+    const session = await auth();
+    if (!session?.user?.id || session.user.id !== actor.userId ||
+        typeof session.stepUpSessionId !== "string" ||
+        session.stepUpSessionId.length < 20 || session.stepUpSessionId.length > 200) {
+      return { error: NextResponse.json({ error: "A valid signed session binding is required." }, { status: 401 }) };
+    }
+    return { actor, sessionId: session.stepUpSessionId };
   }
   return { actor };
+}
+
+async function inStepUpTransaction<T>(
+  actorUserId: string,
+  sessionId: string,
+  operation: StepUpOperation,
+  handle: string,
+  action: (tx: Prisma.TransactionClient) => Promise<T>,
+) {
+  return prisma.$transaction(async (tx) => {
+    await consumeFirebaseStepUpChallenge(tx, { userId: actorUserId, sessionId, operation, handle });
+    // Challenge consumption, domain mutation and audit write must commit or roll back together.
+    return action(tx);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function GET() {
@@ -51,10 +74,14 @@ export async function GET() {
 export async function POST(request: Request) {
   const access = await guard(request);
   if ("error" in access) return access.error;
+  if (!("sessionId" in access)) return NextResponse.json({ error: "A signed session binding is required." }, { status: 401 });
+
   const parsedBody = await jsonBody(request);
   if (!parsedBody.ok) return parsedBody.response;
   const parsed = createSchema.safeParse(parsedBody.body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid successor details.", issues: parsed.error.flatten() }, { status: 422 });
+  if (!parsed.data.stepUpHandle) return NextResponse.json({ error: "Fresh Firebase MFA step-up is required." }, { status: 401 });
+  const { stepUpHandle, ...successorInput } = parsed.data;
 
   const origin = process.env.SITE_URL || process.env.NEXTAUTH_URL;
   let trustedOrigin: URL;
@@ -70,8 +97,8 @@ export async function POST(request: Request) {
   if (!membership || !workspace) return NextResponse.json({ error: "A workspace is required for secure invitation delivery." }, { status: 409 });
 
   try {
-    const invite = await prisma.$transaction(async (tx) => {
-      const created = await addSuccessor(access.actor, parsed.data, tx);
+    const invite = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:create-successor", stepUpHandle, async (tx) => {
+      const created = await addSuccessor(access.actor, successorInput, tx);
       const inviteUrl = new URL("/successor/accept", trustedOrigin);
       inviteUrl.searchParams.set("token", created.token);
       await tx.complianceNotification.create({
@@ -84,9 +111,10 @@ export async function POST(request: Request) {
         },
       });
       return created;
-    }, { isolationLevel: "Serializable" });
+    });
     return NextResponse.json({ data: { ...invite.successor, invitationDelivery: "QUEUED" }, message: "Invitation queued for email delivery." }, { status: 201 });
   } catch (error) {
+    if (error instanceof FirebaseStepUpError) return NextResponse.json({ error: "Step-up handle is invalid, expired, replayed, or bound to a different operation/session." }, { status: 401 });
     if (error instanceof Error && error.message === "SUCCESSOR_ALREADY_EXISTS") return NextResponse.json({ error: "A non-revoked successor already uses this email." }, { status: 409 });
     if (error instanceof Error && error.message === "HIGH_PERMISSION_VERIFICATION_REQUIRED") return NextResponse.json({ error: "A documented video/ID verification plan is required for secret access." }, { status: 422 });
     if (error instanceof Error && error.message === "SUPER_ADMIN_REQUIRED") return NextResponse.json({ error: "Super Administrator access required." }, { status: 403 });
@@ -98,6 +126,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const access = await guard(request);
   if ("error" in access) return access.error;
+  if (!("sessionId" in access)) return NextResponse.json({ error: "A signed session binding is required." }, { status: 401 });
+
   const parsedBody = await jsonBody(request);
   if (!parsedBody.ok) return parsedBody.response;
   const parsed = z.object({
@@ -105,16 +135,36 @@ export async function PATCH(request: Request) {
     successorId: z.string().optional(), reason: z.string().trim().min(8).max(500).optional(),
     asset: z.object({ assetType: z.string().trim().min(2).max(60), label: z.string().trim().min(2).max(160), recoveryLocation: z.string().trim().min(2).max(500), criticality: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]), notes: z.string().max(1000).optional() }).optional(),
     runbook: z.object({ id: z.string().optional(), title: z.string().trim().min(2).max(160), content: z.string().trim().min(20).max(20000) }).optional(),
+    stepUpHandle: handleSchema.optional(),
   }).strict().safeParse(parsedBody.body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid action payload." }, { status: 422 });
+  if (!parsed.data.stepUpHandle) return NextResponse.json({ error: "Fresh Firebase MFA step-up is required." }, { status: 401 });
+  const handle = parsed.data.stepUpHandle;
+
   try {
-    if (parsed.data.action === "alive") return NextResponse.json({ data: await confirmOwnerAlive(access.actor) });
-    if (parsed.data.action === "simulate" && parsed.data.successorId) return NextResponse.json({ data: await simulateHandover(access.actor, parsed.data.successorId) });
-    if (parsed.data.action === "revoke" && parsed.data.successorId && parsed.data.reason) return NextResponse.json({ data: await revokeSuccessor(access.actor, parsed.data.successorId, parsed.data.reason) });
-    if (parsed.data.action === "asset" && parsed.data.asset) return NextResponse.json({ data: await createContinuityAsset(access.actor, parsed.data.asset) }, { status: 201 });
-    if (parsed.data.action === "runbook" && parsed.data.runbook) return NextResponse.json({ data: await saveRunbook(access.actor, parsed.data.runbook) }, { status: 201 });
+    if (parsed.data.action === "alive") {
+      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:owner-alive", handle, (tx) => confirmOwnerAlive(access.actor, tx));
+      return NextResponse.json({ data });
+    }
+    if (parsed.data.action === "simulate" && parsed.data.successorId) {
+      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:simulate", handle, (tx) => simulateHandover(access.actor, parsed.data.successorId!, tx));
+      return NextResponse.json({ data });
+    }
+    if (parsed.data.action === "revoke" && parsed.data.successorId && parsed.data.reason) {
+      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:revoke", handle, (tx) => revokeSuccessor(access.actor, parsed.data.successorId!, parsed.data.reason!, tx));
+      return NextResponse.json({ data });
+    }
+    if (parsed.data.action === "asset" && parsed.data.asset) {
+      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:create-asset", handle, (tx) => createContinuityAsset(access.actor, parsed.data.asset!, tx));
+      return NextResponse.json({ data }, { status: 201 });
+    }
+    if (parsed.data.action === "runbook" && parsed.data.runbook) {
+      const data = await inStepUpTransaction(access.actor.userId, access.sessionId, "continuity:save-runbook", handle, (tx) => saveRunbook(access.actor, parsed.data.runbook!, tx));
+      return NextResponse.json({ data }, { status: 201 });
+    }
     return NextResponse.json({ error: "Required action fields are missing." }, { status: 422 });
   } catch (error) {
+    if (error instanceof FirebaseStepUpError) return NextResponse.json({ error: "Step-up handle is invalid, expired, replayed, or bound to a different operation/session." }, { status: 401 });
     if (error instanceof Error && error.message === "SUCCESSOR_NOT_FOUND") return NextResponse.json({ error: "Successor not found." }, { status: 404 });
     if (error instanceof Error && error.message === "ACTIVE_SUCCESSOR_REQUIRES_RECOVERY_REVIEW") return NextResponse.json({ error: "An active successor requires an independently evidenced recovery review; self-service revoke is blocked." }, { status: 409 });
     if (error instanceof Error && error.message === "RUNBOOK_NOT_FOUND") return NextResponse.json({ error: "Runbook not found." }, { status: 404 });
