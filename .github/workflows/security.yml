@@ -53,9 +53,15 @@ jobs:
             exit "$status"
           fi
       - name: Audit locked dependency tree
-        run: npm audit --audit-level=high 2>&1 | tee dependency-evidence/npm-audit-all.log
+        shell: bash
+        run: |
+          set -o pipefail
+          npm audit --audit-level=high 2>&1 | tee dependency-evidence/npm-audit-all.log
       - name: Audit production dependency tree
-        run: npm audit --omit=dev --audit-level=high 2>&1 | tee dependency-evidence/npm-audit-production.log
+        shell: bash
+        run: |
+          set -o pipefail
+          npm audit --omit=dev --audit-level=high 2>&1 | tee dependency-evidence/npm-audit-production.log
       - name: Upload dependency review evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
