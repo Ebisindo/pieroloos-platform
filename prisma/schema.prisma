@@ -48,6 +48,7 @@ enum ContinuityCaseStatus {
 enum NotificationChannel {
   IN_APP
   EMAIL
+  PUSH
 }
 
 enum NotificationStatus {
@@ -378,6 +379,7 @@ model User {
   assignedTasks           Task[]                   @relation("TaskAssignee")
   activities              Activity[]               @relation("ActivityActor")
   notificationPreferences NotificationPreference[]
+  firebasePushTokens      FirebasePushToken[]
   clientPortalGrants     ClientPortalGrant[]      @relation("ClientPortalGrantUser")
   portalGrantsCreated    ClientPortalGrant[]      @relation("ClientPortalGrantCreatedBy")
   clientPortalEvents     ClientPortalAuditEvent[] @relation("PortalAuditActor")
@@ -1477,6 +1479,7 @@ model NotificationPreference {
   userId          String
   inAppEnabled    Boolean  @default(true)
   emailEnabled    Boolean  @default(false)
+  pushEnabled     Boolean  @default(false)
   quietHoursStart String?
   quietHoursEnd   String?
   timezone        String   @default("UTC")
@@ -1489,6 +1492,20 @@ model NotificationPreference {
 
   @@unique([workspaceId, userId])
   @@index([userId])
+}
+
+model FirebasePushToken {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  lastSeenAt DateTime @default(now())
+  revokedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
 }
 
 model NotificationDeliveryAttempt {

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 import { parseEmailTemplateParams, resolveEmailLocale } from "@/lib/i18n/email-templates";
 import { sendNotificationEmail } from "@/lib/services/notification-email";
+import { sendFirebasePush } from "@/lib/services/firebase-push-delivery";
 
 const MAX_BATCH_SIZE = 100;
 const LEASE_MILLISECONDS = 5 * 60 * 1000;
@@ -14,7 +15,7 @@ type ClaimedNotification = {
   workspaceId: string;
   dedupeKey: string;
   recipientUserId: string | null;
-  channel: "IN_APP" | "EMAIL";
+  channel: "IN_APP" | "EMAIL" | "PUSH";
   subject: string;
   body: string;
   templateKey: string;
@@ -73,6 +74,10 @@ function isPermanentFailure(error: unknown) {
       "INVALID_SMTP_MESSAGE_ID_DOMAIN",
       "INVALID_SMTP_SECURE_SETTING",
       "SMTP_USERNAME_AND_PASSWORD_MUST_BE_PAIRED",
+      "NO_ACTIVE_PUSH_TOKENS",
+      "PUSH_PERMANENT_FAILURE",
+      "FIREBASE_PUSH_NOT_CONFIGURED",
+      "FIREBASE_PUSH_PROJECT_MISMATCH",
     ].includes(error.message)
   ) {
     return true;
@@ -169,7 +174,7 @@ async function loadRecipientContext(notification: ClaimedNotification) {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
     return {
       email,
-      preference: { inAppEnabled: false, emailEnabled: true, quietHoursStart: null, quietHoursEnd: null, timezone: "UTC", locale: "en" },
+      preference: { inAppEnabled: false, emailEnabled: true, pushEnabled: false, quietHoursStart: null, quietHoursEnd: null, timezone: "UTC", locale: "en" },
       notificationsEnabled: true,
       externalInvite: true,
     };
@@ -209,6 +214,7 @@ async function loadRecipientContext(notification: ClaimedNotification) {
     preference: preference ?? {
       inAppEnabled: true,
       emailEnabled: false,
+      pushEnabled: false,
       quietHoursStart: null,
       quietHoursEnd: null,
       timezone: "UTC",
@@ -363,6 +369,7 @@ export async function runNotificationWorker(
       if (!recipient || !recipient.notificationsEnabled ||
         (!recipient.externalInvite && notification.channel === "IN_APP" && !recipient.preference.inAppEnabled) ||
         (!recipient.externalInvite && notification.channel === "EMAIL" && !recipient.preference.emailEnabled) ||
+        (!recipient.externalInvite && notification.channel === "PUSH" && !recipient.preference.pushEnabled) ||
         (recipient.externalInvite && notification.channel !== "EMAIL")) {
         const finalized = await finishWithoutDelivery(notification, workerId, {
           status: "CANCELLED",
@@ -401,6 +408,38 @@ export async function runNotificationWorker(
           success: { messageId: `in-app:${notification.id}`, receipt: "Persisted in recipient inbox." },
         });
         summary[result] += 1;
+        continue;
+      }
+
+      if (notification.channel === "PUSH") {
+        try {
+          const receipt = await sendFirebasePush({
+            userId: notification.recipientUserId!,
+            title: notification.subject,
+            body: notification.body,
+            notificationId: notification.id,
+          });
+          const outcome = await finishAttempt({
+            notification,
+            workerId,
+            attemptId: attempt.id,
+            now,
+            success: { messageId: receipt.messageId, receipt: receipt.receipt },
+          });
+          summary[outcome] += 1;
+        } catch (error) {
+          console.error("Push notification delivery attempt failed.", {
+            notificationId: notification.id,
+            failureCode: failureCode(error),
+          });
+          summary[await finishAttempt({
+            notification,
+            workerId,
+            attemptId: attempt.id,
+            now,
+            error,
+          })] += 1;
+        }
         continue;
       }
 
