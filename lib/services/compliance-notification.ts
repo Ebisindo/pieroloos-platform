@@ -7,7 +7,7 @@ export type ComplianceNotification = {
   obligationId?: string;
   actionId?: string;
   recipientUserId?: string;
-  channel: "IN_APP" | "EMAIL";
+  channel: "IN_APP" | "EMAIL" | "PUSH";
   subject: string;
   body: string;
   scheduledFor: Date;
