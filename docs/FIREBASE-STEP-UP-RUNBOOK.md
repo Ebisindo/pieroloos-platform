@@ -4,6 +4,17 @@ This branch adds Firebase Admin verification, the two-phase MFA challenge, a dur
 
 ## Configuration and isolated environment
 
+## Explicit environment opt-in / emergency stop
+
+The Firebase MFA step-up lifecycle is guarded by `FIREBASE_STEP_UP_ENABLED`. If the variable is unset or not exactly `true`, challenge start, challenge completion, and challenge consumption all fail closed. This prevents protected continuity mutations from proceeding through the step-up path by default.
+
+- Keep it unset or `false` in production until the release owner has recorded staging evidence and independent security/identity and database approvals for the exact deployed SHA.
+- Set `FIREBASE_STEP_UP_ENABLED=true` only in a dedicated isolated staging environment while executing the approved test matrix.
+- Do not enable it merely because CI is green or because a project has Firebase credentials.
+- To stop new protected writes using this flow, unset the variable or set it to `false` in the application runtime configuration and redeploy/restart according to the hosting platform's configuration semantics. Confirm the change with a denied step-up smoke test and sanitized runtime evidence.
+- Keep protected continuity/recovery actions unavailable until staging, reviewer, and post-merge checks are complete.
+
+
 - `FIREBASE_PROJECT_ID` must identify the Firebase project for the specific environment. Production uses `pieroloos-platform`; staging should use a separate, isolated Firebase project and a separate staging database whenever available. The project ID must match the web app's `NEXT_PUBLIC_FIREBASE_PROJECT_ID`.
 - Set `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID` from that environment's Firebase web app configuration. These are client configuration values; API key restrictions still apply.
 - Prefer workload identity / Application Default Credentials for Admin SDK. If a service-account key is needed, store it only in a protected hosting secret store. Never commit service-account JSON, private keys, ID tokens, passwords, SMS codes or session cookies.
