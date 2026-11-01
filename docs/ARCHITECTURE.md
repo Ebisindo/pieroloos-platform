@@ -4,6 +4,8 @@ UI → Application Services → Domain/Business Rules → Repository/Data Access
 
 The UI should not contain persistence or core business rules. Evidence and source quality are first-class concepts. Organization and workspace boundaries are modeled from the start. Human decision authority remains separate from automated preparation.
 
+The dedicated Business Profile workspace at `/business-profile` reads and edits the profile created during client intake; it does not create a second profile record. Reports use workspace-scoped snapshots saved as report documents, while engagement operations use the existing status-transition graph and audit activity trail.
+
 ## First vertical slice
 Client Intake → Business Profile → Engagement → Jurisdiction Lens → Formation → Compliance → Report → Engagement Record.
 
@@ -18,7 +20,7 @@ Client Intake → Business Profile → Engagement → Jurisdiction Lens → Form
 - **Site URL:** `SITE_URL` (optional) enables canonical URLs, sitemap entries and Organization JSON-LD. Unset means they are omitted, not guessed.
 - **Fonts:** `next/font/google` (Inter, Space Grotesk) in `app/layout.tsx`; this needs network access at build time.
 - **Honesty rule:** public copy distinguishes Available, Foundation and Planned capabilities (`productModules` in `lib/navigation.ts`) and states no partners, customers or approvals.
-- **Internationalization:** `lib/i18n/` contains the default English locale, proposed locale registry, typed catalogs, fallback and formatting helpers. The existing public homepage and partnership page use those catalogs with a route-preserving language selector; authenticated workflows remain outside the translated scope. See [INTERNATIONALIZATION.md](INTERNATIONALIZATION.md).
+- **Internationalization:** `lib/i18n/` contains the default English locale, proposed locale registry, typed catalogs, fallback and formatting helpers. Public and the new Business Profile, Reports and Engagements workflows use the locale catalogs. Other authenticated workflows may still have untranslated portions. See [INTERNATIONALIZATION.md](INTERNATIONALIZATION.md).
 
 ## Database and service architecture
 
@@ -61,6 +63,7 @@ Never commit values. Examples live in `.env.example` and `.env.auth.example`.
 | Rate limiting | `RATE_LIMIT_REDIS_REST_URL`, `RATE_LIMIT_REDIS_REST_TOKEN` | Required together in production; atomic shared Redis REST counters; no in-memory production fallback |
 | Public site | `SITE_URL` | Optional; enables canonical URLs, sitemap, JSON-LD |
 | Partnerships | `PARTNERSHIP_INQUIRY_NOTIFY_EMAIL` | Optional; content-free alert, needs SMTP |
+| Payments | `PAYMENTS_ENABLED`, `STRIPE_PAYMENTS_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BANK_TRANSFER_ENABLED`, `BANK_TRANSFER_DETAILS_VERIFIED`, `CRYPTO_PAYMENTS_ENABLED`, per-rail crypto variables | All payment flags default to false. Secret/configure account and token/network values in deployment secret management. Review `PAYMENTS-IMPLEMENTATION-STATUS.md`; there is no automatic blockchain verifier in the current implementation. |
 
 ## Testing commands
 

@@ -53,9 +53,9 @@ The banner is integrated into:
 
 The banner is presentation-only. Existing workspace context, repository queries, permission checks, workflow components, professional-review gates and data writes remain authoritative. Illustrations do not feed data into the workflows, and diagram labels must never be presented as live workspace metrics or recommendations.
 
-The product navigation’s “Business Profile” item currently points to `/clients` and is labelled a foundation in `lib/navigation.ts`. There is no separate `app/business-profile/page.tsx` route in this branch. Do not create a new profile editor or change routing until its intended create/edit workflow, permissions and data ownership are identified. The `/clients` screen is presently for workspace client-portal access/interactions, not a dedicated business-profile editor.
+The dedicated Business Profile workspace is at `/business-profile`, with a detail/editor route at `/business-profile/[id]`. It maintains the existing `BusinessProfile` record created from intake, uses client read/write permissions, workspace-scoped repository access and version/audit updates. The `/clients` screen remains dedicated to client-portal access and interactions.
 
-Reports and Engagements currently display their existing empty states. Adding banner illustrations does not imply that report generation or a full engagement CRUD workflow is implemented. Keep this distinction clear.
+Reports now use persisted client-summary documents, report previews, and a safe escaped HTML download/print export. Engagements use workspace-scoped list/create/update and approved lifecycle transitions, with activity history. Keep data availability, provenance and professional-review limitations visible; UI labels must not imply evidence is independently verified.
 
 A preview route is available at `/command-center/visual-preview`. Its sample content is illustrative, not live telemetry.
 

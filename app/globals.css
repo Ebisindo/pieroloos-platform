@@ -106,7 +106,7 @@ a { color: inherit; text-decoration: none; }
 .context-path { display:flex; gap:8px; align-items:center; color:#6f7892; font-size:12px; }
 .context-path strong { color:#d9deeb; font-weight:600; }
 .search-button { border:1px solid var(--line); background:rgba(255,255,255,.025); color:#8d96ad; border-radius:8px; height:34px; padding:0 9px; display:flex; align-items:center; gap:8px; }
-.search-button kbd { border:1px solid var(--line); border-radius:4px; padding:2px 5px; font-size:9px; color:#66708a; }
+.search-button kbd { border:1px solid var(--line); border-radius:4px; padding:2px 5px; font-size:9px; color:#b9c5dc; }
 .security-state { display:flex; align-items:center; gap:6px; color:#7f8aa5; font-size:10px; }
 .security-state svg { color:var(--green); }
 .avatar { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; border:1px solid rgba(214,182,106,.35); background:rgba(214,182,106,.08); color:var(--gold); font-size:9px; font-weight:700; }
@@ -417,6 +417,46 @@ select.form-input { appearance:auto; }
   .faq-item:not([open]) > *:not(summary) { display: none !important; }
 }
 
+/* Payment gateway and reconciliation surfaces */
+.payment-method-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:18px; }
+.payment-method-grid > div { border:1px solid var(--color-border); background:rgba(12,18,40,.5); border-radius:var(--radius-md); padding:18px; min-width:0; }
+.payment-method-grid h3, .payment-review-card h3 { margin:0 0 10px; font-family:var(--font-display); font-size:15px; }
+.payment-method-grid p { color:var(--color-text-muted); font-size:13px; line-height:1.6; margin:12px 0 0; }
+.payment-action { display:flex; flex-direction:column; align-items:flex-start; gap:8px; min-width:160px; }
+.payment-action .button { white-space:normal; }
+.payment-success { color:var(--green); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.payment-error { color:var(--danger); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.payment-warning { margin:16px 0; padding:12px 14px; border:1px solid rgba(232,199,109,.35); border-radius:var(--radius-md); background:rgba(232,199,109,.07); color:#f1daa0; font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+.payment-address { padding:12px; border:1px solid var(--color-border); background:rgba(0,0,0,.18); border-radius:var(--radius-sm); overflow-wrap:anywhere; }
+.token-identifier { display:block; overflow-wrap:anywhere; margin-top:8px; }
+.bank-instructions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; margin:18px 0; }
+.bank-instructions > div { min-width:0; }
+.bank-instructions dt, .field-label { color:var(--color-text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:5px; }
+.bank-instructions dd { margin:0; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.input-field { width:100%; min-width:0; color:var(--color-text); background:rgba(4,7,21,.72); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:10px 12px; margin-top:6px; }
+select.input-field { color-scheme:dark; }
+.payment-review-card { display:flex; flex-direction:column; gap:18px; }
+.payment-review-card > header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.payment-review-card p { color:var(--color-text-muted); font-size:13px; line-height:1.55; margin:5px 0; overflow-wrap:anywhere; }
+.payment-review-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.payment-review-fields label { display:flex; flex-direction:column; color:var(--color-text-muted); font-size:12px; gap:5px; min-width:0; }
+.payment-review-fields label:has(textarea) { grid-column:1 / -1; }
+.payment-review-fields .payment-warning { grid-column:1 / -1; }
+.bank-transfer-order { width:100%; align-items:stretch; }
+.bank-transfer-order > section { width:100%; }
+.inline-form { display:inline-flex; }
+.muted { color:var(--color-text-muted); font-size:13px; line-height:1.6; }
+@media (max-width: 900px) {
+  .payment-method-grid { grid-template-columns:1fr; }
+}
+@media (max-width: 620px) {
+  .bank-instructions, .payment-review-fields { grid-template-columns:1fr; }
+  .payment-review-fields label:has(textarea), .payment-review-fields .payment-warning { grid-column:auto; }
+  .payment-review-card { padding:14px; }
+  .payment-method-grid > div { padding:14px; }
+  .payment-review-card .page-actions, .payment-action .button { width:100%; }
+}
+
 /* Responsive banner and illustration system — UI/UX enhancement */
 .module-banner {
   position: relative;
@@ -552,4 +592,61 @@ select.form-input { appearance:auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   .module-banner *, .module-banner *::before, .module-banner *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* Preserve legibility in operating-system forced-colors/high-contrast modes. */
+@media (forced-colors: active) {
+  .app-backdrop,
+  .module-banner-decoration,
+  .operational-illustration-orbit,
+  .operational-illustration-orbit-b,
+  .ambient-orbit,
+  .star-field,
+  .boot-orbit {
+    display: none !important;
+  }
+
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 3px;
+  }
+
+  .skip-link {
+    color: CanvasText !important;
+    background: Canvas !important;
+    border: 1px solid LinkText;
+  }
+
+  button,
+  .button,
+  input,
+  textarea,
+  select {
+    border-color: ButtonText;
+  }
+
+  input,
+  textarea,
+  select {
+    color: FieldText;
+    background: Field;
+  }
+}
+
+
+/* Compact authenticated toolbar at the narrowest supported widths. */
+@media (max-width: 480px) {
+  .topbar { gap: 8px; padding: 0 12px; }
+  .topbar-left, .topbar-actions { gap: 8px; min-width: 0; }
+  .topbar-left { flex: 1 1 auto; }
+  .context-path { min-width: 0; gap: 0; }
+  .context-path > span { display: none; }
+  .context-path strong { white-space: nowrap; }
+  .topbar-actions { flex: 0 1 auto; }
+  .topbar-actions .language-select { width: 120px; max-width: 120px; }
+}
+@media (max-width: 360px) {
+  .topbar-actions .search-button,
+  .topbar-actions .avatar { display: none; }
+  .topbar-actions .language-select { width: 108px; max-width: 108px; }
 }

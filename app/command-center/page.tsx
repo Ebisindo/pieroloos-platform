@@ -5,6 +5,7 @@ import { NotificationInbox } from "@/components/control-plane/NotificationInbox"
 import { NotificationPreferencesForm } from "@/components/control-plane/NotificationPreferencesForm";
 import { ModuleBanner } from "@/components/ui/ModuleBanner";
 import { GlassPanel, MetricCard, SectionHeader, StatusBadge } from "@/components/ui/primitives";
+import { WorkspaceAccessState } from "@/components/auth/WorkspaceAccessState";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { listActiveOperationalActions } from "@/lib/db/operational-action-query";
 import { notificationRepository } from "@/lib/db/notification-repository";
@@ -28,7 +29,13 @@ const moduleLabelKeys: Record<(typeof productModules)[number]["key"], MessageKey
 export default async function CommandCenterPage() {
   const t = await getRequestTranslator();
   const context = await getWorkspaceContext();
-  const canReadWorkspace = context.principal?.permissions.includes("workspace:read") ?? false;
+  if (!context.userId) {
+    return <WorkspaceAccessState title={t("app.clients.signInTitle")} description={t("app.clients.signInDescription")} href="/signin?callbackUrl=/command-center" action={t("navigation.signIn")} />;
+  }
+  if (!context.activeWorkspace || !context.principal) {
+    return <WorkspaceAccessState title={t("app.clients.workspaceRequired")} description={t("app.clients.workspaceDescription")} />;
+  }
+  const canReadWorkspace = context.principal.permissions.includes("workspace:read");
   const canReadActions = context.principal?.permissions.includes("compliance:read") ?? false;
   const canManageActions = context.principal?.permissions.includes("compliance:write") ?? false;
   const [counts, activeActions, assignees, notifications, notificationPreferences] = await Promise.all([
