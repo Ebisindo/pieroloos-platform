@@ -8,6 +8,7 @@ import { withAuthorizedWorkspaceTransaction } from "@/lib/auth/authorized-worksp
 const reviewSchema = z.object({
   decision: z.enum(["APPROVED", "REJECTED", "CHANGES_REQUESTED"]),
   note: z.string().trim().min(4).max(3000),
+  expectedVersion: z.number().int().positive(),
 }).strict();
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -61,17 +62,42 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
         if (existing.status === "APPROVED" || existing.status === "REJECTED") {
           throw new Error("INTENT_PROPOSAL_FINAL");
         }
+        if (existing.createdByUserId === principal.userId) {
+          throw new Error("INTENT_PROPOSAL_SELF_REVIEW");
+        }
+        if (existing.version !== parsed.data.expectedVersion) {
+          throw new Error("INTENT_PROPOSAL_VERSION_CONFLICT");
+        }
 
         const reviewedAt = new Date();
-        const updated = await transaction.businessIntentProposal.update({
-          where: { id: existing.id },
+        const updatedCount = await transaction.businessIntentProposal.updateMany({
+          where: {
+            id: existing.id,
+            organizationId: principal.organizationId,
+            workspaceId: principal.workspaceId,
+            version: parsed.data.expectedVersion,
+            status: { notIn: ["APPROVED", "REJECTED"] },
+          },
           data: {
             status: parsed.data.decision,
             reviewedByUserId: principal.userId,
             reviewNote: parsed.data.note,
             reviewedAt,
+            version: { increment: 1 },
           },
         });
+        if (updatedCount.count !== 1) {
+          throw new Error("INTENT_PROPOSAL_VERSION_CONFLICT");
+        }
+        const updated = await transaction.businessIntentProposal.findFirst({
+          where: {
+            id: existing.id,
+            organizationId: principal.organizationId,
+            workspaceId: principal.workspaceId,
+            version: parsed.data.expectedVersion + 1,
+          },
+        });
+        if (!updated) throw new Error("INTENT_PROPOSAL_VERSION_CONFLICT");
         await transaction.businessIntentProposalReview.create({
           data: {
             proposalId: existing.id,
@@ -91,7 +117,8 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
             summary: `Proposal decision recorded: ${parsed.data.decision}.`,
             metadata: {
               proposalId: existing.id,
-              proposalVersion: existing.version,
+              priorProposalVersion: existing.version,
+              proposalVersion: updated.version,
               fromStatus: existing.status,
               toStatus: parsed.data.decision,
               reviewerUserId: principal.userId,
@@ -112,6 +139,12 @@ export async function PATCH(request: Request, routeContext: RouteContext) {
     }
     if (error instanceof Error && error.message === "INTENT_PROPOSAL_FINAL") {
       return NextResponse.json({ error: "Approved or rejected proposals are immutable. Create a new proposal to reconsider the decision." }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "INTENT_PROPOSAL_SELF_REVIEW") {
+      return NextResponse.json({ error: "A different authorized reviewer must review this proposal." }, { status: 403 });
+    }
+    if (error instanceof Error && error.message === "INTENT_PROPOSAL_VERSION_CONFLICT") {
+      return NextResponse.json({ error: "Proposal changed during review. Refresh it and submit the decision against the latest version." }, { status: 409 });
     }
     if (isSerializationConflict(error)) {
       return NextResponse.json({ error: "Proposal changed during review. Refresh and retry." }, { status: 409 });

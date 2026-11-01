@@ -1,11 +1,15 @@
-import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { Prisma, PrismaClient, SuccessorStatus } from "@prisma/client";
 import { clientRepository } from "@/lib/db/client-repository";
 import type { WorkspacePrincipal } from "@/lib/auth/workspace-access";
+import { validateOwnershipTotal, wouldCreateOwnershipCycle } from "@/lib/domain/corporate-graph";
 
 const integrationEnabled = process.env.DATABASE_INTEGRATION_TESTS === "1";
 const prisma = new PrismaClient();
 const organizationIds: string[] = [];
+const evidenceIds: string[] = [];
+const userIds: string[] = [];
+const successorIds: string[] = [];
 
 async function createOrganization(slug: string) {
   const organization = await prisma.organization.create({
@@ -24,13 +28,59 @@ async function createWorkspace(organizationId: string, slug: string) {
 describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
   afterEach(async () => {
     if (organizationIds.length > 0) {
+      const workspaces = await prisma.workspace.findMany({
+        where: { organizationId: { in: organizationIds } },
+        select: { id: true },
+      });
+      if (workspaces.length > 0) {
+        await prisma.businessIntentEvidenceReference.deleteMany({
+          where: { workspaceId: { in: workspaces.map((workspace) => workspace.id) } },
+        });
+      }
       await prisma.organization.deleteMany({ where: { id: { in: organizationIds } } });
       organizationIds.length = 0;
+    }
+    if (evidenceIds.length > 0) {
+      await prisma.evidence.deleteMany({ where: { id: { in: evidenceIds } } });
+      evidenceIds.length = 0;
+    }
+    if (successorIds.length > 0) {
+      await prisma.successor.deleteMany({ where: { id: { in: successorIds } } });
+      successorIds.length = 0;
+    }
+    if (userIds.length > 0) {
+      // Audit rows retain actor foreign keys; remove only rows owned by disposable test actors before cleanup.
+      await prisma.platformAuditEvent.deleteMany({ where: { actorUserId: { in: userIds } } });
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+      userIds.length = 0;
     }
   });
 
   afterAll(async () => {
     await prisma.$disconnect();
+  });
+
+
+  it("installs append-only triggers for compliance evidence and history", async () => {
+    const triggers = await prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+      SELECT tgname AS name
+      FROM pg_trigger
+      WHERE NOT tgisinternal
+        AND tgname IN (
+          'ComplianceEvidence_claims_immutable',
+          'ComplianceDeadlineSnapshot_immutable',
+          'ComplianceStatusSnapshot_immutable',
+          'ComplianceRuleActivity_immutable',
+          'ComplianceRuleVersion_content_immutable'
+        )
+    `);
+    expect(triggers.map((trigger) => trigger.name)).toEqual(expect.arrayContaining([
+      "ComplianceEvidence_claims_immutable",
+      "ComplianceDeadlineSnapshot_immutable",
+      "ComplianceStatusSnapshot_immutable",
+      "ComplianceRuleActivity_immutable",
+      "ComplianceRuleVersion_content_immutable",
+    ]));
   });
 
   it("enforces foreign keys for workspace ownership", async () => {
@@ -79,6 +129,53 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       expect(rejected.reason).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
       expect(rejected.reason.code).toBe("P2002");
     }
+  });
+
+  it("enforces idempotent obligation-generation keys under concurrent PostgreSQL writes", async () => {
+    const suffix = crypto.randomUUID();
+    const organization = await createOrganization(`obligation-generation-${suffix}`);
+    const workspace = await createWorkspace(organization.id, `obligation-generation-${suffix}`);
+    const client = await prisma.client.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        name: "Concurrent generation client",
+      },
+    });
+    const generationKey = suffix.replaceAll("-", "");
+    const attempts = await Promise.allSettled([
+      prisma.complianceObligation.create({
+        data: {
+          organizationId: organization.id,
+          workspaceId: workspace.id,
+          clientId: client.id,
+          generationKey,
+          title: "Generated obligation A",
+          type: "ANNUAL_FILING",
+        },
+      }),
+      prisma.complianceObligation.create({
+        data: {
+          organizationId: organization.id,
+          workspaceId: workspace.id,
+          clientId: client.id,
+          generationKey,
+          title: "Generated obligation B",
+          type: "ANNUAL_FILING",
+        },
+      }),
+    ]);
+
+    expect(attempts.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = attempts.find((result) => result.status === "rejected");
+    expect(rejected).toBeDefined();
+    if (rejected?.status === "rejected") {
+      expect(rejected.reason).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+      expect(rejected.reason.code).toBe("P2002");
+    }
+    await expect(prisma.complianceObligation.count({
+      where: { workspaceId: workspace.id, generationKey },
+    })).resolves.toBe(1);
   });
 
   it("cascades organization deletion to its workspace-owned clients", async () => {
@@ -296,4 +393,675 @@ describe.skipIf(!integrationEnabled)("PostgreSQL database integrity", () => {
       where: { notificationId: notification.id },
     })).resolves.toBe(0);
   });
+
+  it("converges concurrent compliance-generation route requests through PostgreSQL", async () => {
+    const suffix = crypto.randomUUID().replaceAll("-", "").slice(0, 18);
+    const organization = await createOrganization(`route-generation-${suffix}`);
+    const workspace = await createWorkspace(organization.id, `route-generation-${suffix}`);
+    const owner = await prisma.user.create({
+      data: { email: `route-owner-${suffix}@integration.invalid` },
+    });
+    const reviewer = await prisma.user.create({
+      data: { email: `route-reviewer-${suffix}@integration.invalid` },
+    });
+    await prisma.membership.create({
+      data: { userId: owner.id, organizationId: organization.id, role: "OWNER" },
+    });
+    const jurisdiction = await prisma.jurisdiction.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        name: `Integration jurisdiction ${suffix}`,
+        country: "Integration Test",
+        code: `IT-${suffix}`,
+      },
+    });
+    const client = await prisma.client.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        name: "Concurrent obligation generation client",
+      },
+    });
+    const rule = await prisma.complianceRule.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        jurisdictionId: jurisdiction.id,
+        ruleKey: `concurrent-generation-${suffix}`,
+        currentVersion: 1,
+        active: true,
+        createdByUserId: owner.id,
+      },
+    });
+    const now = new Date();
+    const version = await prisma.complianceRuleVersion.create({
+      data: {
+        ruleId: rule.id,
+        workspaceId: workspace.id,
+        version: 1,
+        jurisdictionId: jurisdiction.id,
+        title: "Integration-only sourced rule",
+        description: "A test fixture; not a real statutory rule.",
+        obligationType: "ANNUAL_FILING",
+        sourceAuthority: "Integration fixture",
+        sourceUrl: "https://example.gov/integration-test",
+        sourceRetrievedAt: now,
+        effectiveFrom: new Date("2020-01-01T00:00:00.000Z"),
+        evidenceClass: "E3",
+        applicability: {},
+        relativeDueDays: null,
+        requiresEvidence: false,
+        professionalReviewRequired: true,
+        reviewState: "VERIFIED",
+        reviewedByUserId: reviewer.id,
+        reviewedAt: now,
+        reviewNote: "Integration fixture only.",
+        createdByUserId: owner.id,
+      },
+    });
+
+    const principal: WorkspacePrincipal = {
+      userId: owner.id,
+      organizationId: organization.id,
+      workspaceId: workspace.id,
+      role: "owner",
+      permissions: ["compliance:write"],
+    };
+    let routePrisma: { $disconnect: () => Promise<void> } | null = null;
+
+    try {
+      vi.doMock("@/lib/auth/workspace-context", () => ({
+        getWorkspaceContext: async () => ({ userId: owner.id, principal }),
+      }));
+      vi.doMock("@/lib/auth/request-origin", () => ({
+        hasInvalidRequestOrigin: () => false,
+      }));
+      vi.resetModules();
+
+      const { POST } = await import("@/app/api/compliance/rules/[id]/versions/[versionId]/generate/route");
+      const dbModule = await import("@/lib/db/prisma");
+      routePrisma = dbModule.prisma;
+
+      const request = () => new Request(
+        `http://localhost/api/compliance/rules/${rule.id}/versions/${version.id}/generate`,
+        {
+          method: "POST",
+          headers: { origin: "http://localhost", "content-type": "application/json" },
+          body: JSON.stringify({
+            clientId: client.id,
+            businessType: null,
+            formationCompleted: null,
+            baseDate: null,
+            factEvidence: [],
+          }),
+        },
+      );
+      const routeContext = { params: Promise.resolve({ id: rule.id, versionId: version.id }) };
+      const responses = await Promise.all([
+        POST(request(), routeContext),
+        POST(request(), routeContext),
+      ]);
+      const statusCodes = responses.map((response) => response.status).sort();
+      expect(statusCodes).toEqual([200, 201]);
+
+      const bodies = await Promise.all(responses.map((response) => response.json()));
+      const obligationIds = bodies.map((body) => body.data.id);
+      expect(obligationIds[0]).toBe(obligationIds[1]);
+      const obligationId = obligationIds[0];
+
+      await expect(prisma.complianceObligation.count({
+        where: { workspaceId: workspace.id, clientId: client.id, sourceRuleVersionId: version.id },
+      })).resolves.toBe(1);
+      await expect(prisma.complianceDeadlineSnapshot.count({
+        where: { obligationId },
+      })).resolves.toBe(1);
+      await expect(prisma.complianceActivity.count({
+        where: { obligationId, action: "RULE_OBLIGATION_GENERATED" },
+      })).resolves.toBe(1);
+      await expect(prisma.complianceRuleActivity.count({
+        where: { ruleId: rule.id, action: "OBLIGATION_GENERATED" },
+      })).resolves.toBe(1);
+    } finally {
+      vi.doUnmock("@/lib/auth/workspace-context");
+      vi.doUnmock("@/lib/auth/request-origin");
+      if (routePrisma) await routePrisma.$disconnect();
+
+      // The disposable integration database installs append-only triggers. Disable
+      // user-defined triggers only while removing this test's own fixture records,
+      // then restore them even if teardown fails.
+      const triggerTables = [
+        '"ComplianceDeadlineSnapshot"',
+        '"ComplianceStatusSnapshot"',
+        '"ComplianceRuleActivity"',
+        '"ComplianceRuleVersion"',
+        '"ComplianceEvidence"',
+      ];
+      for (const table of triggerTables) {
+        await prisma.$executeRawUnsafe(`ALTER TABLE ${table} DISABLE TRIGGER USER`);
+      }
+      try {
+        const obligationRows = await prisma.complianceObligation.findMany({
+          where: { workspaceId: workspace.id },
+          select: { id: true },
+        });
+        const obligationIds = obligationRows.map((item) => item.id);
+        await prisma.complianceDeadlineSnapshot.deleteMany({
+          where: { obligationId: { in: obligationIds } },
+        });
+        await prisma.complianceStatusSnapshot.deleteMany({
+          where: { obligationId: { in: obligationIds } },
+        });
+        await prisma.complianceActivity.deleteMany({
+          where: { obligationId: { in: obligationIds } },
+        });
+        await prisma.complianceRuleActivity.deleteMany({ where: { ruleId: rule.id } });
+        await prisma.complianceObligation.deleteMany({ where: { workspaceId: workspace.id } });
+        await prisma.organization.deleteMany({ where: { id: organization.id } });
+        await prisma.jurisdiction.deleteMany({ where: { id: jurisdiction.id } });
+        await prisma.user.deleteMany({ where: { id: { in: [owner.id, reviewer.id] } } });
+        const organizationIndex = organizationIds.indexOf(organization.id);
+        if (organizationIndex >= 0) organizationIds.splice(organizationIndex, 1);
+      } finally {
+        for (const table of [...triggerTables].reverse()) {
+          await prisma.$executeRawUnsafe(`ALTER TABLE ${table} ENABLE TRIGGER USER`);
+        }
+      }
+      vi.resetModules();
+    }
+  });
+
+
+  it("enforces business-intent evidence bindings across proposal, document, client, and workspace", async () => {
+    const suffix = crypto.randomUUID();
+    const organization = await createOrganization(`intent-evidence-${suffix}`);
+    const workspace = await createWorkspace(organization.id, `intent-evidence-${suffix}`);
+    const firstClient = await prisma.client.create({
+      data: { organizationId: organization.id, workspaceId: workspace.id, name: "First client" },
+    });
+    const secondClient = await prisma.client.create({
+      data: { organizationId: organization.id, workspaceId: workspace.id, name: "Second client" },
+    });
+    const creator = await prisma.user.create({
+      data: { email: `intent-evidence-${suffix}@integration.invalid` },
+    });
+    userIds.push(creator.id);
+
+    async function createSource(title: string) {
+      const source = await prisma.evidence.create({
+        data: {
+          title,
+          source: `https://registry.example.gov/${encodeURIComponent(title)}`,
+          sourceType: "OFFICIAL_REGISTRY",
+          retrievedAt: new Date("2026-10-18T10:00:00.000Z"),
+          evidenceClass: "E3",
+          reviewStatus: "VERIFIED",
+        },
+      });
+      evidenceIds.push(source.id);
+      return source;
+    }
+    const firstSource = await createSource("First verified source");
+    const secondSource = await createSource("Second verified source");
+
+    async function createSourceDocument(clientId: string, evidenceId: string) {
+      const id = crypto.randomUUID();
+      return prisma.document.create({
+        data: {
+          id,
+          workspaceId: workspace.id,
+          clientId,
+          evidenceId,
+          rootDocumentId: id,
+          version: 1,
+          latestVersion: 1,
+          name: "Verified source.pdf",
+          mimeType: "application/pdf",
+          storageKey: `${workspace.id}/documents/${id}/source.pdf`,
+          sizeBytes: 25,
+          checksum: "b".repeat(64),
+          status: "AVAILABLE",
+          scanStatus: "CLEAN",
+          reviewStatus: "VERIFIED",
+          uploadedByUserId: creator.id,
+        },
+      });
+    }
+    const firstDocument = await createSourceDocument(firstClient.id, firstSource.id);
+    const secondDocument = await createSourceDocument(secondClient.id, secondSource.id);
+
+    async function createProposal(clientId: string, suffix: string) {
+      return prisma.businessIntentProposal.create({
+        data: {
+          organizationId: organization.id,
+          workspaceId: workspace.id,
+          clientId,
+          createdByUserId: creator.id,
+          status: "PROPOSED",
+          version: 1,
+          inputDigest: suffix,
+          proposal: { businessSummary: "Provisional proposal requiring advisor review." },
+          evidenceReferences: { claims: [], trustedSources: [] },
+        },
+      });
+    }
+    const firstProposal = await createProposal(firstClient.id, `first-${suffix}`);
+    const secondProposal = await createProposal(secondClient.id, `second-${suffix}`);
+
+    const reference = await prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: firstProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: firstSource.id,
+        documentId: firstDocument.id,
+        clientId: firstClient.id,
+        claimStatement: "The statement is supported by the attached source record.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    });
+    expect(reference.workspaceId).toBe(workspace.id);
+
+    // A reference cannot substitute a different client's document, even in the same workspace.
+    await expect(prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: secondProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: secondSource.id,
+        documentId: firstDocument.id,
+        clientId: secondClient.id,
+        claimStatement: "Cross-client attachment must be rejected.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    })).rejects.toThrow();
+
+    // The evidence ID must be the evidence actually attached to the selected document.
+    await expect(prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: secondProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: firstSource.id,
+        documentId: secondDocument.id,
+        clientId: secondClient.id,
+        claimStatement: "Evidence/document mismatch must be rejected.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    })).rejects.toThrow();
+
+    // The proposal's client scope must match the evidence reference's client scope.
+    await expect(prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: firstProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: secondSource.id,
+        documentId: secondDocument.id,
+        clientId: secondClient.id,
+        claimStatement: "Proposal/client mismatch must be rejected.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    })).rejects.toThrow();
+
+    // Unverified sources must not be bindable, even when the tenant, document, and proposal all match.
+    const pendingSource = await prisma.evidence.create({
+      data: {
+        title: "Pending source must not be bindable",
+        source: "https://registry.example.gov/pending-source",
+        sourceType: "OFFICIAL_REGISTRY",
+        retrievedAt: new Date("2026-10-18T10:00:00.000Z"),
+        evidenceClass: "E3",
+        reviewStatus: "PENDING",
+      },
+    });
+    evidenceIds.push(pendingSource.id);
+    const pendingDocument = await createSourceDocument(firstClient.id, pendingSource.id);
+    await expect(prisma.businessIntentEvidenceReference.create({
+      data: {
+        proposalId: firstProposal.id,
+        workspaceId: workspace.id,
+        evidenceId: pendingSource.id,
+        documentId: pendingDocument.id,
+        clientId: firstClient.id,
+        claimStatement: "Pending evidence must be rejected.",
+        verificationState: "SOURCE_VERIFIED_RECORD",
+      },
+    })).rejects.toThrow();
+
+    // A concurrent revoke and bind must serialize on the Evidence row. Either the bind
+    // commits while the source is verified and remains auditable, or revocation wins and
+    // the bind is rejected; a binding must never be created after revocation.
+    const raceSource = await createSource("Concurrent revocation source");
+    const raceDocument = await createSourceDocument(firstClient.id, raceSource.id);
+    const raceProposal = await createProposal(firstClient.id, `race-${suffix}`);
+    const race = await Promise.allSettled([
+      prisma.businessIntentEvidenceReference.create({
+        data: {
+          proposalId: raceProposal.id,
+          workspaceId: workspace.id,
+          evidenceId: raceSource.id,
+          documentId: raceDocument.id,
+          clientId: firstClient.id,
+          claimStatement: "Concurrent binding remains tied to its verification moment.",
+          verificationState: "SOURCE_VERIFIED_RECORD",
+        },
+      }),
+      prisma.evidence.update({
+        where: { id: raceSource.id },
+        data: { reviewStatus: "REVOKED" },
+      }),
+    ]);
+    expect(race[1].status).toBe("fulfilled");
+    await expect(prisma.evidence.findUnique({ where: { id: raceSource.id } }))
+      .resolves.toMatchObject({ reviewStatus: "REVOKED" });
+    const raceReferenceCount = await prisma.businessIntentEvidenceReference.count({
+      where: { proposalId: raceProposal.id, evidenceId: raceSource.id },
+    });
+    expect(raceReferenceCount).toBeLessThanOrEqual(1);
+    if (race[0].status === "fulfilled") {
+      // The binding won the row lock first; revocation happened afterward and is preserved.
+      expect(raceReferenceCount).toBe(1);
+    } else {
+      // Revocation won first, so the eligibility trigger rejected the bind.
+      expect(raceReferenceCount).toBe(0);
+    }
+
+    // Once a source document is referenced, its client/evidence/workspace identity cannot be rebound.
+    await expect(prisma.document.update({
+      where: { id: firstDocument.id },
+      data: { clientId: secondClient.id },
+    })).rejects.toThrow();
+  });
+
+
+  async function createGraphFixture(suffix: string) {
+    const organization = await createOrganization(`graph-${suffix}`);
+    const workspace = await createWorkspace(organization.id, `graph-${suffix}`);
+    const actor = await prisma.user.create({
+      data: { email: `graph-${suffix}@integration.invalid` },
+    });
+    userIds.push(actor.id);
+    const createNode = (name: string) => prisma.corporateGraphNode.create({
+      data: {
+        organizationId: organization.id,
+        workspaceId: workspace.id,
+        name,
+        createdByUserId: actor.id,
+      },
+    });
+    return {
+      organization,
+      workspace,
+      actor,
+      createNode,
+    };
+  }
+
+  async function waitForConcurrentReads() {
+    let ready = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    return async () => {
+      ready += 1;
+      if (ready === 2) release();
+      await gate;
+    };
+  }
+
+  it("serializes concurrent ownership additions so total ownership cannot exceed 100 percent", async () => {
+    const fixture = await createGraphFixture(crypto.randomUUID());
+    const firstOwner = await fixture.createNode("Owner A");
+    const secondOwner = await fixture.createNode("Owner B");
+    const target = await fixture.createNode("Shared target");
+    const barrier = await waitForConcurrentReads();
+
+    const addOwnership = (fromNodeId: string) => prisma.$transaction(async (tx) => {
+      const existing = await tx.corporateGraphEdge.findMany({
+        where: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          archivedAt: null,
+        },
+        select: { toNodeId: true, relation: true, ownershipPercent: true },
+      });
+      const candidate = { fromNodeId, toNodeId: target.id, relation: "OWNS" as const, ownershipPercent: 60 };
+      const invalid = validateOwnershipTotal(existing.map((edge) => ({
+        toNodeId: edge.toNodeId,
+        relation: edge.relation,
+        ownershipPercent: edge.ownershipPercent?.toNumber() ?? null,
+      })), candidate);
+      if (invalid) throw new Error("OWNERSHIP_TOTAL_EXCEEDED");
+      await barrier();
+      return tx.corporateGraphEdge.create({
+        data: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          fromNodeId,
+          toNodeId: target.id,
+          relation: "OWNS",
+          ownershipPercent: new Prisma.Decimal(60),
+          createdByUserId: fixture.actor.id,
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    const results = await Promise.allSettled([
+      addOwnership(firstOwner.id),
+      addOwnership(secondOwner.id),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    expect(rejected).toBeDefined();
+    if (rejected?.status === "rejected") {
+      expect(rejected.reason).toMatchObject({ code: "P2034" });
+    }
+    const committed = await prisma.corporateGraphEdge.findMany({
+      where: { workspaceId: fixture.workspace.id, archivedAt: null },
+    });
+    expect(committed).toHaveLength(1);
+    expect(committed.reduce((total, edge) => total + (edge.ownershipPercent?.toNumber() ?? 0), 0)).toBeLessThanOrEqual(100);
+  });
+
+  it("serializes opposing ownership edges so concurrent writes cannot create a cycle", async () => {
+    const fixture = await createGraphFixture(crypto.randomUUID());
+    const first = await fixture.createNode("Cycle A");
+    const second = await fixture.createNode("Cycle B");
+    const barrier = await waitForConcurrentReads();
+
+    const addEdge = (fromNodeId: string, toNodeId: string) => prisma.$transaction(async (tx) => {
+      const existing = await tx.corporateGraphEdge.findMany({
+        where: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          archivedAt: null,
+        },
+        select: { fromNodeId: true, toNodeId: true, relation: true, ownershipPercent: true },
+      });
+      const candidate = { fromNodeId, toNodeId, relation: "OWNS" as const };
+      if (wouldCreateOwnershipCycle(existing, candidate)) throw new Error("OWNERSHIP_CYCLE");
+      await barrier();
+      return tx.corporateGraphEdge.create({
+        data: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          fromNodeId,
+          toNodeId,
+          relation: "OWNS",
+          createdByUserId: fixture.actor.id,
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    const results = await Promise.allSettled([
+      addEdge(first.id, second.id),
+      addEdge(second.id, first.id),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    expect(rejected).toBeDefined();
+    if (rejected?.status === "rejected") {
+      expect(rejected.reason).toMatchObject({ code: "P2034" });
+    }
+    await expect(prisma.corporateGraphEdge.count({
+      where: { workspaceId: fixture.workspace.id, archivedAt: null },
+    })).resolves.toBe(1);
+  });
+
+  it("rolls back a graph edge when its audit event cannot be written", async () => {
+    const fixture = await createGraphFixture(crypto.randomUUID());
+    const from = await fixture.createNode("Audit rollback source");
+    const to = await fixture.createNode("Audit rollback target");
+    const missingActorId = `missing-${crypto.randomUUID()}`;
+
+    await expect(prisma.$transaction(async (tx) => {
+      const edge = await tx.corporateGraphEdge.create({
+        data: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          fromNodeId: from.id,
+          toNodeId: to.id,
+          relation: "RELATED_TO",
+          createdByUserId: fixture.actor.id,
+        },
+      });
+      await tx.corporateGraphAuditEvent.create({
+        data: {
+          organizationId: fixture.organization.id,
+          workspaceId: fixture.workspace.id,
+          actorUserId: missingActorId,
+          action: "EDGE_CREATED",
+          subjectType: "CorporateGraphEdge",
+          subjectId: edge.id,
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })).rejects.toMatchObject({ code: "P2003" });
+
+    await expect(prisma.corporateGraphEdge.count({
+      where: { workspaceId: fixture.workspace.id, fromNodeId: from.id, toNodeId: to.id },
+    })).resolves.toBe(0);
+    await expect(prisma.corporateGraphAuditEvent.count({
+      where: { workspaceId: fixture.workspace.id, subjectType: "CorporateGraphEdge" },
+    })).resolves.toBe(0);
+  });
+
+
+
+  it("allows only one concurrent PostgreSQL claim of a successor invitation and writes one audit event", async () => {
+    const suffix = crypto.randomUUID();
+    const owner = await prisma.user.create({ data: { email: `continuity-owner-${suffix}@integration.invalid` } });
+    const actorA = await prisma.user.create({ data: { email: `continuity-actor-a-${suffix}@integration.invalid` } });
+    const actorB = await prisma.user.create({ data: { email: `continuity-actor-b-${suffix}@integration.invalid` } });
+    userIds.push(owner.id, actorA.id, actorB.id);
+    const tokenHash = `test-token-hash-${suffix}`;
+    const now = new Date();
+    const successor = await prisma.successor.create({
+      data: {
+        ownerId: owner.id,
+        successorName: "Integration Successor",
+        successorEmail: actorA.email,
+        relationship: "Continuity tester",
+        permissions: { canTransferOwnership: false, canAccessSecrets: false, canDeploy: false, canAccessBilling: false },
+        inviteTokenHash: tokenHash,
+        inviteExpiresAt: new Date(now.getTime() + 60_000),
+        lastOwnerActivityAt: now,
+      },
+    });
+    successorIds.push(successor.id);
+
+    let ready = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const waitForBoth = async () => {
+      ready += 1;
+      if (ready === 2) release();
+      await gate;
+    };
+    const accept = (actorUserId: string) => prisma.$transaction(async (tx) => {
+      await waitForBoth();
+      const claim = await tx.successor.updateMany({
+        where: {
+          id: successor.id,
+          status: SuccessorStatus.PENDING,
+          inviteTokenHash: tokenHash,
+          inviteExpiresAt: { gt: now },
+        },
+        data: {
+          status: SuccessorStatus.ACCEPTED,
+          acceptedAt: now,
+          inviteTokenHash: null,
+          inviteExpiresAt: null,
+        },
+      });
+      if (!claim.count) return false;
+      await tx.platformAuditEvent.create({
+        data: {
+          actorUserId,
+          actorRole: "STAFF",
+          action: "successor_accepted",
+          subjectType: "SUCCESSOR",
+          subjectId: successor.id,
+          outcome: "SUCCESS",
+          details: { adminAccessGranted: false, mfaVerified: false },
+        },
+      });
+      return true;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    const results = await Promise.allSettled([accept(actorA.id), accept(actorB.id)]);
+    const winners = results.filter((result) => result.status === "fulfilled" && result.value === true);
+    expect(winners).toHaveLength(1);
+    const stored = await prisma.successor.findUniqueOrThrow({ where: { id: successor.id } });
+    expect(stored.status).toBe(SuccessorStatus.ACCEPTED);
+    expect(stored.inviteTokenHash).toBeNull();
+    expect(stored.inviteExpiresAt).toBeNull();
+    expect(await prisma.platformAuditEvent.count({ where: { subjectType: "SUCCESSOR", subjectId: successor.id, action: "successor_accepted" } })).toBe(1);
+    const losingResults = results.filter((result) => result.status === "fulfilled" && result.value === false || result.status === "rejected");
+    expect(losingResults).toHaveLength(1);
+    for (const result of results) {
+      if (result.status === "rejected") expect(result.reason).toMatchObject({ code: "P2034" });
+    }
+  });
+
+  it("rolls back a successor invitation claim when its audit write fails", async () => {
+    const suffix = crypto.randomUUID();
+    const owner = await prisma.user.create({ data: { email: `continuity-rollback-owner-${suffix}@integration.invalid` } });
+    const actor = await prisma.user.create({ data: { email: `continuity-rollback-actor-${suffix}@integration.invalid` } });
+    userIds.push(owner.id, actor.id);
+    const tokenHash = `rollback-token-hash-${suffix}`;
+    const now = new Date();
+    const successor = await prisma.successor.create({
+      data: {
+        ownerId: owner.id,
+        successorName: "Rollback Successor",
+        successorEmail: actor.email,
+        relationship: "Continuity tester",
+        permissions: { canTransferOwnership: false, canAccessSecrets: false, canDeploy: false, canAccessBilling: false },
+        inviteTokenHash: tokenHash,
+        inviteExpiresAt: new Date(now.getTime() + 60_000),
+        lastOwnerActivityAt: now,
+      },
+    });
+    successorIds.push(successor.id);
+
+    await expect(prisma.$transaction(async (tx) => {
+      await tx.successor.updateMany({
+        where: { id: successor.id, status: SuccessorStatus.PENDING, inviteTokenHash: tokenHash, inviteExpiresAt: { gt: now } },
+        data: { status: SuccessorStatus.ACCEPTED, acceptedAt: now, inviteTokenHash: null, inviteExpiresAt: null },
+      });
+      await tx.platformAuditEvent.create({
+        data: {
+          actorUserId: `missing-audit-actor-${suffix}`,
+          actorRole: "STAFF",
+          action: "successor_accepted",
+          subjectType: "SUCCESSOR",
+          subjectId: successor.id,
+          outcome: "SUCCESS",
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })).rejects.toBeDefined();
+
+    const stored = await prisma.successor.findUniqueOrThrow({ where: { id: successor.id } });
+    expect(stored.status).toBe(SuccessorStatus.PENDING);
+    expect(stored.inviteTokenHash).toBe(tokenHash);
+    expect(stored.inviteExpiresAt?.getTime()).toBeGreaterThan(now.getTime());
+    expect(await prisma.platformAuditEvent.count({ where: { subjectType: "SUCCESSOR", subjectId: successor.id, action: "successor_accepted" } })).toBe(0);
+  });
+
 });
