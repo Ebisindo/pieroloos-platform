@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 import { parseEmailTemplateParams, resolveEmailLocale } from "@/lib/i18n/email-templates";
 import { sendNotificationEmail } from "@/lib/services/notification-email";
+import { sendFirebasePush } from "@/lib/services/firebase-push-delivery";
 
 const MAX_BATCH_SIZE = 100;
 const LEASE_MILLISECONDS = 5 * 60 * 1000;
@@ -12,8 +13,9 @@ type ClaimedNotification = {
   id: string;
   organizationId: string;
   workspaceId: string;
+  dedupeKey: string;
   recipientUserId: string | null;
-  channel: "IN_APP" | "EMAIL";
+  channel: "IN_APP" | "EMAIL" | "PUSH";
   subject: string;
   body: string;
   templateKey: string;
@@ -72,6 +74,10 @@ function isPermanentFailure(error: unknown) {
       "INVALID_SMTP_MESSAGE_ID_DOMAIN",
       "INVALID_SMTP_SECURE_SETTING",
       "SMTP_USERNAME_AND_PASSWORD_MUST_BE_PAIRED",
+      "NO_ACTIVE_PUSH_TOKENS",
+      "PUSH_PERMANENT_FAILURE",
+      "FIREBASE_PUSH_NOT_CONFIGURED",
+      "FIREBASE_PUSH_PROJECT_MISMATCH",
     ].includes(error.message)
   ) {
     return true;
@@ -161,7 +167,18 @@ async function claimDueNotifications(now: Date, workerId: string, limit: number)
 }
 
 async function loadRecipientContext(notification: ClaimedNotification) {
-  if (!notification.recipientUserId) return null;
+  if (!notification.recipientUserId) {
+    const allowedPrefix = notification.dedupeKey.startsWith("successor-invite-") ||
+      notification.dedupeKey.startsWith("continuity-warning-");
+    const email = allowedPrefix ? notificationEmail(notification) : "";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+    return {
+      email,
+      preference: { inAppEnabled: false, emailEnabled: true, pushEnabled: false, quietHoursStart: null, quietHoursEnd: null, timezone: "UTC", locale: "en" },
+      notificationsEnabled: true,
+      externalInvite: true,
+    };
+  }
   const [user, preference, workspace, membership, workspaceSettings] = await Promise.all([
     prisma.user.findUnique({
       where: { id: notification.recipientUserId },
@@ -197,13 +214,22 @@ async function loadRecipientContext(notification: ClaimedNotification) {
     preference: preference ?? {
       inAppEnabled: true,
       emailEnabled: false,
+      pushEnabled: false,
       quietHoursStart: null,
       quietHoursEnd: null,
       timezone: "UTC",
       locale: "en",
     },
     notificationsEnabled: workspaceSettings?.notificationsEnabled ?? true,
+    externalInvite: false,
   };
+}
+
+function notificationEmail(notification: ClaimedNotification): string {
+  const marker = "\nInvitation recipient: ";
+  const index = notification.body.lastIndexOf(marker);
+  if (index < 0) return "";
+  return notification.body.slice(index + marker.length).trim().split(/\r?\n/)[0].trim();
 }
 
 async function finishWithoutDelivery(
@@ -211,7 +237,7 @@ async function finishWithoutDelivery(
   workerId: string,
   data: { status: "CANCELLED" | "QUEUED"; reason: string; scheduledFor?: Date },
 ) {
-  await prisma.complianceNotification.updateMany({
+  const updated = await prisma.complianceNotification.updateMany({
     where: { id: notification.id, status: "PROCESSING", lockedBy: workerId },
     data: {
       status: data.status,
@@ -221,6 +247,7 @@ async function finishWithoutDelivery(
       lockedBy: null,
     },
   });
+  return updated.count === 1;
 }
 
 async function beginAttempt(notification: ClaimedNotification, workerId: string, now: Date) {
@@ -256,29 +283,33 @@ async function finishAttempt(input: {
 }) {
   const { notification, workerId, attemptId, now } = input;
   if (input.success) {
-    await prisma.$transaction([
-      prisma.notificationDeliveryAttempt.update({
+    const stillOwnsLease = await prisma.$transaction(async (transaction) => {
+      await transaction.notificationDeliveryAttempt.update({
         where: { id: attemptId },
         data: {
           status: "ACCEPTED",
           completedAt: now,
-          providerMessageId: input.success.messageId,
+          providerMessageId: input.success!.messageId,
         },
-      }),
-      prisma.complianceNotification.updateMany({
+      });
+      const updated = await transaction.complianceNotification.updateMany({
         where: { id: notification.id, status: "PROCESSING", lockedBy: workerId },
         data: {
           status: "SENT",
           sentAt: now,
           failureReason: null,
-          providerMessageId: input.success.messageId,
-          deliveryReceipt: input.success.receipt,
+          providerMessageId: input.success!.messageId,
+          deliveryReceipt: input.success!.receipt,
           lockedAt: null,
           lockedBy: null,
         },
-      }),
-    ]);
-    return "delivered" as const;
+      });
+      return updated.count === 1;
+    });
+    // SMTP accepted the message, but a lost lease means this worker cannot
+    // claim that it successfully finalized the queue record. Surface the
+    // ambiguity for reconciliation instead of reporting a false delivery.
+    return stillOwnsLease ? "delivered" as const : "reconciliationRequired" as const;
   }
 
   const code = failureCode(input.error);
@@ -287,8 +318,8 @@ async function finishAttempt(input: {
   const status = deadLetter ? "DEAD_LETTER" : "QUEUED";
   const retryDate = deadLetter ? null : retryAt(now, notification.attemptCount + 1);
   const safeMessage = `Notification delivery failed (${code}).`;
-  await prisma.$transaction([
-    prisma.notificationDeliveryAttempt.update({
+  const stillOwnsLease = await prisma.$transaction(async (transaction) => {
+    await transaction.notificationDeliveryAttempt.update({
       where: { id: attemptId },
       data: {
         status: deadLetter ? "PERMANENT_FAILURE" : "RETRYABLE_FAILURE",
@@ -296,8 +327,8 @@ async function finishAttempt(input: {
         failureCode: code,
         failureMessage: safeMessage,
       },
-    }),
-    prisma.complianceNotification.updateMany({
+    });
+    const updated = await transaction.complianceNotification.updateMany({
       where: { id: notification.id, status: "PROCESSING", lockedBy: workerId },
       data: {
         status,
@@ -307,8 +338,10 @@ async function finishAttempt(input: {
         lockedAt: null,
         lockedBy: null,
       },
-    }),
-  ]);
+    });
+    return updated.count === 1;
+  });
+  if (!stillOwnsLease) return "reconciliationRequired" as const;
   return deadLetter ? "deadLettered" as const : "retried" as const;
 }
 
@@ -327,35 +360,40 @@ export async function runNotificationWorker(
     cancelled: 0,
     deferred: 0,
     failed: 0,
+    reconciliationRequired: 0,
   };
 
   for (const notification of claimed) {
     try {
       const recipient = await loadRecipientContext(notification);
       if (!recipient || !recipient.notificationsEnabled ||
-        (notification.channel === "IN_APP" && !recipient.preference.inAppEnabled) ||
-        (notification.channel === "EMAIL" && !recipient.preference.emailEnabled)) {
-        await finishWithoutDelivery(notification, workerId, {
+        (!recipient.externalInvite && notification.channel === "IN_APP" && !recipient.preference.inAppEnabled) ||
+        (!recipient.externalInvite && notification.channel === "EMAIL" && !recipient.preference.emailEnabled) ||
+        (!recipient.externalInvite && notification.channel === "PUSH" && !recipient.preference.pushEnabled) ||
+        (recipient.externalInvite && notification.channel !== "EMAIL")) {
+        const finalized = await finishWithoutDelivery(notification, workerId, {
           status: "CANCELLED",
           reason: !recipient ? "RECIPIENT_NOT_IN_WORKSPACE" : "RECIPIENT_PREFERENCE_DISABLED",
         });
-        summary.cancelled += 1;
+        if (finalized) summary.cancelled += 1;
+        else summary.failed += 1;
         continue;
       }
 
-      const quietUntil = quietHoursEnd(
+      const quietUntil = recipient.externalInvite ? null : quietHoursEnd(
         now,
         recipient.preference.quietHoursStart,
         recipient.preference.quietHoursEnd,
         recipient.preference.timezone,
       );
       if (notification.channel === "EMAIL" && quietUntil) {
-        await finishWithoutDelivery(notification, workerId, {
+        const finalized = await finishWithoutDelivery(notification, workerId, {
           status: "QUEUED",
           reason: "DEFERRED_DURING_QUIET_HOURS",
           scheduledFor: quietUntil,
         });
-        summary.deferred += 1;
+        if (finalized) summary.deferred += 1;
+        else summary.failed += 1;
         continue;
       }
 
@@ -373,24 +411,57 @@ export async function runNotificationWorker(
         continue;
       }
 
+      if (notification.channel === "PUSH") {
+        try {
+          const receipt = await sendFirebasePush({
+            userId: notification.recipientUserId!,
+            title: notification.subject,
+            body: notification.body,
+            notificationId: notification.id,
+          });
+          const outcome = await finishAttempt({
+            notification,
+            workerId,
+            attemptId: attempt.id,
+            now,
+            success: { messageId: receipt.messageId, receipt: receipt.receipt },
+          });
+          summary[outcome] += 1;
+        } catch (error) {
+          console.error("Push notification delivery attempt failed.", {
+            notificationId: notification.id,
+            failureCode: failureCode(error),
+          });
+          summary[await finishAttempt({
+            notification,
+            workerId,
+            attemptId: attempt.id,
+            now,
+            error,
+          })] += 1;
+        }
+        continue;
+      }
+
       try {
         const receipt = await sendNotificationEmail({
           id: notification.id,
           templateKey: notification.templateKey,
           templateVersion: notification.templateVersion,
           subject: notification.subject,
-          body: notification.body,
+          body: notification.body.split(/\nInvitation recipient: /)[0],
           recipientEmail: recipient.email,
           locale: resolveEmailLocale(recipient.preference.locale),
           templateParams: parseEmailTemplateParams(notification.templateKey, notification.templateParams),
         });
-        summary.delivered += await finishAttempt({
+        const outcome = await finishAttempt({
           notification,
           workerId,
           attemptId: attempt.id,
           now,
           success: { messageId: receipt.messageId, receipt: receipt.response },
-        }).then(() => 1);
+        });
+        summary[outcome] += 1;
       } catch (error) {
         console.error("Notification delivery attempt failed.", {
           notificationId: notification.id,

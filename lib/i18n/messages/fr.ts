@@ -37,6 +37,7 @@ const fr = {
   "navigation.marketExpansion": "Expansion de marché",
   "navigation.crossBorder": "Préparation transfrontalière",
   "navigation.formation": "Création",
+  "navigation.businessIntent": "Objectif commercial et revue IA",
   "navigation.compliance": "Conformité",
   "navigation.reports": "Rapports",
   "navigation.engagements": "Missions",
@@ -463,6 +464,8 @@ const fr = {
   "app.compliance.reviewNoteLabel": "Note de revue",
   "app.compliance.verify": "Vérifier",
   "app.compliance.requestChanges": "Demander des modifications",
+  "app.compliance.revokeEvidence": "Révoquer la preuve",
+  "app.compliance.revokeEvidenceConfirm": "Révoquer définitivement cette preuve ? Elle ne pourra pas être restaurée ; ajoutez une preuve de remplacement si nécessaire.",
   "app.compliance.noDocuments": "Aucun document client n’est disponible.",
   "app.compliance.noOwner": "Aucun responsable attribué",
   "app.compliance.professionalBoundary": "Le suivi de conformité organise les dossiers et les flux de travail ; il ne détermine pas la conformité juridique ou réglementaire.",
@@ -491,6 +494,7 @@ const fr = {
   "app.compliance.typeOther": "Autre",
   "app.compliance.verified": "Vérifié",
   "app.compliance.changesRequested": "Modifications demandées",
+  "app.compliance.revoked": "Révoquée",
   "app.compliance.documentEvidence": "Preuve documentaire pour {title}",
   "app.compliance.sourceReferenceOptional": "Référence de la source (facultatif)",
   "app.compliance.attachEvidenceTo": "Joindre une preuve à {title}",
@@ -1097,6 +1101,11 @@ const fr = {
   "apiError.failPortalVisibility": "Impossible de mettre à jour la visibilité du portail client.",
   "apiError.failRemoveMember": "Impossible de retirer le membre de l'organisation.",
   "apiError.failUpdateRole": "Impossible de modifier le rôle du membre de l'organisation.",
+  "ui.banner.intakeEyebrow": "SAISIE CLIENT",
+  "ui.banner.formationDescription": "Transformez le contexte d’entreprise examiné et les comparaisons de juridictions en un plan par étapes, avec preuves, dépendances et points de contrôle humain.",
+  "ui.banner.engagementsDescription": "Suivez les missions de services professionnels, les responsables et les prochaines étapes, de la saisie à la livraison et à la clôture.",
+  "ui.banner.reportsDescription": "Créez des documents structurés à partir des dossiers et preuves disponibles. La fiabilité d’un rapport dépend de ses sources et de sa revue.",
+  "ui.banner.complianceDescription": "Suivez les obligations de l’espace de travail, reliez les preuves et mettez en évidence les points de revue. Les indicateurs facilitent la supervision professionnelle sans constituer une conclusion juridique.",
 } satisfies MessageCatalog;
 
 export default fr;

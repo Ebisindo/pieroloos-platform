@@ -37,6 +37,7 @@ const es = {
   "navigation.marketExpansion": "Expansión de mercado",
   "navigation.crossBorder": "Preparación transfronteriza",
   "navigation.formation": "Constitución",
+  "navigation.businessIntent": "Intención empresarial y revisión de IA",
   "navigation.compliance": "Cumplimiento",
   "navigation.reports": "Informes",
   "navigation.engagements": "Servicios",
@@ -463,6 +464,8 @@ const es = {
   "app.compliance.reviewNoteLabel": "Nota de revisión",
   "app.compliance.verify": "Verificar",
   "app.compliance.requestChanges": "Solicitar cambios",
+  "app.compliance.revokeEvidence": "Revocar evidencia",
+  "app.compliance.revokeEvidenceConfirm": "¿Revocar permanentemente este registro de evidencia? No se puede restaurar; adjunte un registro de reemplazo si se corrige.",
   "app.compliance.noDocuments": "No hay documentos de clientes disponibles.",
   "app.compliance.noOwner": "No hay responsable asignado",
   "app.compliance.professionalBoundary": "El seguimiento de cumplimiento organiza registros y flujos de trabajo; no determina el cumplimiento jurídico ni regulatorio.",
@@ -491,6 +494,7 @@ const es = {
   "app.compliance.typeOther": "Otro",
   "app.compliance.verified": "Verificada",
   "app.compliance.changesRequested": "Cambios solicitados",
+  "app.compliance.revoked": "Revocada",
   "app.compliance.documentEvidence": "Evidencia documental para {title}",
   "app.compliance.sourceReferenceOptional": "Referencia de la fuente (opcional)",
   "app.compliance.attachEvidenceTo": "Adjuntar evidencia a {title}",
@@ -1097,6 +1101,11 @@ const es = {
   "apiError.failPortalVisibility": "No se pudo actualizar la visibilidad del portal del cliente.",
   "apiError.failRemoveMember": "No se pudo eliminar la membresía de la organización.",
   "apiError.failUpdateRole": "No se pudo actualizar el rol de la membresía de la organización.",
+  "ui.banner.intakeEyebrow": "ADMISIÓN DE CLIENTES",
+  "ui.banner.formationDescription": "Convierta el contexto empresarial revisado y las comparaciones de jurisdicciones en un plan por etapas con evidencias, dependencias y puntos de revisión humana.",
+  "ui.banner.engagementsDescription": "Mantenga visibles los encargos de servicios profesionales, responsables y próximos pasos desde la admisión hasta la entrega y el cierre.",
+  "ui.banner.reportsDescription": "Genere resultados estructurados a partir de registros empresariales y evidencias disponibles. La fiabilidad depende de las fuentes y la revisión.",
+  "ui.banner.complianceDescription": "Realice seguimiento de obligaciones del espacio de trabajo, vincule evidencias y destaque puntos de revisión. Los indicadores apoyan la supervisión profesional, no constituyen conclusiones jurídicas.",
 } satisfies MessageCatalog;
 
 export default es;

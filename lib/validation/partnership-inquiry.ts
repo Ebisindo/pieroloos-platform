@@ -14,7 +14,13 @@ const singleLine = (label: string, min: number, max: number) =>
   z.string().trim()
     .min(min, `${label} must be at least ${min} characters.`)
     .max(max, `${label} must be at most ${max} characters.`)
-    .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), `${label} must not contain control characters.`);
+    .refine(
+      (value) => !Array.from(value).some((character) => {
+        const code = character.charCodeAt(0);
+        return code <= 0x1f || code === 0x7f;
+      }),
+      `${label} must not contain control characters.`,
+    );
 
 const optionalText = (label: string, max: number) =>
   z.preprocess(

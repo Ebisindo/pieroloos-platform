@@ -1,0 +1,72 @@
+name: Regenerate Firebase Admin lockfile
+
+on:
+  push:
+    branches:
+      - security/firebase-mfa-step-up-runtime
+    paths:
+      - ".github/workflows/refresh-firebase-lock.yml"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: firebase-lockfile-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  regenerate-lockfile:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: security/firebase-mfa-step-up-runtime
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Regenerate complete npm lockfile
+        run: npm install firebase-admin@13.5.0 --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Verify clean locked install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Firebase Admin lock metadata
+        shell: node {0}
+        run: |
+          const fs = require('node:fs');
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const expected = manifest.dependencies?.['firebase-admin'];
+          const root = lock.packages?.[''];
+          const resolved = lock.packages?.['node_modules/firebase-admin'];
+          if (expected !== '^13.5.0' || root?.dependencies?.['firebase-admin'] !== expected) {
+            throw new Error('firebase-admin manifest and lockfile declarations are inconsistent');
+          }
+          if (resolved?.version !== '13.5.0' || !resolved.resolved || !resolved.integrity) {
+            throw new Error('firebase-admin@13.5.0 is not fully resolved with integrity metadata');
+          }
+          console.log(`Verified firebase-admin ${resolved.version}`);
+
+      - name: Commit generated lockfile when changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "package.json and package-lock.json are already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "build(auth): regenerate Firebase Admin dependency lockfile"
+          git push origin HEAD:security/firebase-mfa-step-up-runtime

@@ -16,8 +16,14 @@ PieroloOS is a professional decision-support and workflow-organization platform.
 | Sign-in providers and authorization | [docs/AUTH-SETUP.md](docs/AUTH-SETUP.md) |
 | Platform Super Admin, permissions, provisioning and limits | [docs/ADMINISTRATION.md](docs/ADMINISTRATION.md) |
 | Launch readiness checklist and pilot gate | [docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md](docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md) |
+| Security incident response, backup/restore rehearsal, recovery evidence | [docs/SECURITY-INCIDENT-RECOVERY-RUNBOOK.md](docs/SECURITY-INCIDENT-RECOVERY-RUNBOOK.md) |
+| Structured logging, monitoring alerts, readiness and evidence gates | [docs/OBSERVABILITY-OPERATIONS.md](docs/OBSERVABILITY-OPERATIONS.md) |
+| Human approval and separate AI execution authorization | [docs/AI-EXECUTION-AUTHORITY.md](docs/AI-EXECUTION-AUTHORITY.md) |
 | Library layering | [docs/ARCHITECTURE-LIB.md](docs/ARCHITECTURE-LIB.md) |
 | Lint/typecheck troubleshooting | [docs/LINT-PROJECT-DIRECTORY.md](docs/LINT-PROJECT-DIRECTORY.md) |
+| GitHub Codespaces localhost:3000 preview and port forwarding | [docs/CODESPACES-PREVIEW.md](docs/CODESPACES-PREVIEW.md) |
+| Permanent public pre-operation preview deployment standard | [docs/PERMANENT-PREVIEW-DEPLOYMENT.md](docs/PERMANENT-PREVIEW-DEPLOYMENT.md) |
+| GitHub branch, pull request, review, and merge workflow | [docs/GITHUB-PULL-REQUEST-WORKFLOW.md](docs/GITHUB-PULL-REQUEST-WORKFLOW.md) |
 
 The `README-SESSION-*`, `SESSION-*` and `docs/SESSION-*` files are historical delivery notes. A feature described only there is not evidence that it is implemented; check the code and tests.
 
@@ -27,8 +33,10 @@ The `README-SESSION-*`, `SESSION-*` and `docs/SESSION-*` files are historical de
 npm install
 cp .env.example .env.local   # fill in values; never commit secrets
 npm run db:generate
-npm run dev
+npm run dev -- --hostname 0.0.0.0 --port 3000
 ```
+
+For Codespaces port forwarding, preview access, environment safety, and troubleshooting, follow [docs/CODESPACES-PREVIEW.md](docs/CODESPACES-PREVIEW.md). This is a temporary developer preview, not permanent hosting. For the permanent public pre-operation preview standard, follow [docs/PERMANENT-PREVIEW-DEPLOYMENT.md](docs/PERMANENT-PREVIEW-DEPLOYMENT.md).
 
 This repository uses a recent Next.js with breaking changes. Read the matching guide in `node_modules/next/dist/docs/` before changing framework-level code (see [AGENTS.md](AGENTS.md)).
 
