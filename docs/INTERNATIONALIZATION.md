@@ -17,7 +17,7 @@ English remains the default and source language. French, Portuguese and Spanish 
 | Portuguese (`pt`) | Proposed / preview | Prepared | Public and listed application surfaces; gaps remain as noted above | Passed | Not completed |
 | Spanish (`es`) | Proposed / preview | Prepared | Public and listed application surfaces; gaps remain as noted above | Passed | Not completed |
 
-There are no separate contact, FAQ, privacy or terms routes/components in the current public website. Reports now have a translated workspace UI for saved-summary generation, listing, preview, and HTML export; the report snapshot's generated section content is currently written in English and should be treated as a separate localization follow-up. Server API response contracts and email templates are not translated by this frontend work.
+Public FAQ and Terms routes and a Policies & Legal directory with draft policy routes are available. The FAQ/Terms/legal document bodies are source-authored in English; French, Portuguese and Spanish catalogues provide the page-level navigation, metadata and draft-status notices, and the global preview notice remains visible. These languages are not professionally reviewed legal translations. The Terms and policy documents remain non-indexable and marked as drafts until the necessary approvals are documented. Reports have a translated workspace UI for saved-summary generation, listing, preview, and HTML export; generated report snapshot content may remain in English and is a separate localization follow-up. Server API response contracts and email templates are not translated by this frontend work.
 
 ## Architecture
 
