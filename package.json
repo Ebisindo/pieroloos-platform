@@ -19,7 +19,8 @@
     "db:migrate:dev": "prisma migrate dev",
     "admin:provision-superadmin": "node scripts/provision-superadmin.mjs",
     "admin:transfer-superadmin": "node scripts/transfer-superadmin.mjs",
-    "admin:link-firebase-uid": "node scripts/link-firebase-uid.mjs"
+    "admin:link-firebase-uid": "node scripts/link-firebase-uid.mjs",
+    "security:audit": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
