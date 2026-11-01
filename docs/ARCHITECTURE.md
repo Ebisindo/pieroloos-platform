@@ -28,6 +28,7 @@ Client Intake → Business Profile → Engagement → Jurisdiction Lens → Form
 - Tenancy: `Organization` → `Membership(role)` and `Workspace`; domain records carry `organizationId`/`workspaceId`, with composite foreign keys enforcing workspace scope.
 - Request path for authenticated APIs: origin check → session → workspace principal and permission → zod validation → service → domain rules → repository → Prisma. See [ARCHITECTURE-LIB.md](ARCHITECTURE-LIB.md).
 - Sensitive writes use `authorized-workspace-transaction` and `trusted-action-service`; consequential changes write audit events.
+- AI business-intent proposals are advisory snapshots. Human review is version-bound; separate operation-bound execution consent is recorded in `AIExecutionAuthorization`. No external executor is connected to this ledger yet; see [AI execution authority](AI-EXECUTION-AUTHORITY.md).
 - Documents use S3-compatible private storage with integrity hashes and scan status.
 - Background work (notifications, escalations) runs through secret-protected worker routes triggered by `.github/workflows/notification-scheduler.yml`.
 - `PartnershipInquiry` is the one intentionally non-tenant-scoped table (public submissions). See [PARTNERSHIP.md](PARTNERSHIP.md).
@@ -59,6 +60,7 @@ Never commit values. Examples live in `.env.example` and `.env.auth.example`.
 | Workers | `OPERATIONAL_WORKER_SECRET`, `DOCUMENT_SCANNER_WEBHOOK_SECRET` | Scheduler also needs repository secrets `PIEROLOOS_APP_URL` and `OPERATIONAL_WORKER_SECRET` |
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_MESSAGE_ID_DOMAIN` | Optional unless notifications are enabled |
 | Storage | `OBJECT_STORAGE_BUCKET`, `_REGION`, `_ENDPOINT`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_SERVER_SIDE_ENCRYPTION`, `_KMS_KEY_ID` | Private bucket only |
+| Rate limiting | `RATE_LIMIT_REDIS_REST_URL`, `RATE_LIMIT_REDIS_REST_TOKEN` | Required together in production; atomic shared Redis REST counters; no in-memory production fallback |
 | Public site | `SITE_URL` | Optional; enables canonical URLs, sitemap, JSON-LD |
 | Partnerships | `PARTNERSHIP_INQUIRY_NOTIFY_EMAIL` | Optional; content-free alert, needs SMTP |
 
@@ -73,22 +75,29 @@ npm run test:db          # needs PostgreSQL (see scripts/run-db-tests.mjs)
 NEXTAUTH_SECRET=<value> DATABASE_URL=<url> npm run build
 ```
 
-CI (`.github/workflows/ci.yml`) provisions PostgreSQL 16 and runs migrate, DB tests, typecheck, tests and build. CI does not run lint, and `test:e2e` has no Playwright configuration.
+CI (`.github/workflows/ci.yml`) has separate quality and browser-test jobs. The quality job provisions PostgreSQL 16, validates and applies migrations to a disposable CI database, runs database-integrity tests, lint, typecheck, unit/route tests, and a production build. The browser job installs Chromium, builds the app, and runs the Playwright suite against the production server; current public-surface coverage includes accessibility scans and internationalization/responsive checks. These automated checks do not replace manual keyboard, screen-reader, visual, security, or production-environment verification.
 
 ## Deployment requirements
 
 - Node 22 (as used in CI), PostgreSQL 16+, an S3-compatible private bucket, an SMTP provider if notifications are enabled.
 - Run `npm run db:deploy` before starting a new release; migrations are additive.
 - Set all required secrets in a secret manager; set `SITE_URL` to the public origin.
-- Rate limiting is per-process: inject a shared store or enforce limits at the edge before running more than one instance. `x-forwarded-for` must be set by a trusted proxy.
+- Configure `RATE_LIMIT_REDIS_REST_URL` and `RATE_LIMIT_REDIS_REST_TOKEN` in production. Rate-limit requests use atomic Redis Lua counters and fail closed when the shared store is unavailable; validate provider quotas and alerting in staging before rollout.
+- Trust forwarded client-IP headers only when set by the configured trusted proxy/CDN; never accept arbitrary caller-supplied forwarding headers as identity.
 - Configure the scheduler secrets so notification and escalation workers run.
 - Verify security headers on the deployed host. The CSP is minimal (frame, base, form, object only).
 
+## Observability
+
+- `lib/observability/logger.ts` emits a narrow, allow-listed JSON event schema; it must not receive arbitrary request data or exception objects.
+- `GET /api/health` checks PostgreSQL reachability, returns a server-generated correlation ID, and logs generic dependency status without raw errors.
+- The health endpoint is not proof of object-storage, worker, alert-delivery, backup, or full service readiness. See [Observability and Operations](OBSERVABILITY-OPERATIONS.md) for current scope and release evidence requirements.
+
 ## Operational risks
 
-- Per-process rate limiting is bypassable across instances.
-- No documented backup, restore rehearsal or recovery runbook.
-- No error tracking, structured logging or worker-failure alerting beyond `/api/health`.
+- Rate-limit policies still need a route-by-route inventory and staging verification of limits, failure behavior, shared-store availability and trusted-proxy configuration.
+- A recovery runbook is documented, but no successful isolated backup/restore rehearsal evidence or measured recovery objectives are recorded.
+- Structured operational logging is initially integrated only with `/api/health`; broader route/worker instrumentation and tested alert delivery remain open (see [Observability and Operations](OBSERVABILITY-OPERATIONS.md)).
 - Audit tables have no tamper evidence.
 - Unpaginated list queries can grow without bound.
 - Fonts download at build time.

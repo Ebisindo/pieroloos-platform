@@ -42,6 +42,7 @@ export const notificationRepository = {
         organizationId: principal.organizationId,
         workspaceId: principal.workspaceId,
         recipientUserId: principal.userId,
+        channel: "IN_APP",
         status: { not: "CANCELLED" },
         scheduledFor: { lte: new Date() },
       },
@@ -98,6 +99,44 @@ export const notificationRepository = {
       create: data,
       update: {},
     });
+
+    // Fan out a separately deduplicated push outbox item for existing in-app
+    // notification events. Delivery remains gated by the recipient's explicit
+    // push preference and an active token in the worker.
+    if (
+      input.channel === "IN_APP" &&
+      input.recipientUserId &&
+      (input.status === undefined || input.status === "QUEUED")
+    ) {
+      const pushData = {
+        organizationId: data.organizationId,
+        workspaceId: data.workspaceId,
+        obligationId: data.obligationId,
+        actionId: data.actionId,
+        recipientUserId: data.recipientUserId,
+        channel: "PUSH" as const,
+        subject: data.subject,
+        body: data.body,
+        scheduledFor: data.scheduledFor,
+        status: "QUEUED" as const,
+      };
+      await prisma.complianceNotification.upsert({
+        where: {
+          organizationId_workspaceId_dedupeKey: {
+            organizationId: input.organizationId,
+            workspaceId: input.workspaceId,
+            dedupeKey: `push:${input.dedupeKey}`,
+          },
+        },
+        create: {
+          ...pushData,
+          dedupeKey: `push:${input.dedupeKey}`,
+          templateKey: "firebase-web-push",
+          templateVersion: 1,
+        },
+        update: {},
+      });
+    }
 
     return mapRecord(record);
   },

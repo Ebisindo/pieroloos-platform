@@ -20,6 +20,7 @@ const navigationKeys = {
   "/expansion": "navigation.marketExpansion",
   "/cross-border": "navigation.crossBorder",
   "/formation": "navigation.formation",
+  "/ai/business-intent": "navigation.businessIntent",
   "/compliance": "navigation.compliance",
   "/reports": "navigation.reports",
   "/engagements": "navigation.engagements",

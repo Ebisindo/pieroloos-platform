@@ -24,9 +24,12 @@ export default async function AdminDashboardPage() {
         eyebrow={actor.isSuperAdmin ? "SUPER ADMINISTRATOR" : "PLATFORM ADMINISTRATOR"}
         title="Administrative Control Centre"
         description="A permission-scoped view of operational records currently supported by PieroloOS."
-        actions={hasPlatformPermission(actor, PlatformPermission.ADMINS_READ)
-          ? <Link className="button button-secondary" href="/admin/administrators">Manage administrators</Link>
-          : undefined}
+        actions={<div className="page-actions">
+          {actor.isSuperAdmin ? <Link className="button button-secondary" href="/admin/continuity">Business continuity</Link> : null}
+          {hasPlatformPermission(actor, PlatformPermission.ADMINS_READ)
+            ? <Link className="button button-secondary" href="/admin/administrators">Manage administrators</Link>
+            : null}
+        </div>}
       />
 
       <section aria-label="Platform overview" className="metric-grid">

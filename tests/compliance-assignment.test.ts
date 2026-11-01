@@ -74,7 +74,12 @@ describe("compliance obligation assignment", () => {
       where: { userId: "user-new", organizationId: "org-1" },
     }));
     expect(obligationUpdateManyMock).toHaveBeenCalledWith({
-      where: { id: "obligation-1", workspaceId: "workspace-1" },
+      where: {
+        id: "obligation-1",
+        organizationId: "org-1",
+        workspaceId: "workspace-1",
+        ownerUserId: "user-old",
+      },
       data: { ownerUserId: "user-new" },
     });
     expect(activityCreateMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -83,6 +88,22 @@ describe("compliance obligation assignment", () => {
         metadata: { previousOwnerUserId: "user-old", ownerUserId: "user-new" },
       }),
     }));
+  });
+
+
+  it("rejects a concurrent reassignment instead of writing an inaccurate audit event", async () => {
+    obligationFindFirstMock
+      .mockResolvedValueOnce({ id: "obligation-1", ownerUserId: "user-old" })
+      .mockResolvedValueOnce({ id: "obligation-1", ownerUserId: "another-manager" });
+    obligationUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    const response = await assignOwner(request({ ownerUserId: "user-new" }), {
+      params: Promise.resolve({ id: "obligation-1" }),
+    });
+    expect(response.status).toBe(409);
+    expect(obligationUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ ownerUserId: "another-manager" }),
+    }));
+    expect(activityCreateMock).not.toHaveBeenCalled();
   });
 
   it("rejects assigning a non-member", async () => {
