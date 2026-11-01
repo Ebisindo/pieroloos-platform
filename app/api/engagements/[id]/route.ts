@@ -31,7 +31,11 @@ export async function PATCH(request: Request, context: Context) {
     return NextResponse.json({ error: "Engagement write permission required." }, { status: 403 });
   }
   const { id } = await context.params;
-  const parsed = engagementUpdateSchema.safeParse(await request.json());
+  let body: unknown;
+  try { body = await request.json(); } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+  }
+  const parsed = engagementUpdateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Validation failed", issues: parsed.error.flatten() }, { status: 422 },
