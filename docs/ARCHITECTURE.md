@@ -61,6 +61,7 @@ Never commit values. Examples live in `.env.example` and `.env.auth.example`.
 | Rate limiting | `RATE_LIMIT_REDIS_REST_URL`, `RATE_LIMIT_REDIS_REST_TOKEN` | Required together in production; atomic shared Redis REST counters; no in-memory production fallback |
 | Public site | `SITE_URL` | Optional; enables canonical URLs, sitemap, JSON-LD |
 | Partnerships | `PARTNERSHIP_INQUIRY_NOTIFY_EMAIL` | Optional; content-free alert, needs SMTP |
+| Payments | `PAYMENTS_ENABLED`, `STRIPE_PAYMENTS_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BANK_TRANSFER_ENABLED`, `BANK_TRANSFER_DETAILS_VERIFIED`, `CRYPTO_PAYMENTS_ENABLED`, per-rail crypto variables | All payment flags default to false. Secret/configure account and token/network values in deployment secret management. Review `PAYMENTS-IMPLEMENTATION-STATUS.md`; there is no automatic blockchain verifier in the current implementation. |
 
 ## Testing commands
 

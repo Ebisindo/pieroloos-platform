@@ -23,6 +23,7 @@ const navigationKeys = {
   "/compliance": "navigation.compliance",
   "/reports": "navigation.reports",
   "/engagements": "navigation.engagements",
+  "/billing": "navigation.billing",
   "/settings": "navigation.settings",
   "/portal": "navigation.clientPortal",
   "/admin/dashboard": "navigation.adminControlCentre",

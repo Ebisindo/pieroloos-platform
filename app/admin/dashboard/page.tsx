@@ -25,6 +25,7 @@ export default async function AdminDashboardPage() {
         title="Administrative Control Centre"
         description="A permission-scoped view of operational records currently supported by PieroloOS."
         actions={<div className="page-actions">
+          {actor.isSuperAdmin ? <Link className="button button-secondary" href="/admin/payments">Payment reconciliation</Link> : null}
           {actor.isSuperAdmin ? <Link className="button button-secondary" href="/admin/continuity">Business continuity</Link> : null}
           {actor.isSuperAdmin ? <Link className="button button-secondary" href="/admin/institutions">Global institution directory</Link> : null}
           {hasPlatformPermission(actor, PlatformPermission.ADMINS_READ)
