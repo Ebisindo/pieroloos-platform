@@ -58,6 +58,7 @@ const en = {
   "navigation.marketExpansion": "Market Expansion",
   "navigation.crossBorder": "Cross-border Preparation",
   "navigation.formation": "Formation",
+  "navigation.businessIntent": "Business Intent & AI Review",
   "navigation.compliance": "Compliance",
   "navigation.reports": "Reports",
   "navigation.engagements": "Engagements",
@@ -484,6 +485,8 @@ const en = {
   "app.compliance.reviewNoteLabel": "Review note",
   "app.compliance.verify": "Verify",
   "app.compliance.requestChanges": "Request changes",
+  "app.compliance.revokeEvidence": "Revoke evidence",
+  "app.compliance.revokeEvidenceConfirm": "Revoke this evidence record permanently? It cannot be restored; attach a replacement if corrected.",
   "app.compliance.noDocuments": "No client documents are available.",
   "app.compliance.noOwner": "No owner assigned",
   "app.compliance.professionalBoundary": "Compliance tracking organizes records and workflow; it does not determine legal or regulatory compliance.",
@@ -512,6 +515,7 @@ const en = {
   "app.compliance.typeOther": "Other",
   "app.compliance.verified": "Verified",
   "app.compliance.changesRequested": "Changes requested",
+  "app.compliance.revoked": "Revoked",
   "app.compliance.documentEvidence": "Document evidence for {title}",
   "app.compliance.sourceReferenceOptional": "Source reference (optional)",
   "app.compliance.attachEvidenceTo": "Attach evidence to {title}",
@@ -1118,6 +1122,11 @@ const en = {
   "apiError.failPortalVisibility": "Unable to update client portal visibility.",
   "apiError.failRemoveMember": "Unable to remove organization membership.",
   "apiError.failUpdateRole": "Unable to update organization membership role.",
+  "ui.banner.intakeEyebrow": "CLIENT INTAKE",
+  "ui.banner.formationDescription": "Turn reviewed business context and jurisdiction comparisons into a staged plan with evidence, dependencies and human-review gates.",
+  "ui.banner.engagementsDescription": "Keep professional-service work, ownership and next steps visible from intake through delivery and closure.",
+  "ui.banner.reportsDescription": "Create structured outputs from available business records and evidence. A report is only as reliable as its source data and review.",
+  "ui.banner.complianceDescription": "Track workspace-scoped obligations, connect evidence, and surface review gates. Status indicators support professional oversight; they are not legal determinations.",
 } as const;
 
 export default en;

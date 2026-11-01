@@ -3,7 +3,8 @@ import { ArrowUpRight, Database, FileCheck2, ShieldCheck, Workflow } from "lucid
 import { ActionQueue } from "@/components/control-plane/ActionQueue";
 import { NotificationInbox } from "@/components/control-plane/NotificationInbox";
 import { NotificationPreferencesForm } from "@/components/control-plane/NotificationPreferencesForm";
-import { GlassPanel, MetricCard, PageHeader, SectionHeader, StatusBadge } from "@/components/ui/primitives";
+import { ModuleBanner } from "@/components/ui/ModuleBanner";
+import { GlassPanel, MetricCard, SectionHeader, StatusBadge } from "@/components/ui/primitives";
 import { getWorkspaceContext } from "@/lib/auth/workspace-context";
 import { listActiveOperationalActions } from "@/lib/db/operational-action-query";
 import { notificationRepository } from "@/lib/db/notification-repository";
@@ -78,11 +79,12 @@ export default async function CommandCenterPage() {
 
   return (
     <div className="page-stack">
-      <PageHeader
+      <ModuleBanner
         eyebrow={t("app.dashboard.eyebrow")}
         title={t("navigation.businessFormation")}
         description={t("app.dashboard.description")}
-        actions={<Link href="/clients/new" className="button button-primary">{t("app.dashboard.newClient")}</Link>}
+        visual="flow"
+        action={<Link href="/clients/new" className="button button-primary">{t("app.dashboard.newClient")}</Link>}
       />
 
       <div className="metric-grid">

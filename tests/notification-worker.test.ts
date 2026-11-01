@@ -6,6 +6,7 @@ const {
   notificationFindUniqueOrThrowMock,
   attemptCreateMock,
   attemptUpdateMock,
+  attemptUpdateManyMock,
   userFindUniqueMock,
   preferenceFindUniqueMock,
   workspaceFindFirstMock,
@@ -13,12 +14,14 @@ const {
   workspaceSettingsFindUniqueMock,
   transactionMock,
   sendEmailMock,
+  sendPushMock,
 } = vi.hoisted(() => ({
   notificationFindManyMock: vi.fn(),
   notificationUpdateManyMock: vi.fn(),
   notificationFindUniqueOrThrowMock: vi.fn(),
   attemptCreateMock: vi.fn(),
   attemptUpdateMock: vi.fn(),
+  attemptUpdateManyMock: vi.fn(),
   userFindUniqueMock: vi.fn(),
   preferenceFindUniqueMock: vi.fn(),
   workspaceFindFirstMock: vi.fn(),
@@ -26,6 +29,7 @@ const {
   workspaceSettingsFindUniqueMock: vi.fn(),
   transactionMock: vi.fn(),
   sendEmailMock: vi.fn(),
+  sendPushMock: vi.fn(),
 }));
 
 const transaction = {
@@ -37,6 +41,7 @@ const transaction = {
   notificationDeliveryAttempt: {
     create: attemptCreateMock,
     update: attemptUpdateMock,
+    updateMany: attemptUpdateManyMock,
   },
 };
 
@@ -55,11 +60,15 @@ vi.mock("@/lib/db/prisma", () => ({
 vi.mock("@/lib/services/notification-email", () => ({
   sendNotificationEmail: sendEmailMock,
 }));
+vi.mock("@/lib/services/firebase-push-delivery", () => ({
+  sendFirebasePush: sendPushMock,
+}));
 
 import { runNotificationWorker } from "@/lib/services/notification-worker";
 
 const queuedEmail = {
   id: "notification-1",
+  dedupeKey: "test-notification",
   organizationId: "org-1",
   workspaceId: "workspace-1",
   recipientUserId: "user-1",
@@ -83,10 +92,12 @@ describe("notification background worker", () => {
     notificationFindUniqueOrThrowMock.mockReset().mockResolvedValue({ attemptCount: 1 });
     attemptCreateMock.mockReset().mockResolvedValue({ id: "attempt-1" });
     attemptUpdateMock.mockReset().mockResolvedValue({});
+    attemptUpdateManyMock.mockReset().mockResolvedValue({ count: 1 });
     userFindUniqueMock.mockReset().mockResolvedValue({ id: "user-1", email: "user@example.com" });
     preferenceFindUniqueMock.mockReset().mockResolvedValue({
       inAppEnabled: true,
       emailEnabled: true,
+      pushEnabled: true,
       quietHoursStart: null,
       quietHoursEnd: null,
       timezone: "UTC",
@@ -100,6 +111,10 @@ describe("notification background worker", () => {
     sendEmailMock.mockReset().mockResolvedValue({
       messageId: "<receipt@example.com>",
       response: "250 accepted",
+    });
+    sendPushMock.mockReset().mockResolvedValue({
+      messageId: "projects/staging/messages/push-receipt",
+      receipt: "accepted=1;failed=0",
     });
   });
 
@@ -123,6 +138,68 @@ describe("notification background worker", () => {
     }));
   });
 
+  it("sends opted-in PUSH outbox rows through Firebase Admin and records provider acceptance", async () => {
+    notificationFindManyMock.mockResolvedValueOnce([{ ...queuedEmail, channel: "PUSH" as const }]);
+
+    const result = await runNotificationWorker(new Date("2026-10-06T06:30:00Z"));
+
+    expect(result).toMatchObject({ claimed: 1, delivered: 1, retried: 0 });
+    expect(sendPushMock).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user-1",
+      title: "Action needs attention",
+      body: "Please review.",
+      notificationId: "notification-1",
+    }));
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "SENT",
+        deliveryReceipt: "accepted=1;failed=0",
+      }),
+    }));
+  });
+
+  it("retries transient Firebase push provider failures with bounded backoff", async () => {
+    notificationFindManyMock.mockResolvedValueOnce([{ ...queuedEmail, channel: "PUSH" as const }]);
+    sendPushMock.mockRejectedValueOnce(Object.assign(new Error("PUSH_PROVIDER_PARTIAL_FAILURE"), { code: "ETIMEDOUT" }));
+    const now = new Date("2026-10-06T06:30:00Z");
+
+    const result = await runNotificationWorker(now);
+
+    expect(result).toMatchObject({ claimed: 1, retried: 1, deadLettered: 0 });
+    expect(attemptUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "RETRYABLE_FAILURE",
+        failureCode: "ETIMEDOUT",
+        failureMessage: "Notification delivery failed (ETIMEDOUT).",
+      }),
+    }));
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "QUEUED",
+        nextAttemptAt: new Date(now.getTime() + 30_000),
+      }),
+    }));
+  });
+
+  it("does not report delivery as finalized when the SMTP acceptance arrives after the worker loses its lease", async () => {
+    notificationUpdateManyMock
+      .mockResolvedValueOnce({ count: 1 }) // claim notification
+      .mockResolvedValueOnce({ count: 1 }) // create attempt under the lease
+      .mockResolvedValueOnce({ count: 0 }); // lease no longer belongs to this worker
+    const result = await runNotificationWorker(new Date("2026-10-06T06:30:00Z"));
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      claimed: 1,
+      delivered: 0,
+      reconciliationRequired: 1,
+    });
+    expect(attemptUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "ACCEPTED", providerMessageId: "<receipt@example.com>" }),
+    }));
+  });
+
   it("uses bounded retry scheduling and records sanitized failures", async () => {
     const timeout = Object.assign(new Error("connection timed out with private server details"), { code: "ETIMEDOUT" });
     sendEmailMock.mockRejectedValueOnce(timeout);
@@ -143,6 +220,86 @@ describe("notification background worker", () => {
         status: "QUEUED",
         nextAttemptAt: new Date(now.getTime() + 30_000),
       }),
+    }));
+  });
+
+
+  it("moves permanent provider failures directly to dead-letter with sanitized failure details", async () => {
+    const permanent = Object.assign(new Error("provider rejected credentials and included private response text"), { responseCode: 550, code: "EAUTH" });
+    sendEmailMock.mockRejectedValueOnce(permanent);
+    const now = new Date("2026-10-06T06:30:00Z");
+
+    const result = await runNotificationWorker(now);
+
+    expect(result).toMatchObject({ claimed: 1, deadLettered: 1, retried: 0 });
+    expect(attemptUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "PERMANENT_FAILURE",
+        failureCode: "EAUTH",
+        failureMessage: "Notification delivery failed (EAUTH).",
+      }),
+    }));
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: "DEAD_LETTER",
+        deadLetteredAt: now,
+        failureReason: "Notification delivery failed (EAUTH).",
+      }),
+    }));
+  });
+
+  it("dead-letters a retryable failure when the notification has exhausted its retry budget", async () => {
+    notificationFindManyMock.mockResolvedValueOnce([{ ...queuedEmail, attemptCount: 4, maxAttempts: 5 }]);
+    sendEmailMock.mockRejectedValueOnce(Object.assign(new Error("temporary provider outage"), { code: "ETIMEDOUT" }));
+    const now = new Date("2026-10-06T06:30:00Z");
+
+    const result = await runNotificationWorker(now);
+
+    expect(result).toMatchObject({ deadLettered: 1, retried: 0 });
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "DEAD_LETTER", deadLetteredAt: now }),
+    }));
+  });
+
+  it("marks an expired worker lease as retryable before safely reclaiming the notification", async () => {
+    const now = new Date("2026-10-06T06:30:00Z");
+    notificationFindManyMock.mockResolvedValueOnce([{
+      ...queuedEmail,
+      status: "PROCESSING",
+      attemptCount: 1,
+      lockedBy: "worker-that-crashed",
+      lockedAt: new Date(now.getTime() - 6 * 60 * 1000),
+    }]);
+
+    const result = await runNotificationWorker(now);
+
+    expect(result).toMatchObject({ claimed: 1, delivered: 1 });
+    expect(attemptUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        notificationId: "notification-1",
+        attemptNumber: 1,
+        status: "ATTEMPTING",
+      }),
+      data: expect.objectContaining({
+        status: "RETRYABLE_FAILURE",
+        failureCode: "WORKER_LEASE_EXPIRED",
+      }),
+    }));
+  });
+
+  it("does not count cancellation as finalized after the worker loses its lease", async () => {
+    notificationUpdateManyMock
+      .mockResolvedValueOnce({ count: 1 }) // claim notification
+      .mockResolvedValueOnce({ count: 0 }); // another worker owns the row now
+    membershipFindFirstMock.mockResolvedValueOnce(null);
+
+    const result = await runNotificationWorker(new Date("2026-10-06T06:30:00Z"));
+
+    expect(result).toMatchObject({ claimed: 1, cancelled: 0, failed: 1 });
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(notificationUpdateManyMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ status: "PROCESSING", lockedBy: expect.any(String) }),
+      data: expect.objectContaining({ status: "CANCELLED" }),
     }));
   });
 
