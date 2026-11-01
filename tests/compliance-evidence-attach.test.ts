@@ -80,6 +80,33 @@ describe("compliance evidence attachment", () => {
     }));
   });
 
+
+  it("persists a structured fact assertion for independent review before it can be used in generation", async () => {
+    const response = await attachEvidence(request({
+      documentId: "document-1",
+      evidenceClass: "E3",
+      factKey: "BUSINESS_TYPE",
+      factValue: "COMPANY",
+      note: "Company registry document supports the business type.",
+    }), { params: Promise.resolve({ id: "obligation-1" }) });
+
+    expect(response.status).toBe(201);
+    expect(evidenceCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ factKey: "BUSINESS_TYPE", factValue: "COMPANY" }),
+    }));
+  });
+
+  it("rejects an incomplete structured fact assertion", async () => {
+    const response = await attachEvidence(request({
+      documentId: "document-1",
+      evidenceClass: "E3",
+      factKey: "BUSINESS_TYPE",
+    }), { params: Promise.resolve({ id: "obligation-1" }) });
+
+    expect(response.status).toBe(422);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("requires the document to belong to the same client and workspace", async () => {
     documentFindFirstMock.mockResolvedValue(null);
     const response = await attachEvidence(request({

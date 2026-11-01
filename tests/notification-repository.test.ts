@@ -60,10 +60,11 @@ describe("notification repository", () => {
         organizationId: "org-1",
         workspaceId: "workspace-1",
         recipientUserId: "user-1",
+        channel: "IN_APP",
         status: { not: "CANCELLED" },
       }),
     }));
-    expect(notificationFindManyMock.mock.calls[0][0].where).not.toHaveProperty("channel");
+    expect(notificationFindManyMock.mock.calls[0][0].where).toHaveProperty("channel", "IN_APP");
   });
 
   it("requires compliance-read permission to view in-app notices", async () => {
@@ -140,6 +141,23 @@ describe("notification repository", () => {
         organizationId: "org-1",
         workspaceId: "workspace-1",
         dedupeKey: "escalation:action-1:2",
+      }),
+      update: {},
+    }));
+    expect(notificationUpsertMock).toHaveBeenCalledTimes(2);
+    expect(notificationUpsertMock.mock.calls[1][0]).toEqual(expect.objectContaining({
+      where: { organizationId_workspaceId_dedupeKey: {
+        organizationId: "org-1",
+        workspaceId: "workspace-1",
+        dedupeKey: "push:escalation:action-1:2",
+      } },
+      create: expect.objectContaining({
+        organizationId: "org-1",
+        workspaceId: "workspace-1",
+        recipientUserId: "user-2",
+        channel: "PUSH",
+        dedupeKey: "push:escalation:action-1:2",
+        templateKey: "firebase-web-push",
       }),
       update: {},
     }));

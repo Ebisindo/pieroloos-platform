@@ -37,6 +37,7 @@ const pt = {
   "navigation.marketExpansion": "Expansão de mercado",
   "navigation.crossBorder": "Preparação transfronteiriça",
   "navigation.formation": "Formação",
+  "navigation.businessIntent": "Intenção empresarial e revisão de IA",
   "navigation.compliance": "Conformidade",
   "navigation.reports": "Relatórios",
   "navigation.engagements": "Atendimentos",
@@ -464,6 +465,8 @@ const pt = {
   "app.compliance.reviewNoteLabel": "Nota de revisão",
   "app.compliance.verify": "Verificar",
   "app.compliance.requestChanges": "Solicitar alterações",
+  "app.compliance.revokeEvidence": "Revogar evidência",
+  "app.compliance.revokeEvidenceConfirm": "Revogar permanentemente este registo de evidência? Não pode ser restaurado; anexe um registo substituto se houver correção.",
   "app.compliance.noDocuments": "Não há documentos de clientes disponíveis.",
   "app.compliance.noOwner": "Nenhum responsável atribuído",
   "app.compliance.professionalBoundary": "O acompanhamento de conformidade organiza registros e fluxos de trabalho; não determina a conformidade jurídica ou regulatória.",
@@ -492,6 +495,7 @@ const pt = {
   "app.compliance.typeOther": "Outro",
   "app.compliance.verified": "Verificada",
   "app.compliance.changesRequested": "Alterações solicitadas",
+  "app.compliance.revoked": "Revogada",
   "app.compliance.documentEvidence": "Evidência documental de {title}",
   "app.compliance.sourceReferenceOptional": "Referência da fonte (opcional)",
   "app.compliance.attachEvidenceTo": "Anexar evidência a {title}",
@@ -1098,6 +1102,11 @@ const pt = {
   "apiError.failPortalVisibility": "Não foi possível atualizar a visibilidade do portal do cliente.",
   "apiError.failRemoveMember": "Não foi possível remover o membro da organização.",
   "apiError.failUpdateRole": "Não foi possível atualizar a função do membro da organização.",
+  "ui.banner.intakeEyebrow": "CADASTRO DE CLIENTES",
+  "ui.banner.formationDescription": "Transforme o contexto empresarial revisado e as comparações de jurisdições em um plano por etapas, com evidências, dependências e pontos de revisão humana.",
+  "ui.banner.engagementsDescription": "Mantenha os serviços profissionais, responsáveis e próximas etapas visíveis desde o cadastro até a entrega e o encerramento.",
+  "ui.banner.reportsDescription": "Crie resultados estruturados a partir dos registros empresariais e evidências disponíveis. A confiabilidade depende das fontes e da revisão.",
+  "ui.banner.complianceDescription": "Acompanhe obrigações do espaço de trabalho, conecte evidências e destaque pontos de revisão. Os indicadores apoiam a supervisão profissional e não constituem conclusões jurídicas.",
 } satisfies MessageCatalog;
 
 export default pt;

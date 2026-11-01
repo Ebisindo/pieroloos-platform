@@ -76,7 +76,7 @@ function normalizedTronAddress(value: string): string | null {
   }
   let hexValue = number.toString(16);
   if (hexValue.length % 2) hexValue = "0" + hexValue;
-  let decoded: number[] = [];
+  const decoded: number[] = [];
   for (let index = 0; index < hexValue.length; index += 2) decoded.push(Number.parseInt(hexValue.slice(index, index + 2), 16));
   for (const char of input) {
     if (char !== "1") break;
