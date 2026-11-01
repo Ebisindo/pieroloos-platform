@@ -17,14 +17,14 @@ Status terms: **Implemented** (code and tests exist), **Partial** (core workflow
 
 | Step | Module | Status |
 | --- | --- | --- |
-| Define business intent | Client intake, business profile | Implemented |
-| Entity and market architecture | Business profile, market entry plans | Partial |
+| Define business intent | Client intake and dedicated Business Profile list/detail editor | Implemented |
+| Entity and market architecture | Business profile fields and market entry plans | Partial |
 | Jurisdiction considerations | Jurisdiction Lens (workspace-recorded observations) | Partial |
 | Risk assessment | Market readiness, cross-border dossiers | Partial |
 | Formation roadmap | Formation plans, stages, tasks | Partial |
 | Compliance organisation | Obligations, evidence, reminders, escalation | Partial |
 | Escalation to professionals | Advisor review gates on tasks and evidence | Partial |
-| Ongoing administration | Engagements, actions, notifications, reports | Partial |
+| Ongoing administration | Engagements (list, create, update, controlled status transitions and activity history), saved client-summary reports and export | Partial |
 | Growth and expansion | Market expansion, cross-border preparation | Partial |
 | Client collaboration | Client portal (grants, uploads, messages) | Implemented |
 | Authoritative jurisdiction source registry | Domain types only; no table, no sourced seed data | Prepared |
@@ -43,8 +43,8 @@ The feature-maturity registry in `lib/domain/trust-boundary.ts` mirrors this tab
 - There is no UI to review partnership inquiries; the admin list is an API only.
 - No payment provider, invoicing or cancellation flow.
 - Search in the application shell is a placeholder.
-- Many list queries are unpaginated.
-- No end-to-end browser tests.
+- Workspace lists use bounded result sets in several places rather than cursor pagination.
+- Accessibility automation covers public routes and signed-out access states; authenticated workflow E2E tests and physical-device testing still need a documented non-production test identity and manual verification.
 
 ## Roadmap (sequenced; not committed dates)
 

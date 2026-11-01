@@ -1,0 +1,149 @@
+import { BillingPaymentStatus } from "@prisma/client";
+import { paymentControlConfiguration } from "@/lib/domain/payment-gateway";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getCurrentPlatformActor } from "@/lib/auth/platform-access";
+import { hasInvalidRequestOrigin } from "@/lib/auth/request-origin";
+import { enforceRateLimit, PLATFORM_ADMIN_MUTATION_LIMIT } from "@/lib/http/rate-limit";
+import { prisma } from "@/lib/db/prisma";
+import { reconcileBankTransfer, reconcileCryptoPayment, PaymentGatewayError } from "@/lib/services/payment-gateway";
+
+const actionSchema = z.object({
+  action: z.enum(["APPROVE_BANK_TRANSFER", "REJECT_BANK_TRANSFER", "APPROVE_CRYPTO_PAYMENT", "REJECT_CRYPTO_PAYMENT"]),
+  paymentId: z.string().min(1).max(128),
+  organizationId: z.string().min(1).max(128),
+  receivedAmountMinor: z.string().regex(/^[1-9][0-9]{0,17}$/).optional(),
+  receivedCurrency: z.string().regex(/^[A-Z]{3}$/).optional(),
+  receivedAmountBaseUnits: z.string().regex(/^[1-9][0-9]{0,35}$/).optional(),
+  bankTransactionReference: z.string().trim().min(4).max(160).optional(),
+  evidenceReference: z.string().trim().min(4).max(500),
+  reason: z.string().trim().min(8).max(500),
+}).strict();
+
+function allowed(actor: { isSuperAdmin: boolean }) {
+  // Financial account data and reconciliation controls are restricted to the platform Super Administrator.
+  return actor.isSuperAdmin;
+}
+
+export async function GET() {
+  const actor = await getCurrentPlatformActor();
+  if (!actor) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (!allowed(actor)) return NextResponse.json({ error: "Financial administration access required." }, { status: 403 });
+
+  try {
+    const where = {};
+    const [pendingRows, recent] = await Promise.all([
+      prisma.billingPayment.findMany({
+        where: { ...where, status: BillingPaymentStatus.PENDING },
+        orderBy: { createdAt: "asc" }, take: 100,
+        select: { id: true, organizationId: true, invoiceId: true, provider: true, providerPaymentId: true, currency: true, amountMinor: true, createdAt: true },
+      }),
+      prisma.billingPayment.findMany({
+        where,
+        orderBy: { createdAt: "desc" }, take: 100,
+        select: { id: true, organizationId: true, invoiceId: true, provider: true, providerPaymentId: true, status: true, currency: true, amountMinor: true, refundedAmountMinor: true, createdAt: true, paidAt: true },
+      }),
+    ]);
+    const claims = pendingRows.length ? await prisma.platformAuditEvent.findMany({
+      where: { action: "PAYMENT_CLAIM_SUBMITTED", subjectType: "BILLING_PAYMENT", subjectId: { in: pendingRows.map((p) => p.id) }, outcome: "SUCCESS" },
+      orderBy: { occurredAt: "desc" },
+      select: { subjectId: true, actorUserId: true, details: true, occurredAt: true },
+    }) : [];
+    const latestClaimByPayment = new Map<string, typeof claims[number]>();
+    for (const claim of claims) {
+      if (claim.subjectId && !latestClaimByPayment.has(claim.subjectId)) latestClaimByPayment.set(claim.subjectId, claim);
+    }
+    const pending = pendingRows.filter((payment) => latestClaimByPayment.has(payment.id)).map((payment) => {
+      const claim = latestClaimByPayment.get(payment.id);
+      const details = claim?.details as { paymentReference?: unknown; claimMetadata?: unknown } | null;
+      return {
+        ...payment,
+        claim: details?.claimMetadata ?? null,
+        paymentReference: typeof details?.paymentReference === "string" ? details.paymentReference : null,
+        submittedByUserId: claim?.actorUserId ?? null,
+        submittedAt: claim?.occurredAt ?? payment.createdAt,
+      };
+    });
+    await prisma.platformAuditEvent.create({
+      data: {
+        actorUserId: actor.userId, actorRole: "SUPER_ADMIN",
+        action: "BILLING_PAYMENTS_READ", subjectType: "BILLING_PAYMENT", outcome: "SUCCESS",
+        details: { pendingCount: pending.length, recentCount: recent.length },
+      },
+    });
+    return NextResponse.json({ data: { pending: pending.map((payment) => ({ ...payment, amountMinor: payment.amountMinor.toString() })), recent: recent.map((payment) => ({ ...payment, amountMinor: payment.amountMinor.toString(), refundedAmountMinor: payment.refundedAmountMinor.toString() })) } });
+  } catch {
+    console.error("Unable to list payment records.");
+    return NextResponse.json({ error: "Unable to load payment records." }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  if (hasInvalidRequestOrigin(request)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  const actor = await getCurrentPlatformActor();
+  if (!actor) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (!actor.isSuperAdmin) return NextResponse.json({ error: "Only the platform Super Administrator may reconcile payment claims." }, { status: 403 });
+  const controls = paymentControlConfiguration();
+  if (!controls.paymentsEnabled || !controls.reconciliationAdminOnly || !controls.requireDistinctReviewer) {
+    return NextResponse.json({ error: "Payment reconciliation is disabled by the platform safety configuration." }, { status: 503 });
+  }
+  const limited = await enforceRateLimit(PLATFORM_ADMIN_MUTATION_LIMIT, actor.userId);
+  if (limited) return limited;
+
+  let body: unknown;
+  try {
+    const raw = await request.text();
+    if (Buffer.byteLength(raw, "utf8") > 8 * 1024) return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
+    body = JSON.parse(raw);
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+  }
+  const parsed = actionSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "Validation failed.", issues: parsed.error.flatten().fieldErrors }, { status: 422 });
+  if (parsed.data.action === "APPROVE_BANK_TRANSFER" &&
+      (!parsed.data.receivedAmountMinor || !parsed.data.receivedCurrency || !parsed.data.bankTransactionReference)) {
+    return NextResponse.json({ error: "Bank approval requires exact amount, currency, bank reference, and independent evidence reference." }, { status: 422 });
+  }
+  if (parsed.data.action === "APPROVE_CRYPTO_PAYMENT" && !parsed.data.receivedAmountBaseUnits) {
+    return NextResponse.json({ error: "Crypto approval requires the exact on-chain token amount in base units and independent chain evidence." }, { status: 422 });
+  }
+
+  try {
+    if (parsed.data.action === "APPROVE_CRYPTO_PAYMENT" || parsed.data.action === "REJECT_CRYPTO_PAYMENT") {
+      const result = await reconcileCryptoPayment({
+        actorUserId: actor.userId,
+        organizationId: parsed.data.organizationId,
+        paymentId: parsed.data.paymentId,
+        receivedAmountBaseUnits: BigInt(parsed.data.receivedAmountBaseUnits ?? "1"),
+        decision: parsed.data.action === "APPROVE_CRYPTO_PAYMENT" ? "APPROVE" : "REJECT",
+        evidenceReference: parsed.data.evidenceReference,
+        reason: parsed.data.reason,
+      });
+      return NextResponse.json({
+        data: result,
+        notice: parsed.data.action === "APPROVE_CRYPTO_PAYMENT"
+          ? "The server verified this transaction against the configured read-only chain RPC and recorded the result with audit evidence."
+          : "The rejected claim was recorded with audit evidence.",
+      });
+    }
+    const result = await reconcileBankTransfer({
+      actorUserId: actor.userId,
+      organizationId: parsed.data.organizationId,
+      paymentId: parsed.data.paymentId,
+      receivedAmountMinor: BigInt(parsed.data.receivedAmountMinor ?? "1"),
+      receivedCurrency: parsed.data.receivedCurrency ?? "USD",
+      bankTransactionReference: parsed.data.bankTransactionReference ?? "rejection",
+      evidenceReference: parsed.data.evidenceReference,
+      decision: parsed.data.action === "APPROVE_BANK_TRANSFER" ? "APPROVE" : "REJECT",
+      reason: parsed.data.reason,
+    });
+    return NextResponse.json({ data: result });
+  } catch (error) {
+    if (error instanceof PaymentGatewayError) {
+      const status = { DISABLED: 503, NOT_FOUND: 404, NOT_PAYABLE: 409, INVALID: 422, CONFLICT: 409, FORBIDDEN: 403, NOT_CONFIGURED: 503 }[error.code];
+      return NextResponse.json({ error: error.message, code: error.code }, { status });
+    }
+    console.error("Payment reconciliation failed.");
+    return NextResponse.json({ error: "Payment reconciliation could not be completed." }, { status: 500 });
+  }
+}

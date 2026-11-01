@@ -4,6 +4,8 @@ UI → Application Services → Domain/Business Rules → Repository/Data Access
 
 The UI should not contain persistence or core business rules. Evidence and source quality are first-class concepts. Organization and workspace boundaries are modeled from the start. Human decision authority remains separate from automated preparation.
 
+The dedicated Business Profile workspace at `/business-profile` reads and edits the profile created during client intake; it does not create a second profile record. Reports use workspace-scoped snapshots saved as report documents, while engagement operations use the existing status-transition graph and audit activity trail.
+
 ## First vertical slice
 Client Intake → Business Profile → Engagement → Jurisdiction Lens → Formation → Compliance → Report → Engagement Record.
 
@@ -12,13 +14,13 @@ Client Intake → Business Profile → Engagement → Jurisdiction Lens → Form
 
 ## Public website architecture
 
-- **Public routes:** `/` (for signed-out visitors) and `/partners`. They are listed in `lib/navigation.ts` (`publicRoutes`, `isPublicRoute`). `AppShell` and `BootLayer` bypass the workspace shell and splash for these routes; pages render `components/public/PublicShell.tsx` (header, footer, disclaimer).
-- **`/` behaviour:** signed-in users are redirected to their workspace landing page; signed-out visitors see `components/public/PublicHome.tsx`. Public pages read no workspace data.
-- **Private by default:** the root layout sets `robots: noindex`. Public pages opt in through `publicPageMetadata()` in `lib/site.ts`. `app/robots.ts` disallows everything except `/` and `/partners`; `app/sitemap.ts` lists only those.
+- **Public routes:** `/`, `/partners`, `/faq`, `/terms`, `/policies`, and explicitly allowlisted `/policies/{slug}` document routes. They are listed in `lib/navigation.ts` (`publicRoutes`, `isPublicRoute`). `AppShell` and `BootLayer` bypass the workspace shell and splash for these routes; pages render `components/public/PublicShell.tsx`. Signed-out public documents must not read workspace records.
+- **`/` behaviour:** signed-in users are redirected to their workspace landing page; signed-out visitors see `components/public/PublicHome.tsx`.
+- **Indexing is narrower than public access:** the root layout defaults to `noindex`; `INDEXABLE_PATHS`, `app/robots.ts`, and `app/sitemap.ts` control search discovery. FAQ is indexable. Draft Terms and policy pages remain excluded from indexing and the sitemap until approval. The Terms and policy routes remain crawlable so crawlers can read their `noindex` metadata. `SITE_URL` is never guessed.
 - **Site URL:** `SITE_URL` (optional) enables canonical URLs, sitemap entries and Organization JSON-LD. Unset means they are omitted, not guessed.
 - **Fonts:** `next/font/google` (Inter, Space Grotesk) in `app/layout.tsx`; this needs network access at build time.
 - **Honesty rule:** public copy distinguishes Available, Foundation and Planned capabilities (`productModules` in `lib/navigation.ts`) and states no partners, customers or approvals.
-- **Internationalization:** `lib/i18n/` contains the default English locale, proposed locale registry, typed catalogs, fallback and formatting helpers. The existing public homepage and partnership page use those catalogs with a route-preserving language selector; authenticated workflows remain outside the translated scope. See [INTERNATIONALIZATION.md](INTERNATIONALIZATION.md).
+- **Internationalization:** `lib/i18n/` contains the default English locale, proposed locale registry, typed catalogs, fallback and formatting helpers. Public and the new Business Profile, Reports and Engagements workflows use the locale catalogs. Other authenticated workflows may still have untranslated portions. See [INTERNATIONALIZATION.md](INTERNATIONALIZATION.md).
 
 ## Database and service architecture
 
@@ -61,6 +63,7 @@ Never commit values. Examples live in `.env.example` and `.env.auth.example`.
 | Rate limiting | `RATE_LIMIT_REDIS_REST_URL`, `RATE_LIMIT_REDIS_REST_TOKEN` | Required together in production; atomic shared Redis REST counters; no in-memory production fallback |
 | Public site | `SITE_URL` | Optional; enables canonical URLs, sitemap, JSON-LD |
 | Partnerships | `PARTNERSHIP_INQUIRY_NOTIFY_EMAIL` | Optional; content-free alert, needs SMTP |
+| Payments | `PAYMENTS_ENABLED`, `STRIPE_PAYMENTS_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BANK_TRANSFER_ENABLED`, `BANK_TRANSFER_DETAILS_VERIFIED`, `CRYPTO_PAYMENTS_ENABLED`, per-rail crypto variables | All payment flags default to false. Secret/configure account and token/network values in deployment secret management. Review `PAYMENTS-IMPLEMENTATION-STATUS.md`; there is no automatic blockchain verifier in the current implementation. |
 
 ## Testing commands
 
@@ -100,3 +103,8 @@ CI (`.github/workflows/ci.yml`) has separate quality and browser-test jobs. The 
 - Unpaginated list queries can grow without bound.
 - Fonts download at build time.
 - Partnership inquiries contain personal data with no retention or privacy policy yet.
+
+
+## FAQ, Terms and policy document routes
+
+The public route allowlist now includes `/faq`, `/terms`, `/policies`, and the explicit policy slugs in `lib/navigation.ts`. These pages use `components/public/PublicShell.tsx` and must not read workspace records for signed-out visitors. Public accessibility does not imply permission to index a page: the FAQ is in `INDEXABLE_PATHS`, while the Terms page and the Policies directory/document routes remain `noindex` until their publication blockers are resolved. `SITE_URL` is never guessed; it supplies canonical URLs and sitemap origin only when configured. All Terms and policy pages remain conspicuously marked as drafts, and public policy drafts are not a substitute for a versioned, approval-enforced policy-management workflow.

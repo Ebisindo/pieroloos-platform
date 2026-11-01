@@ -4,6 +4,7 @@ import {
   Building2,
   ClipboardCheck,
   FileBarChart,
+  CreditCard,
   GitBranch,
   Globe2,
   LayoutDashboard,
@@ -18,6 +19,7 @@ import {
 export const workspaceNavigation = [
   { href: "/command-center", label: "Business Formation", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: BriefcaseBusiness },
+  { href: "/business-profile", label: "Business Profile", icon: Building2 },
   { href: "/ai/business-intent", label: "Business Intent & AI Review", icon: Lightbulb },
   { href: "/jurisdictions", label: "Jurisdiction Lens", icon: Scale },
   { href: "/expansion", label: "Market Expansion", icon: Globe2 },
@@ -26,6 +28,7 @@ export const workspaceNavigation = [
   { href: "/compliance", label: "Compliance", icon: ClipboardCheck },
   { href: "/reports", label: "Reports", icon: FileBarChart },
   { href: "/engagements", label: "Engagements", icon: Activity },
+  { href: "/billing", label: "navigation.billing", icon: CreditCard },
 ] as const;
 
 export const systemNavigation = [
@@ -37,7 +40,7 @@ export const adminNavigation = [
 ] as const;
 
 // Unauthenticated marketing routes; rendered without the workspace shell or boot splash.
-export const publicRoutes = ["/", "/partners"] as const;
+export const publicRoutes = ["/", "/partners", "/faq", "/terms", "/policies", "/policies/privacy", "/policies/cookies", "/policies/acceptable-use", "/policies/security", "/policies/data-retention", "/policies/data-processing", "/policies/subscription", "/policies/billing", "/policies/refunds-cancellations", "/policies/intellectual-property", "/policies/third-party-services", "/policies/partnerships", "/policies/complaints", "/policies/accessibility", "/policies/ai-and-automation", "/policies/jurisdictional-notice"] as const;
 
 export function isPublicRoute(pathname: string): boolean {
   return (publicRoutes as readonly string[]).includes(pathname);
@@ -56,7 +59,7 @@ export const portalNavigation = [
 
 export const productModules = [
   { key: "clients", label: "Client Intake", href: "/clients", status: "operational" },
-  { key: "business-profile", label: "Business Profile", href: "/clients", status: "foundation" },
+  { key: "business-profile", label: "Business Profile", href: "/business-profile", status: "operational" },
   { key: "jurisdiction", label: "Jurisdiction Lens", href: "/jurisdictions", status: "foundation" },
   { key: "expansion", label: "Market Expansion", href: "/expansion", status: "foundation" },
   { key: "cross-border", label: "Cross-border Preparation", href: "/cross-border", status: "foundation" },

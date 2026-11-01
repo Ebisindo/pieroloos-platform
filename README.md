@@ -16,6 +16,8 @@ PieroloOS is a professional decision-support and workflow-organization platform.
 | Sign-in providers and authorization | [docs/AUTH-SETUP.md](docs/AUTH-SETUP.md) |
 | Platform Super Admin, permissions, provisioning and limits | [docs/ADMINISTRATION.md](docs/ADMINISTRATION.md) |
 | Launch readiness checklist and pilot gate | [docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md](docs/SESSION-27-PRODUCTION-READINESS-PILOT-GATE.md) |
+| Public policy audit and publication blockers | [docs/POLICY-GOVERNANCE-AUDIT.md](docs/POLICY-GOVERNANCE-AUDIT.md) |
+| Payment gateway implementation contract and current status | [docs/PAYMENTS-IMPLEMENTATION-PLAN.md](docs/PAYMENTS-IMPLEMENTATION-PLAN.md), [docs/PAYMENTS-IMPLEMENTATION-STATUS.md](docs/PAYMENTS-IMPLEMENTATION-STATUS.md) |
 | Security incident response, backup/restore rehearsal, recovery evidence | [docs/SECURITY-INCIDENT-RECOVERY-RUNBOOK.md](docs/SECURITY-INCIDENT-RECOVERY-RUNBOOK.md) |
 | Structured logging, monitoring alerts, readiness and evidence gates | [docs/OBSERVABILITY-OPERATIONS.md](docs/OBSERVABILITY-OPERATIONS.md) |
 | Human approval and separate AI execution authorization | [docs/AI-EXECUTION-AUTHORITY.md](docs/AI-EXECUTION-AUTHORITY.md) |

@@ -14,7 +14,7 @@ export const engagementRepository = {
     assertPermission(principal, "engagement:read");
     return prisma.engagement.findFirst({
       where: { id, workspaceId: principal.workspaceId },
-      include: engagementInclude,
+      include: { ...engagementInclude, activities: { orderBy: { createdAt: "desc" as const }, take: 50 } },
     });
   },
 
@@ -24,6 +24,41 @@ export const engagementRepository = {
       where: { clientId, workspaceId: principal.workspaceId },
       orderBy: { updatedAt: "desc" },
       include: { activities: { orderBy: { createdAt: "desc" }, take: 10 } },
+    });
+  },
+
+  async listClientsForWorkspace(principal: WorkspacePrincipal) {
+    assertPermission(principal, "client:read");
+    return prisma.client.findMany({
+      where: { workspaceId: principal.workspaceId },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: { id: true, name: true, organizationName: true, proposedBusiness: true, email: true },
+    });
+  },
+
+  async listByWorkspace(principal: WorkspacePrincipal, filters?: { status?: EngagementStatus; query?: string }) {
+    assertPermission(principal, "engagement:read");
+    const query = filters?.query?.trim();
+    return prisma.engagement.findMany({
+      where: {
+        workspaceId: principal.workspaceId,
+        ...(filters?.status ? { status: filters.status } : {}),
+        ...(query ? {
+          OR: [
+            { service: { contains: query, mode: "insensitive" } },
+            { nextAction: { contains: query, mode: "insensitive" } },
+            { client: { name: { contains: query, mode: "insensitive" } } },
+            { client: { organizationName: { contains: query, mode: "insensitive" } } },
+          ],
+        } : {}),
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      include: {
+        client: { select: { id: true, name: true, organizationName: true, email: true } },
+        activities: { orderBy: { createdAt: "desc" }, take: 5 },
+      },
     });
   },
 
@@ -78,12 +113,6 @@ export const engagementRepository = {
       });
       if (update.count !== 1) throw new Error("ENGAGEMENT_CHANGED_CONCURRENTLY");
 
-      const updated = await tx.engagement.findFirst({
-        where: { id: current.id, workspaceId: principal.workspaceId },
-        include: engagementInclude,
-      });
-      if (!updated) throw new Error("ENGAGEMENT_NOT_FOUND");
-
       await tx.activity.create({
         data: {
           engagementId: id,
@@ -95,6 +124,11 @@ export const engagementRepository = {
         },
       });
 
+      const updated = await tx.engagement.findFirst({
+        where: { id: current.id, workspaceId: principal.workspaceId },
+        include: engagementInclude,
+      });
+      if (!updated) throw new Error("ENGAGEMENT_NOT_FOUND");
       return updated;
     });
   },
@@ -119,12 +153,6 @@ export const engagementRepository = {
       });
       if (update.count !== 1) throw new Error("ENGAGEMENT_CHANGED_CONCURRENTLY");
 
-      const updated = await tx.engagement.findFirst({
-        where: { id, workspaceId: principal.workspaceId },
-        include: engagementInclude,
-      });
-      if (!updated) throw new Error("ENGAGEMENT_NOT_FOUND");
-
       await tx.activity.create({
         data: {
           engagementId: id,
@@ -135,6 +163,12 @@ export const engagementRepository = {
           description: note,
         },
       });
+
+      const updated = await tx.engagement.findFirst({
+        where: { id, workspaceId: principal.workspaceId },
+        include: engagementInclude,
+      });
+      if (!updated) throw new Error("ENGAGEMENT_NOT_FOUND");
       return updated;
     });
   },
