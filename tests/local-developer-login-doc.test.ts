@@ -8,7 +8,7 @@ describe("local developer login documentation", () => {
     expect(content).toContain('LOCAL_AUTH_EMAIL="pierolocorpinternational@gmail.com"');
     expect(content).toContain('LOCAL_AUTH_PASSWORD="SET_THE_DEVELOPMENT_PASSWORD_LOCALLY"');
     expect(content).toContain("does not create an account");
-    expect(content).toContain("existing user with an organization membership");
+    expect(content).toContain("existing database user with an organization membership");
     expect(content).toContain("never a production fallback");
     expect(content).not.toMatch(/LOCAL_AUTH_PASSWORD="(?!SET_THE_DEVELOPMENT_PASSWORD_LOCALLY)[^"]+"/);
   });
