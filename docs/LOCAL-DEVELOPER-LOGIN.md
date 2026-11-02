@@ -4,43 +4,57 @@ This setup is for a local development process only. It does not create an accoun
 
 ## 1. Set local environment
 
-From the repository root, create or edit the ignored `.env.local` file. Do not commit it or paste its values into GitHub.
+Create or edit the ignored `.env.local` file from the repository root. Do not commit it or paste its values into GitHub.
+
+For a browser opened through the GitHub Codespaces forwarded port, set `NEXTAUTH_URL` to the exact HTTPS forwarded address shown for port 3000 (the Ports panel → Open in Browser). Do not use the Codespace's internal hostname. Use `http://localhost:3000` only when the browser itself is accessing the application through localhost.
 
 ```dotenv
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_URL="https://YOUR-EXACT-CODESPACE-PORT-3000-FORWARDED-ADDRESS"
 NEXTAUTH_SECRET="REPLACE_WITH_A_NEW_RANDOM_SECRET"
 LOCAL_AUTH_ENABLED="true"
 LOCAL_AUTH_EMAIL="pierolocorpinternational@gmail.com"
 LOCAL_AUTH_PASSWORD="SET_THE_DEVELOPMENT_PASSWORD_LOCALLY"
 ```
 
-Generate a strong NextAuth secret:
+Generate a fresh NextAuth secret:
 
 ```bash
 openssl rand -base64 32
 ```
 
-Enter the development password directly into your local `.env.local` editor or terminal prompt. Never place it in source code, shell history, screenshots, commit messages, GitHub issues, or CI logs. Do not reuse a production account password.
+Enter a new, unique development password directly into `.env.local`. Do not reuse a password exposed in a screenshot, chat, issue, terminal recording, or commit. Never place credentials in source code, shell history, screenshots, GitHub issues, or CI logs.
 
-## 2. Start/restart Next.js
+## 2. Verify the local environment safely
+
+```bash
+grep -q '^LOCAL_AUTH_ENABLED="true"$' .env.local && echo "Local auth enabled"
+grep -q '^LOCAL_AUTH_EMAIL="pierolocorpinternational@gmail.com"$' .env.local && echo "Developer email configured"
+grep -q '^LOCAL_AUTH_PASSWORD=".' .env.local && echo "Local password configured (value hidden)"
+grep -q '^NEXTAUTH_SECRET=".' .env.local && echo "NextAuth secret configured (value hidden)"
+```
+
+Do not use `cat .env.local`, `printenv`, `env`, or shell tracing to display the secret values.
+
+## 3. Restart Next.js
+
+Stop the existing server with Ctrl+C, then run:
 
 ```bash
 npm run dev
 ```
 
-Changing environment variables requires restarting the development server. Open the local port 3000 preview and use the exact email/password values from `.env.local`.
+Open the forwarded HTTPS port 3000 address and sign in using the values stored in `.env.local`. If the server reports an authentication configuration problem, inspect the server error without printing environment values.
 
-## 3. Confirm the user is provisioned
+## 4. Confirm staff provisioning
 
-The credentials provider intentionally authenticates only an existing user with an organization membership. It does not create users or grant privileges. If sign-in is rejected, an authorized administrator must provision the staff identity and membership through the platform's controlled onboarding process; do not bypass the guard.
+The credentials provider authenticates only an existing database user with an organization membership. It does not create users or grant privileges. If access is denied, check the exact email and the existing staff membership using the controlled administrative procedure. Do not weaken or bypass the membership check.
 
-Super Administrator is a separate database assignment. A successful local login does not imply Super Administrator status. Use the reviewed, audited provisioning procedure only after verifying the intended identity and existing membership.
+Super Administrator is a separate database assignment. A successful local sign-in does not imply Super Administrator status.
 
-## 4. Scope and security
+## 5. Scope and security
 
-- The credentials provider is registered only when `NODE_ENV=development` and `LOCAL_AUTH_ENABLED=true`.
+- Local credentials are registered only when `NODE_ENV=development` and `LOCAL_AUTH_ENABLED=true`.
 - Production must use a supported organization identity provider; local credentials are never a production fallback.
-- Keep `.env.local` out of Git. The repository ignores `.env.local` and `.env`.
-- If the password was exposed in a screenshot, issue, chat, commit, terminal recording, or other shared location, rotate it immediately.
-- Use a separate, unique local password. Do not use it for email, GitHub, hosting, or production services.
-- This mechanism is intended for the development server bound to the local Codespace forwarded port. Do not publish these local credentials as a shared team login.
+- `.env.local` and `.env` are ignored by Git. Confirm this before entering secrets: `git check-ignore -v .env.local`.
+- Use a fresh unique password and fresh NextAuth secret; rotate any values exposed previously.
+- Do not share local credentials with other developers. Each developer should have an individually provisioned account.
