@@ -48,3 +48,10 @@ Build PieroloOS as a dependable corporate intelligence and formation platform fo
 
 ## Definition of done
 A change is complete only when it fixes the root problem, follows repository conventions, protects data and permissions, covers relevant edge cases, includes appropriate tests or an explicit testing limitation, passes available checks, and leaves a reviewable diff. Prefer durable, observable correctness over superficial completeness.
+
+## Environment-file security boundary
+- Never open, read, print, search, hash, parse, copy, upload, or otherwise inspect any real `.env` or `.env.*` file, even if ignored or untracked.
+- Restrict file inspection to named source/configuration files and safe templates; avoid broad searches or commands that could include environment-file contents.
+- `.env.example` and `.env.*.example` are templates only and must never contain real credentials.
+- If a task seems to require an environment-file value, request a sanitized value or verify behavior without exposing it.
+- Enforce actual isolation by running AI tools in a sandbox with no mount or read permission for real environment files; repository instructions alone cannot enforce filesystem access.
