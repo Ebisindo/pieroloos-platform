@@ -1,8 +1,9 @@
 node_modules
 .next
 out
-.env
-.env.local
+.env*
+!.env.example
+!.env.*.example
 coverage
 playwright-report
 test-results
