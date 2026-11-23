@@ -141,3 +141,14 @@ Identify the owning process before stopping anything. Never terminate unknown pr
 - [ ] Port visibility remains Private unless public access has been explicitly approved.
 
 This procedure supports development preview only. It does not publish a production site or establish production readiness.
+
+
+## Run AI coding agents with filesystem isolation
+
+The port-forwarding development workflow above does not isolate AI agents from local files. For repository-agent sessions, start the Docker sandbox from the repository root:
+
+```bash
+scripts/agent-sandbox/run.sh
+```
+
+See [Agent Sandbox](AGENT-SANDBOX.md) for prerequisites, network modes, export workflow, controls, and limitations. Do not mount or copy real environment files into the container, and do not treat a private Codespaces port as an agent filesystem boundary.

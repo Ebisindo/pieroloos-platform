@@ -55,3 +55,7 @@ A change is complete only when it fixes the root problem, follows repository con
 - `.env.example` and `.env.*.example` are templates only and must never contain real credentials.
 - If a task seems to require an environment-file value, request a sanitized value or verify behavior without exposing it.
 - Enforce actual isolation by running AI tools in a sandbox with no mount or read permission for real environment files; repository instructions alone cannot enforce filesystem access.
+
+
+## Agent isolation for repository work
+Use `scripts/agent-sandbox/run.sh` to launch agents against a committed source snapshot. Read [docs/AGENT-SANDBOX.md](../docs/AGENT-SANDBOX.md) first. Do not run repository agents directly on hosts or Codespaces that contain real environment files unless an equivalent OS-level boundary has been configured. Never provide host credentials or secret values to the container.

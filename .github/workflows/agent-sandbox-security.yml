@@ -1,0 +1,64 @@
+name: Agent Sandbox Security
+
+on:
+  pull_request:
+    paths:
+      - "scripts/agent-sandbox/**"
+      - "scripts/check-env-file-boundary.mjs"
+      - "docs/AGENT-SANDBOX.md"
+      - ".github/workflows/agent-sandbox-security.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/agent-sandbox/**"
+      - "scripts/check-env-file-boundary.mjs"
+      - "docs/AGENT-SANDBOX.md"
+      - ".github/workflows/agent-sandbox-security.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox-boundary:
+    name: Build and verify agent environment isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AGENT_SANDBOX_TEST_SECRET: runner-only-sentinel-not-a-credential
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Verify tracked environment-file boundary
+        run: node scripts/check-env-file-boundary.mjs
+
+      - name: Create ignored dummy environment path in an isolated checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/sandbox-test"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/sandbox-test"
+          touch "$RUNNER_TEMP/sandbox-test/.env.local"
+
+      - name: Build container image
+        run: docker build --pull --tag pieroloos-agent-sandbox:ci --file scripts/agent-sandbox/Dockerfile scripts/agent-sandbox
+
+      - name: Verify host sentinel and environment file are absent from container
+        run: |
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+            --network none \
+            --env AGENT_SANDBOX_TEST_SECRET=runner-only-sentinel-not-a-credential \
+            --tmpfs /tmp:rw,nosuid,nodev,size=16m \
+            pieroloos-agent-sandbox:ci bash -lc '
+              test -z "${AGENT_SANDBOX_TEST_SECRET:-}"
+              test ! -e /workspace/.env.local
+              test ! -e /var/run/docker.sock
+              test ! -e /root/.ssh
+              echo "agent-sandbox-boundary-self-test=passed"
+            '

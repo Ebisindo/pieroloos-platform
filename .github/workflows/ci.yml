@@ -64,6 +64,9 @@ jobs:
       - name: Test PostgreSQL data integrity
         run: npm run test:db
 
+      - name: Verify dependency runtime compatibility
+        run: npm run security:dependency-compat
+
       - name: Lint
         run: npm run lint
 

@@ -15,3 +15,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `.env.example` and `.env.*.example` are templates only. Never place real credentials in them.
 - If a task seems to require a value from an environment file, stop that part and ask for a sanitized value or verify behavior without exposing the value.
 - Do not claim repository guidance technically prevents a model or process from accessing a file. Run AI tools in a sandbox that does not mount or grant read access to real environment files for enforceable isolation.
+
+
+## Enforceable agent isolation
+- For repository-agent execution, use `scripts/agent-sandbox/run.sh` from a clean Git worktree. It creates the workspace from committed Git objects only and does not mount host environment files, home directories, SSH credentials, Git credentials, or the Docker socket.
+- Read `docs/AGENT-SANDBOX.md` before running agents. Repository instructions are not an access-control boundary; agents launched directly on the host or in unrestricted Codespaces do not receive this isolation.
+- Do not mount real `.env*` files or pass secret values to the container. Use the offline network mode when external network access is not required.
