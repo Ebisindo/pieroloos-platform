@@ -1,0 +1,80 @@
+name: Refresh PR dependency lockfile
+
+on:
+  push:
+    branches:
+      - security/agent-env-file-boundary
+    paths:
+      - package.json
+      - .github/workflows/dependency-lockfile-refresh.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: dependency-lock-refresh-pr114
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/security/agent-env-file-boundary'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: security/agent-env-file-boundary
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Regenerate npm lockfile from manifest
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund --engine-strict=false
+
+      - name: Verify clean reproducible installation
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Commit regenerated lockfile
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json is already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(deps): regenerate npm lockfile for security updates"
+          git push origin HEAD:security/agent-env-file-boundary
+
+      - name: Dispatch CI and Security checks for the updated PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          node --input-type=module <<'NODE'
+          const [owner, repo] = process.env.GH_REPOSITORY.split('/');
+          for (const workflow_id of ['ci.yml', 'security.yml']) {
+            const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow_id}/dispatches`, {
+              method: 'POST',
+              headers: {
+                accept: 'application/vnd.github+json',
+                authorization: `Bearer ${process.env.GH_TOKEN}`,
+                'x-github-api-version': '2022-11-28',
+                'content-type': 'application/json'
+              },
+              body: JSON.stringify({ref: 'security/agent-env-file-boundary'})
+            });
+            if (!response.ok) {
+              const body = await response.text();
+              throw new Error(`Could not dispatch ${workflow_id}: ${response.status} ${body}`);
+            }
+            console.log(`Dispatched ${workflow_id} against security/agent-env-file-boundary`);
+          }
+          NODE
