@@ -40,17 +40,25 @@ jobs:
       - name: Verify tracked environment-file boundary
         run: node scripts/check-env-file-boundary.mjs
 
-      - name: Create ignored dummy environment path
-        run: touch .env.local
-
-      - name: Run isolated container boundary self-test
+      - name: Create ignored dummy environment path in an isolated checkout
         run: |
-          trap 'rm -f .env.local' EXIT
-          scripts/agent-sandbox/run.sh bash -lc '
-            test ! -e /workspace/.env.local
-            test -z "${AGENT_SANDBOX_TEST_SECRET:-}"
-            test ! -e /var/run/docker.sock
-            test ! -e /root/.ssh
-            test -w /workspace
-            echo "agent-sandbox-boundary-self-test=passed"
-          '
+          mkdir -p "$RUNNER_TEMP/sandbox-test"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/sandbox-test"
+          touch "$RUNNER_TEMP/sandbox-test/.env.local"
+
+      - name: Build container image
+        run: docker build --pull --tag pieroloos-agent-sandbox:ci --file scripts/agent-sandbox/Dockerfile scripts/agent-sandbox
+
+      - name: Verify host sentinel and environment file are absent from container
+        run: |
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+            --network none \
+            --env AGENT_SANDBOX_TEST_SECRET=runner-only-sentinel-not-a-credential \
+            --tmpfs /tmp:rw,nosuid,nodev,size=16m \
+            pieroloos-agent-sandbox:ci bash -lc '
+              test -z "${AGENT_SANDBOX_TEST_SECRET:-}"
+              test ! -e /workspace/.env.local
+              test ! -e /var/run/docker.sock
+              test ! -e /root/.ssh
+              echo "agent-sandbox-boundary-self-test=passed"
+            '
