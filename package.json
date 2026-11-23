@@ -20,7 +20,8 @@
     "admin:provision-superadmin": "node scripts/provision-superadmin.mjs",
     "admin:transfer-superadmin": "node scripts/transfer-superadmin.mjs",
     "admin:link-firebase-uid": "node scripts/link-firebase-uid.mjs",
-    "security:audit": "npm audit --omit=dev --audit-level=high"
+    "security:audit": "npm audit --omit=dev --audit-level=high",
+    "security:dependency-compat": "node scripts/check-dependency-runtime-compatibility.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
