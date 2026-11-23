@@ -14,7 +14,7 @@ This is an enforceable boundary for agents launched **through this wrapper**. It
 
 ## Start a session
 
-From the repository root:
+From the repository root, offline networking is the default:
 
 ```bash
 scripts/agent-sandbox/run.sh
@@ -26,13 +26,15 @@ Run a specific agent command instead:
 scripts/agent-sandbox/run.sh <agent-command> <arguments>
 ```
 
-Default networking uses Docker's bridge network so public registries/model endpoints are reachable. For offline work:
+The default is `--network none`. For a reviewed task that explicitly requires general outbound network access, opt in:
 
 ```bash
-PIEROLO_AGENT_SANDBOX_NETWORK=none scripts/agent-sandbox/run.sh
+PIEROLO_AGENT_SANDBOX_NETWORK=bridge scripts/agent-sandbox/run.sh
 ```
 
-Only `bridge` and `none` are accepted. Do not forward host secrets into the container. Use an approved short-lived credential broker where necessary; this change does not configure a broker.
+**Bridge mode permits general outbound access and is not an egress allowlist.** Use it only for a reviewed workload; use `none` for untrusted/offline tasks. A separately approved egress proxy policy is preferable for connected untrusted workloads.
+
+Do not forward host secrets into the container. Use an approved short-lived credential broker where necessary; this change does not configure a broker.
 
 ## Controls
 
@@ -46,12 +48,16 @@ At exit, source changes are exported as a patch under:
 ${XDG_STATE_HOME:-$HOME/.local/state}/pieroloos-agent-sandbox/
 ```
 
-Review the patch and exact path before applying it to the host. The wrapper never applies a patch automatically and blocks export if the sandbox index contains a real environment-file path.
+Review the patch and exact path before applying it. Run the printed `git apply --check` command and inspect the patch before applying; the wrapper never applies patches automatically and blocks export if the sandbox index contains a real environment-file path.
+
+## Image reproducibility
+
+The Docker base image is pinned by immutable digest. The Git and CA certificate Debian package versions are declared as build arguments and installed by exact version. Update these values only with a reviewed image/package refresh, then run the complete sandbox and security CI.
 
 ## Limits
 
 - Only processes launched through this wrapper receive this protection.
 - Git archive includes committed files only; commit or stash changes first. Submodule contents are not copied by default.
-- Bridge mode allows outbound network access; it is not an egress allowlist. Use `none` for offline tasks.
+- Bridge mode allows general outbound network access; it is not an egress allowlist. The default `none` mode has no network.
 - Docker daemon and host-kernel vulnerabilities remain outside this boundary.
 - This does not replace secret rotation, least-privilege cloud IAM, CI secret management, or separate staging/production identities.
