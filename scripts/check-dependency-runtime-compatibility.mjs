@@ -31,9 +31,14 @@ for (const name of ["firebase", "firebase-admin", "eslint", "vite"]) {
   assert.ok(lock.packages?.[`node_modules/${name}`]?.version, `${name} must exist in the lockfile`);
 }
 for (const [name, range] of Object.entries(manifest.overrides ?? {})) {
-  const locked = lock.packages?.[`node_modules/${name}`]?.version;
-  assert.ok(locked, `Override target ${name} must exist at the root of the lockfile`);
-  if (/^\d+\.\d+\.\d+$/.test(range)) assert.equal(locked, range, `Override ${name} does not match lockfile`);
+  const matching = Object.entries(lock.packages ?? {})
+    .filter(([path]) => path === `node_modules/${name}` || path.endsWith(`/node_modules/${name}`))
+    .map(([, entry]) => entry.version)
+    .filter(Boolean);
+  assert.ok(matching.length > 0, `Override target ${name} must exist somewhere in the lockfile`);
+  if (/^\d+\.\d+\.\d+$/.test(range)) {
+    for (const locked of matching) assert.equal(locked, range, `Override ${name} has a non-overridden nested version`);
+  }
 }
 
 assert.equal(typeof PrismaClient, "function");
