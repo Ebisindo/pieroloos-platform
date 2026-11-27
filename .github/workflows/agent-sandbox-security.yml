@@ -40,6 +40,17 @@ jobs:
       - name: Verify tracked environment-file boundary
         run: node scripts/check-env-file-boundary.mjs
 
+      - name: Verify sandbox launcher defaults to network-none and requires explicit bridge opt-in
+        run: |
+          grep -F 'NETWORK="${PIEROLO_AGENT_SANDBOX_NETWORK:-none}"' scripts/agent-sandbox/run.sh
+          grep -F 'bridge)' scripts/agent-sandbox/run.sh
+          grep -F 'WARNING: bridge networking permits general outbound access' scripts/agent-sandbox/run.sh
+          grep -F 'Apply after review: git apply --check' scripts/agent-sandbox/run.sh
+          if grep -F 'NETWORK="${PIEROLO_AGENT_SANDBOX_NETWORK:-bridge}"' scripts/agent-sandbox/run.sh; then
+            echo "Unsafe bridge default detected." >&2
+            exit 1
+          fi
+
       - name: Create ignored dummy environment path in an isolated checkout
         run: |
           mkdir -p "$RUNNER_TEMP/sandbox-test"

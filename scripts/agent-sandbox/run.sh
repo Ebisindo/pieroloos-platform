@@ -7,9 +7,16 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 }
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE="${PIEROLO_AGENT_SANDBOX_IMAGE:-pieroloos-agent-sandbox:node22}"
-NETWORK="${PIEROLO_AGENT_SANDBOX_NETWORK:-bridge}"
+NETWORK="${PIEROLO_AGENT_SANDBOX_NETWORK:-none}"
 
-case "$NETWORK" in bridge|none) ;; *) echo "Network must be bridge or none." >&2; exit 2 ;; esac
+case "$NETWORK" in
+  none) ;;
+  bridge)
+    echo "WARNING: bridge networking permits general outbound access; it is not an egress allowlist." >&2
+    echo "Use bridge mode only for a reviewed task and approved workload." >&2
+    ;;
+  *) echo "Network must be none (default) or bridge (explicit opt-in)." >&2; exit 2 ;;
+esac
 command -v docker >/dev/null 2>&1 || { echo "Docker is required." >&2; exit 2; }
 docker info >/dev/null 2>&1 || { echo "Docker daemon unavailable." >&2; exit 2; }
 
@@ -63,7 +70,7 @@ if [[ -t 0 && -t 1 ]]; then ARGS+=(--interactive --tty); fi
 if [[ $# -eq 0 ]]; then set -- bash -l; fi
 
 echo "Only the committed Git tree is mounted. Host env files, HOME, SSH, Git credentials and Docker socket are not mounted."
-echo "Network mode: $NETWORK (set PIEROLO_AGENT_SANDBOX_NETWORK=none for offline mode)."
+echo "Network mode: $NETWORK."
 docker "${ARGS[@]}" "$IMAGE" "$@"
 
 # Never export a diff if its index contains a real env-file path.
